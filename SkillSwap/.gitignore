@@ -1,0 +1,24 @@
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*service-account*.json
+
+# Backend
+backend/target/
+backend/logs/
+backend/.mvn/wrapper/
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/*.tsbuildinfo
+
+# Tool caches
+.mvn/
+.npm/
+*.log
+.DS_Store

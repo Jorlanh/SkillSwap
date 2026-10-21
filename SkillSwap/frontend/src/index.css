@@ -1,0 +1,212 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 98%;
+    --foreground: 220 15% 15%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 220 15% 15%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 15% 15%;
+
+    --primary: 174 62% 40%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 210 30% 90%;
+    --secondary-foreground: 220 15% 15%;
+
+    --muted: 220 14% 96%;
+    --muted-foreground: 220 8% 46%;
+
+    --accent: 207 60% 82%;
+    --accent-foreground: 220 15% 15%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 220 13% 91%;
+    --input: 220 13% 91%;
+    --ring: 174 62% 40%;
+
+    --radius: 0.75rem;
+
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 220 8% 46%;
+    --sidebar-primary: 174 62% 40%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 207 60% 92%;
+    --sidebar-accent-foreground: 220 15% 15%;
+    --sidebar-border: 220 13% 91%;
+    --sidebar-ring: 174 62% 40%;
+
+    --skillswap-teal: 174 62% 40%;
+    --skillswap-light-blue: 207 60% 82%;
+    --skillswap-card-bg: 210 25% 95%;
+    --skillswap-gold: 45 93% 58%;
+    --skillswap-accept: 142 50% 45%;
+    --skillswap-reject: 0 55% 55%;
+
+    font-family: 'Inter', sans-serif;
+  }
+
+  .dark {
+    --background: 222 20% 8%;
+    --foreground: 210 20% 92%;
+
+    --card: 222 20% 12%;
+    --card-foreground: 210 20% 92%;
+
+    --popover: 222 20% 12%;
+    --popover-foreground: 210 20% 92%;
+
+    --primary: 174 62% 45%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 222 15% 18%;
+    --secondary-foreground: 210 20% 92%;
+
+    --muted: 222 15% 18%;
+    --muted-foreground: 215 15% 60%;
+
+    --accent: 207 40% 25%;
+    --accent-foreground: 210 20% 92%;
+
+    --destructive: 0 62% 35%;
+    --destructive-foreground: 210 20% 92%;
+
+    --border: 222 15% 20%;
+    --input: 222 15% 20%;
+    --ring: 174 62% 45%;
+
+    --sidebar-background: 222 20% 10%;
+    --sidebar-foreground: 215 15% 60%;
+    --sidebar-primary: 174 62% 45%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 222 15% 18%;
+    --sidebar-accent-foreground: 210 20% 92%;
+    --sidebar-border: 222 15% 20%;
+    --sidebar-ring: 174 62% 45%;
+
+    --skillswap-teal: 174 62% 45%;
+    --skillswap-light-blue: 207 40% 25%;
+    --skillswap-card-bg: 222 15% 15%;
+    --skillswap-gold: 45 93% 58%;
+    --skillswap-accept: 142 50% 45%;
+    --skillswap-reject: 0 55% 55%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+
+  h1, h2, h3, h4 {
+    font-family: 'Plus Jakarta Sans', sans-serif;
+  }
+}
+
+@layer utilities {
+  .safe-area-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+}
+
+/* Alto contraste: áreas de fundo ficam escuras, textos claros recebem destaque
+   vermelho e os elementos interativos ganham bordas e foco visíveis. */
+.high-contrast {
+  --background: 0 0% 4%;
+  --foreground: 0 100% 86%;
+  --card: 0 0% 9%;
+  --card-foreground: 0 100% 92%;
+  --popover: 0 0% 8%;
+  --popover-foreground: 0 100% 92%;
+  --primary: 0 100% 68%;
+  --primary-foreground: 0 0% 4%;
+  --secondary: 0 0% 18%;
+  --secondary-foreground: 0 100% 92%;
+  --muted: 0 0% 15%;
+  --muted-foreground: 0 100% 86%;
+  --accent: 0 100% 20%;
+  --accent-foreground: 0 100% 96%;
+  --border: 0 0% 94%;
+  --input: 0 0% 94%;
+  --ring: 0 100% 80%;
+  --sidebar-background: 0 0% 3%;
+  --sidebar-foreground: 0 100% 86%;
+  --sidebar-primary: 0 100% 68%;
+  --sidebar-primary-foreground: 0 0% 4%;
+  --sidebar-accent: 0 100% 20%;
+  --sidebar-accent-foreground: 0 100% 96%;
+  --sidebar-border: 0 0% 94%;
+  --sidebar-ring: 0 100% 80%;
+  --skillswap-teal: 0 100% 68%;
+  --skillswap-light-blue: 0 100% 25%;
+  --skillswap-card-bg: 0 0% 10%;
+  --skillswap-gold: 45 100% 75%;
+  --skillswap-accept: 120 100% 70%;
+  --skillswap-reject: 0 100% 75%;
+}
+
+.high-contrast button,
+.high-contrast a,
+.high-contrast [role="button"],
+.high-contrast input,
+.high-contrast textarea,
+.high-contrast select {
+  border-width: 2px;
+}
+
+.high-contrast button:focus-visible,
+.high-contrast a:focus-visible,
+.high-contrast input:focus-visible,
+.high-contrast textarea:focus-visible,
+.high-contrast select:focus-visible,
+.high-contrast [tabindex]:focus-visible {
+  outline: 3px solid #ffffff;
+  outline-offset: 3px;
+  box-shadow: 0 0 0 6px #ff5c5c;
+}
+
+.visual-marker {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  vertical-align: middle;
+}
+
+.visual-marker-shape {
+  display: inline-block;
+  flex: 0 0 auto;
+  border: 2px solid #111827;
+}
+
+.visual-marker-shape-triangle {
+  background: #1683d8;
+  clip-path: polygon(50% 0%, 100% 100%, 0% 100%);
+  border-radius: 2px;
+}
+
+.visual-marker-shape-square {
+  background: #f27b22;
+  border-radius: 3px;
+}
+
+.visual-marker-shape-circle {
+  background: #ffffff;
+  border-radius: 9999px;
+}
+
+.high-contrast .visual-marker-shape {
+  border-color: #ffffff;
+}

@@ -1,0 +1,16 @@
+{
+  "name": "SkillSwap",
+  "short_name": "SkillSwap",
+  "description": "Plataforma de troca de habilidades",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#2a9d8f",
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "64x64",
+      "type": "image/x-icon"
+    }
+  ]
+}

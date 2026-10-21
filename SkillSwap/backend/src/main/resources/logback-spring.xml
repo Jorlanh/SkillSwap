@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+
+    <property name="LOGS" value="./logs" />
+
+    <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
+
+    <appender name="Console" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <Pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</Pattern>
+        </encoder>
+    </appender>
+
+    <appender name="RollingFile" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${LOGS}/skill-swap.log</file>
+        <encoder>
+            <Pattern>%d %p %c{1} [%t] %m%n</Pattern>
+        </encoder>
+        <!-- Correção: Usar SizeAndTimeBasedRollingPolicy diretamente -->
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <fileNamePattern>${LOGS}/archived/skill-swap-%d{yyyy-MM-dd}.%i.log</fileNamePattern>
+            <!-- Definir maxFileSize diretamente dentro desta policy -->
+            <maxFileSize>10MB</maxFileSize>
+            <!-- Opcional: Limitar o tamanho total dos arquivos arquivados -->
+            <!-- <totalSizeCap>1GB</totalSizeCap> -->
+            <!-- Opcional: Manter arquivos por X dias -->
+            <maxHistory>30</maxHistory>
+        </rollingPolicy>
+    </appender>
+
+    <appender name="SecurityAuditFile" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${LOGS}/security-audit.log</file>
+        <encoder class="net.logstash.logback.encoder.LogstashEncoder" />
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>${LOGS}/archived/security-audit-%d{yyyy-MM-dd}.log</fileNamePattern>
+            <maxHistory>30</maxHistory>
+        </rollingPolicy>
+    </appender>
+
+    <logger name="security-audit" level="INFO" additivity="false">
+        <appender-ref ref="SecurityAuditFile" />
+    </logger>
+
+    <root level="INFO">
+        <appender-ref ref="RollingFile" />
+        <appender-ref ref="Console" />
+    </root>
+
+</configuration>

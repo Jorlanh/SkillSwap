@@ -1,0 +1,59 @@
+[
+{
+  "username": "novo_usuario",
+  "password": "senha123"
+},
+
+{
+  "name": "Java",
+  "description": "Linguagem de programação orientada a objetos",
+  "category": "Programação",
+  "level": "Avançado"
+},
+
+{
+  "name": "Spring Boot",
+  "description": "Framework para construção de APIs REST",
+  "category": "Framework",
+  "level": "Intermediário"
+},
+
+{
+  "name": "JavaScript",
+  "description": "Linguagem de programação para desenvolvimento web",
+  "category": "Programação",
+  "level": "Intermediário"
+},
+
+{
+  "name": "React",
+  "description": "Biblioteca JavaScript para construção de interfaces de usuário",
+  "category": "Framework",
+  "level": "Intermediário"
+},
+
+{
+  "name": "Python",
+  "description": "Linguagem de programação versátil e fácil de aprender",
+  "category": "Programação",
+  "level": "Básico"
+},
+
+{
+  "username": "novo_usuario",
+  "password": "senha123",
+  "skills": [
+    {
+      "skillId": 1
+    },
+    {
+      "skillId": 2
+    },
+    {
+      "skillId": 3
+    }
+  ]
+}
+
+
+]
