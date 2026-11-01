@@ -1,6 +1,6 @@
 import { NavLink } from '@/components/NavLink';
 import {
-  User, MessageSquare, FileText, Settings, Sun, BookOpen, DollarSign, Home, Users, Menu, X, Trophy, BriefcaseBusiness, Building2
+  User, MessageSquare, FileText, Settings, Sun, BookOpen, Home, Users, Menu, X, Trophy, BriefcaseBusiness
 } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
@@ -19,9 +19,7 @@ const sidebarLinks = [
   { to: '/configuracoes', label: 'Configurações', icon: Settings, public: false },
   { to: '/preferencias', label: 'Preferências', icon: Sun, public: false },
   { to: '/cursos', label: 'Meus cursos', icon: BookOpen, public: false },
-  { to: '/financeiro', label: 'Financeiro', icon: DollarSign, public: false },
   { to: '/acesso', label: 'Minha jornada', icon: BriefcaseBusiness, public: false },
-  { to: '/institucional', label: 'Workspace institucional', icon: Building2, public: false },
 ];
 
 const AppSidebar = ({ isAuthenticated }: AppSidebarProps) => {

@@ -28,7 +28,7 @@ export default defineConfig(({ mode }) => ({
       workbox: {
         navigateFallbackDenylist: [/^\/~oauth/, /^\/api/], // Evita que o PWA intercepte chamadas de API do Java
         globPatterns: ["**/*.{js,css,html,ico,png,svg,jpg,jpeg,woff2}"],
-        maximumFileSizeToCacheInBytes: 10000000, // O selo visual do produto tem cerca de 7 MB
+        maximumFileSizeToCacheInBytes: 3000000, // Aumenta limite de cache para 3MB
       },
       manifest: {
         name: "SkillSwap HUB",

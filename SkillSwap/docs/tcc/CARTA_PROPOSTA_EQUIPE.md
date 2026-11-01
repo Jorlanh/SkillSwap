@@ -6,7 +6,7 @@
 
 Propomos consolidar o SkillSwap Access como uma plataforma exclusivamente de software que integra aprendizagem acessível, troca de habilidades, evidência prática, recomendação explicável e conexão com oportunidades profissionais. O sistema atenderá usuários comuns e terá foco prioritário em pessoas com deficiência, sem criar uma experiência separada.
 
-O produto poderá ser utilizado por universidades, empresas e instituições de inclusão. A arquitetura será React/TypeScript no frontend, Spring Boot em monólito modular no backend, PostgreSQL/Flyway para persistência e Firebase Authentication para identidade. FCM, mapas, vídeo, Stripe, Redis, RabbitMQ e Prometheus serão condicionais e usados somente quando houver configuração, custo e evidência de funcionamento.
+O produto poderá ser utilizado por universidades, empresas e instituições de inclusão. A arquitetura será React/TypeScript no frontend, Spring Boot em monólito modular no backend, PostgreSQL/Flyway para persistência e Firebase Authentication para identidade. FCM, mapas, vídeo, Redis, RabbitMQ e Prometheus serão condicionais e usados somente quando houver configuração, custo e evidência de funcionamento.
 
 O diferencial proposto é integrar os quatro momentos da jornada — aprender, praticar, explicar a compatibilidade e alcançar uma oportunidade — preservando autonomia, privacidade e acessibilidade. Não afirmaremos superioridade ou impacto antes de aplicar o protocolo de validação.
 

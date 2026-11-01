@@ -10,8 +10,6 @@ import br.com.teamss.skillswap.skill_swap.model.services.ContentModerationServic
 import br.com.teamss.skillswap.skill_swap.model.services.FileUploadService;
 import br.com.teamss.skillswap.skill_swap.model.services.NotificationService;
 import br.com.teamss.skillswap.skill_swap.model.services.PostService;
-import br.com.teamss.skillswap.skill_swap.model.services.ModerationAssessment;
-import br.com.teamss.skillswap.skill_swap.model.services.ReportService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -34,14 +32,13 @@ public class PostServiceImpl implements PostService {
     private final CommentRepository commentRepository;
     private final FileUploadService fileUploadService;
     private final ContentModerationService moderationService;
-    private final ReportService reportService;
 
     // Injeção via construtor (Recomendado)
     public PostServiceImpl(PostRepository postRepository, UserRepository userRepository,
                            NotificationService notificationService, LikeRepository likeRepository,
                            RepostRepository repostRepository, ShareLinkRepository shareLinkRepository,
                            CommentRepository commentRepository, FileUploadService fileUploadService,
-                           ContentModerationService moderationService, ReportService reportService) {
+                           ContentModerationService moderationService) {
         this.postRepository = postRepository;
         this.userRepository = userRepository;
         this.notificationService = notificationService;
@@ -51,24 +48,20 @@ public class PostServiceImpl implements PostService {
         this.commentRepository = commentRepository;
         this.fileUploadService = fileUploadService;
         this.moderationService = moderationService;
-        this.reportService = reportService;
     }
 
     @Override
     @Transactional
     public Post createPost(UUID userId, String title, String content, MultipartFile image, MultipartFile video) {
-        User user = userRepository.findById(userId).orElseThrow(() -> new RuntimeException("Usuário não encontrado!"));
-        ModerationAssessment titleAssessment = moderationService.assess(title);
-        ModerationAssessment contentAssessment = moderationService.assess(content);
-        if (titleAssessment.blocked() || contentAssessment.blocked()) {
-            ModerationAssessment assessment = contentAssessment.blocked() ? contentAssessment : titleAssessment;
-            reportService.createAutomatedCase(user, content, "post", assessment);
+        if (moderationService.isContentInappropriate(title) || moderationService.isContentInappropriate(content)) {
             throw new InappropriateContentException("O seu post viola as diretrizes da comunidade.");
         }
+        
+        User user = userRepository.findById(userId).orElseThrow(() -> new RuntimeException("Usuário não encontrado!"));
         int maxPost = 1000 + (user.getProfile() == null ? 0 : user.getProfile().getExtraPostChars());
         if (content == null || content.isBlank()) throw new IllegalArgumentException("O post precisa ter conteudo.");
         if (content.length() > maxPost) {
-            throw new IllegalArgumentException("O post ultrapassa o limite técnico gratuito de " + maxPost + " caracteres.");
+            throw new IllegalArgumentException("O post ultrapassa o limite de " + maxPost + " caracteres. Compre um aumento de limite em Premium.");
         }
         Post post = new Post();
         post.setUser(user);
@@ -108,13 +101,11 @@ public class PostServiceImpl implements PostService {
     @Override
     @Transactional
     public Post commentOnPost(Long postId, UUID userId, String content) {
-        Post post = postRepository.findById(postId).orElseThrow(() -> new RuntimeException("Post não encontrado!"));
-        User user = userRepository.findById(userId).orElseThrow(() -> new RuntimeException("Usuário não encontrado!"));
-        ModerationAssessment assessment = moderationService.assess(content);
-        if (assessment.blocked()) {
-            reportService.createAutomatedCase(user, content, "comentário", assessment);
+        if (moderationService.isContentInappropriate(content)) {
             throw new InappropriateContentException("Comentário inadequado.");
         }
+        Post post = postRepository.findById(postId).orElseThrow(() -> new RuntimeException("Post não encontrado!"));
+        User user = userRepository.findById(userId).orElseThrow(() -> new RuntimeException("Usuário não encontrado!"));
         
         Comment newComment = new Comment();
         newComment.setPost(post);

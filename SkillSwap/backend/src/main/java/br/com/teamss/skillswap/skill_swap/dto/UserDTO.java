@@ -20,8 +20,6 @@ public class UserDTO {
     // --- START: Accessibility Settings ---
     private boolean librasAvatarEnabled = false; // Valor padrão
     private String preferredTheme = "default";   // Valor padrão
-    private String accessibilityVisualMarker = "NEUTRAL_CIRCLE";
-    private boolean accessibilityVisualMarkerPublic = false;
     // --- END: Accessibility Settings ---
 
     // Construtor original mantido
@@ -79,22 +77,6 @@ public class UserDTO {
 
     public void setPreferredTheme(String preferredTheme) {
         this.preferredTheme = preferredTheme;
-    }
-
-    public String getAccessibilityVisualMarker() {
-        return accessibilityVisualMarker;
-    }
-
-    public void setAccessibilityVisualMarker(String accessibilityVisualMarker) {
-        this.accessibilityVisualMarker = accessibilityVisualMarker;
-    }
-
-    public boolean isAccessibilityVisualMarkerPublic() {
-        return accessibilityVisualMarkerPublic;
-    }
-
-    public void setAccessibilityVisualMarkerPublic(boolean accessibilityVisualMarkerPublic) {
-        this.accessibilityVisualMarkerPublic = accessibilityVisualMarkerPublic;
     }
     // --- END: Accessibility Settings Getters/Setters ---
 }

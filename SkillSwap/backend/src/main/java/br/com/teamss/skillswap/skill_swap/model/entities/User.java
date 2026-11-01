@@ -1,7 +1,6 @@
 package br.com.teamss.skillswap.skill_swap.model.entities;
 
 import com.fasterxml.jackson.annotation.JsonManagedReference;
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import java.sql.Date;
 import java.time.Instant;
@@ -23,7 +22,6 @@ public class User {
     private String username;
 
     @Column(name = "password", nullable = false)
-    @JsonIgnore
     private String password;
 
     @Column(name = "name", nullable = false)
@@ -39,11 +37,9 @@ public class User {
     private String phoneNumber;
 
     @Column(name = "verification_code")
-    @JsonIgnore
     private String verificationCode;
 
     @Column(name = "verification_code_expiry")
-    @JsonIgnore
     private Instant verificationCodeExpiry;
 
     @Column(name = "verified")
@@ -56,7 +52,6 @@ public class User {
     private Instant createdAt = Instant.now(); // Valor padrão explícito
 
     @Column(name = "two_factor_secret")
-    @JsonIgnore
     private String twoFactorSecret;
 
     @Column(name = "verified_badge")
@@ -67,23 +62,7 @@ public class User {
 
     // --- INCREMENTO: Firebase Cloud Messaging Token ---
     @Column(name = "fcm_token")
-    @JsonIgnore
     private String fcmToken;
-
-    /** Data de anonimização lógica solicitada pelo titular. */
-    @Column(name = "deleted_at")
-    @JsonIgnore
-    private Instant deletedAt;
-
-    /** Faixa etária operacional; não é exibida em perfis públicos. */
-    @Column(name = "account_age_band", nullable = false, length = 16)
-    @JsonIgnore
-    private String accountAgeBand = "ADULT";
-
-    /** Situação da confirmação do responsável para menores. */
-    @Column(name = "minor_access_status", nullable = false, length = 32)
-    @JsonIgnore
-    private String minorAccessStatus = "NOT_APPLICABLE";
 
     // --- START: Accessibility Settings ---
     @Column(name = "libras_avatar_enabled", columnDefinition = "BOOLEAN DEFAULT FALSE")
@@ -91,20 +70,6 @@ public class User {
 
     @Column(name = "preferred_theme", length = 50, columnDefinition = "VARCHAR(50) DEFAULT 'default'")
     private String preferredTheme = "default"; // e.g., "default", "high-contrast-dark", "high-contrast-light"
-
-    /**
-     * Marcador visual escolhido pela própria pessoa. Ele é uma preferência de
-     * apresentação e não deve ser interpretado como diagnóstico ou deficiência.
-     */
-    @Column(name = "accessibility_visual_marker", nullable = false, length = 32)
-    private String accessibilityVisualMarker = "NEUTRAL_CIRCLE";
-
-    /**
-     * Desativado por padrão para não transformar uma preferência visual em
-     * informação pública sobre deficiência ou condição de saúde.
-     */
-    @Column(name = "accessibility_visual_marker_public", nullable = false)
-    private boolean accessibilityVisualMarkerPublic = false;
     // --- END: Accessibility Settings ---
 
     @OneToOne(mappedBy = "user", cascade = CascadeType.ALL, fetch = FetchType.LAZY) // FetchType LAZY é geralmente melhor para OneToOne
@@ -269,30 +234,6 @@ public class User {
         this.fcmToken = fcmToken;
     }
 
-    public Instant getDeletedAt() {
-        return deletedAt;
-    }
-
-    public void setDeletedAt(Instant deletedAt) {
-        this.deletedAt = deletedAt;
-    }
-
-    public String getAccountAgeBand() {
-        return accountAgeBand;
-    }
-
-    public void setAccountAgeBand(String accountAgeBand) {
-        this.accountAgeBand = accountAgeBand;
-    }
-
-    public String getMinorAccessStatus() {
-        return minorAccessStatus;
-    }
-
-    public void setMinorAccessStatus(String minorAccessStatus) {
-        this.minorAccessStatus = minorAccessStatus;
-    }
-
     public Profile getProfile() {
         return profile;
     }
@@ -421,22 +362,6 @@ public class User {
 
     public void setPreferredTheme(String preferredTheme) {
         this.preferredTheme = preferredTheme;
-    }
-
-    public String getAccessibilityVisualMarker() {
-        return accessibilityVisualMarker;
-    }
-
-    public void setAccessibilityVisualMarker(String accessibilityVisualMarker) {
-        this.accessibilityVisualMarker = accessibilityVisualMarker;
-    }
-
-    public boolean isAccessibilityVisualMarkerPublic() {
-        return accessibilityVisualMarkerPublic;
-    }
-
-    public void setAccessibilityVisualMarkerPublic(boolean accessibilityVisualMarkerPublic) {
-        this.accessibilityVisualMarkerPublic = accessibilityVisualMarkerPublic;
     }
     // --- END: Accessibility Settings Getters/Setters ---
 

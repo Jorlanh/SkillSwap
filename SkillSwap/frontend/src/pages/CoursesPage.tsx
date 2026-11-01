@@ -1,117 +1,126 @@
 import { useEffect, useState } from 'react';
-import { BookOpen, CheckCircle2, Clock, Download, GraduationCap } from 'lucide-react';
-import { toast } from 'sonner';
-import { Badge } from '@/components/ui/badge';
+import { Award, CheckCircle2, Clock, Printer } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import { LessonService } from '@/services/api';
+import { toast } from 'sonner';
 
-type LessonView = {
+type Lesson = {
   lessonId: number;
-  teacherName: string;
-  studentName: string;
-  scheduledTime: string;
-  status: string;
   title?: string;
-  introduction?: string;
-  durationMinutes: number;
+  scheduledTime: string;
+  durationMinutes?: number;
+  status: string;
+  teacherConfirmed?: boolean;
+  studentConfirmed?: boolean;
   completedAt?: string;
-  certificateAvailable: boolean;
+  teacher?: { name?: string; username?: string };
+  student?: { name?: string; username?: string };
 };
 
-type Certificate = {
-  certificateCode: string;
-  studentName: string;
-  studentUsername: string;
-  teacherName: string;
-  title: string;
-  introduction: string;
-  durationMinutes: number;
-  completedAt: string;
-};
+const escapeHtml = (value: unknown) => String(value ?? '').replace(/[&<>'"]/g, (character) => ({
+  '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;',
+}[character] ?? character));
 
-const escapeHtml = (value: unknown) => String(value ?? '')
-  .replaceAll('&', '&amp;')
-  .replaceAll('<', '&lt;')
-  .replaceAll('>', '&gt;')
-  .replaceAll('"', '&quot;')
-  .replaceAll("'", '&#039;');
-
-const formatDate = (value?: string) => value
-  ? new Date(value).toLocaleString('pt-BR', { dateStyle: 'full', timeStyle: 'short' })
-  : 'Data não informada';
-
-const openCertificateForPrint = (certificate: Certificate) => {
-  const popup = window.open('', '_blank', 'width=960,height=720');
-  if (!popup) throw new Error('O navegador bloqueou a janela do certificado.');
-
-  const hours = (certificate.durationMinutes / 60).toLocaleString('pt-BR', {
-    minimumFractionDigits: certificate.durationMinutes % 60 === 0 ? 0 : 1,
-    maximumFractionDigits: 2,
-  });
-
+const printCertificate = (certificate: any) => {
+  const popup = window.open('', '_blank', 'noopener,noreferrer,width=900,height=700');
+  if (!popup) {
+    toast.error('O navegador bloqueou a janela do certificado. Permita pop-ups para a SkillSwap.');
+    return;
+  }
+  const date = new Date(certificate.completedAt).toLocaleDateString('pt-BR');
+  const hours = (Number(certificate.durationMinutes || 60) / 60).toFixed(1).replace('.', ',');
   popup.document.write(`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Certificado SkillSwap</title><style>
-    @page { size: A4 landscape; margin: 12mm; } * { box-sizing: border-box; }
-    body { margin: 0; font-family: Arial, sans-serif; color: #10253f; background: #eef5f8; }
-    .certificate { min-height: 185mm; padding: 22mm; border: 5px solid #0d9488; background: white; display: flex; flex-direction: column; justify-content: space-between; text-align: center; }
-    .brand { color: #0d9488; letter-spacing: .16em; font-weight: 800; font-size: 18px; } h1 { margin: 18px 0 10px; font-size: 38px; }
-    .intro { max-width: 700px; margin: 0 auto; font-size: 18px; line-height: 1.55; }
-    .student { margin: 18px auto; font-size: 34px; font-weight: 800; color: #087f78; border-bottom: 2px solid #087f78; padding: 0 18px 8px; display: inline-block; }
-    .details { display: flex; justify-content: center; gap: 42px; margin: 22px 0; font-size: 16px; } .detail strong { display: block; font-size: 22px; margin-top: 6px; }
-    .footer { display: flex; justify-content: space-between; gap: 20px; border-top: 1px solid #b7cbd0; padding-top: 14px; font-size: 12px; text-align: left; } .code { font-family: monospace; }
-    @media print { body { background: white; } .certificate { border-width: 3px; } }
-  </style></head><body><main class="certificate"><div><div class="brand">SKILLSWAP</div><h1>Certificado de conclusão</h1>
-    <p class="intro">${escapeHtml(certificate.introduction)}</p><div class="student">${escapeHtml(certificate.studentName)}</div>
-    <p class="intro">concluiu a atividade <strong>${escapeHtml(certificate.title)}</strong>, realizada com orientação de <strong>${escapeHtml(certificate.teacherName)}</strong>.</p>
-    <div class="details"><div class="detail">Carga horária<strong>${escapeHtml(hours)} h</strong></div><div class="detail">Conclusão<strong>${escapeHtml(formatDate(certificate.completedAt))}</strong></div></div></div>
-    <div class="footer"><span>Participante: @${escapeHtml(certificate.studentUsername)}</span><span class="code">Código: ${escapeHtml(certificate.certificateCode)}</span><span>SkillSwap</span></div></main>
-    <script>window.onload = function () { window.focus(); window.print(); };</script></body></html>`);
+    body{font-family:Arial,sans-serif;background:#f4f7f8;padding:48px;color:#17202a}
+    .certificate{max-width:760px;margin:auto;background:#fff;border:12px solid #0d9488;padding:64px;text-align:center;box-shadow:0 10px 30px #0002}
+    h1{color:#0d9488;font-size:36px;margin:0 0 24px} h2{font-size:28px;margin:18px 0}
+    p{font-size:18px;line-height:1.6}.meta{margin-top:32px;font-size:14px;color:#435}
+    @media print{body{background:#fff;padding:0}.certificate{box-shadow:none}}
+  </style></head><body><main class="certificate" aria-labelledby="title">
+    <h1 id="title">SkillSwap</h1><p>Certificado de conclusão</p>
+    <p>Declaramos que</p><h2>${escapeHtml(certificate.studentName)}</h2>
+    <p>concluiu a aula <strong>${escapeHtml(certificate.lessonTitle)}</strong>, com duração de ${hours} hora(s), com acompanhamento de ${escapeHtml(certificate.teacherName)}.</p>
+    <p class="meta">Concluído em ${date}<br>Identificador: ${escapeHtml(certificate.certificateId)}</p>
+    <p class="meta">Comprovante de participação na plataforma SkillSwap. Não substitui diploma ou certificação profissional.</p>
+  </main><script>window.onload=()=>window.print()</script></body></html>`);
   popup.document.close();
 };
 
 const CoursesPage = () => {
-  const [lessons, setLessons] = useState<LessonView[]>([]);
+  const [lessons, setLessons] = useState<Lesson[]>([]);
   const [loading, setLoading] = useState(true);
-  const [busyLesson, setBusyLesson] = useState<number | null>(null);
+  const [workingId, setWorkingId] = useState<number | null>(null);
 
-  const loadLessons = async () => {
+  const load = async () => {
+    setLoading(true);
     try {
-      const { data } = await LessonService.getMine();
-      setLessons(Array.isArray(data) ? data : []);
+      const response = await LessonService.getMine();
+      setLessons(response.data || []);
     } catch {
-      toast.error('Não foi possível carregar suas aulas.');
+      toast.error('Não foi possível carregar as aulas.');
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => { void loadLessons(); }, []);
+  useEffect(() => { load(); }, []);
 
-  const completeLesson = async (lessonId: number) => {
-    setBusyLesson(lessonId);
-    try { await LessonService.complete(lessonId); toast.success('Aula concluída. O certificado já está disponível.'); await loadLessons(); }
-    catch { toast.error('Não foi possível concluir esta aula.'); }
-    finally { setBusyLesson(null); }
+  const confirm = async (lessonId: number) => {
+    setWorkingId(lessonId);
+    try {
+      const response = await LessonService.confirmCompletion(lessonId);
+      toast.success(response.data.readyForCertificate
+        ? 'Aula concluída. O certificado foi liberado para o aluno.'
+        : 'Sua confirmação foi registrada. A outra pessoa ainda precisa confirmar.');
+      await load();
+    } catch {
+      toast.error('Não foi possível confirmar a conclusão.');
+    } finally {
+      setWorkingId(null);
+    }
   };
 
-  const downloadCertificate = async (lessonId: number) => {
-    setBusyLesson(lessonId);
-    try { const { data } = await LessonService.getCertificate(lessonId); openCertificateForPrint(data as Certificate); }
-    catch (error) { toast.error(error instanceof Error ? error.message : 'Não foi possível gerar o certificado.'); }
-    finally { setBusyLesson(null); }
+  const certificate = async (lessonId: number) => {
+    try {
+      const response = await LessonService.getCertificate(lessonId);
+      printCertificate(response.data);
+    } catch {
+      toast.error('O certificado só é liberado após a confirmação dos dois participantes e fica disponível para o aluno.');
+    }
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
-      <div><h1 className="font-display font-bold text-2xl text-foreground">Aulas e certificados</h1><p className="text-muted-foreground mt-2">Conclua uma aula e gere um certificado com seu nome, carga horária e código de verificação.</p></div>
-      {loading ? <Card><CardContent className="p-8 text-center text-muted-foreground">Carregando suas aulas...</CardContent></Card> : lessons.length === 0 ? (
-        <Card><CardContent className="p-8 text-center"><BookOpen className="mx-auto mb-3 text-skillswap-teal" /><p className="text-muted-foreground">Você ainda não possui aulas agendadas.</p><p className="text-sm text-muted-foreground mt-2">Quando uma aula for marcada com você, ela aparecerá aqui.</p></CardContent></Card>
-      ) : <div className="space-y-4">{lessons.map((lesson) => {
-        const completed = lesson.status?.toUpperCase() === 'COMPLETED';
-        const hours = (lesson.durationMinutes / 60).toLocaleString('pt-BR', { maximumFractionDigits: 2 });
-        return <Card key={lesson.lessonId} className="border-border bg-card"><CardHeader className="flex flex-row items-start justify-between gap-4"><div><CardTitle className="flex items-center gap-2"><GraduationCap className="text-skillswap-teal" />{lesson.title || 'Aula de troca de habilidades'}</CardTitle><p className="text-sm text-muted-foreground mt-2">{lesson.introduction || 'Atividade de aprendizagem entre pares.'}</p></div><Badge variant={completed ? 'default' : 'secondary'}>{completed ? 'Concluída' : lesson.status || 'Agendada'}</Badge></CardHeader><CardContent className="space-y-4"><div className="grid gap-3 sm:grid-cols-3 text-sm"><span><b>Professor:</b> {lesson.teacherName}</span><span><b>Aluno:</b> {lesson.studentName}</span><span className="flex items-center gap-1"><Clock size={15} />{hours} h · {formatDate(lesson.scheduledTime)}</span></div><div className="flex flex-wrap gap-3">{!completed && <Button onClick={() => void completeLesson(lesson.lessonId)} disabled={busyLesson === lesson.lessonId} className="gap-2"><CheckCircle2 size={16} />{busyLesson === lesson.lessonId ? 'Concluindo...' : 'Marcar como concluída'}</Button>}{completed && <Button variant="outline" onClick={() => void downloadCertificate(lesson.lessonId)} disabled={busyLesson === lesson.lessonId} className="gap-2"><Download size={16} />{busyLesson === lesson.lessonId ? 'Gerando...' : 'Gerar certificado'}</Button>}</div></CardContent></Card>;
-      })}</div>}
-    </div>
+    <main className="max-w-4xl mx-auto p-4 pb-20">
+      <header className="mb-6">
+        <h1 className="font-display font-bold text-3xl text-foreground">Aulas e certificados</h1>
+        <p className="text-muted-foreground mt-2">A participação é gratuita. O certificado é um comprovante de conclusão da aula.</p>
+      </header>
+      {loading ? <p className="text-muted-foreground">Carregando aulas...</p> : lessons.length === 0 ? (
+        <Card className="p-8 text-center"><Clock className="mx-auto mb-3 text-muted-foreground" /><p className="text-muted-foreground">Nenhuma aula encontrada.</p></Card>
+      ) : (
+        <div className="grid gap-4">
+          {lessons.map((lesson) => {
+            const completed = lesson.status === 'COMPLETED';
+            const currentUserConfirmed = lesson.studentConfirmed || lesson.teacherConfirmed;
+            return <Card key={lesson.lessonId} className="p-5">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                  <h2 className="font-bold text-lg">{lesson.title || 'Aula SkillSwap'}</h2>
+                  <p className="text-sm text-muted-foreground">{new Date(lesson.scheduledTime).toLocaleString('pt-BR')} · {lesson.durationMinutes || 60} minutos</p>
+                  <p className="text-sm mt-2">Professor: {lesson.teacher?.name || lesson.teacher?.username || 'participante'}</p>
+                  <p className="text-sm">Aluno: {lesson.student?.name || lesson.student?.username || 'participante'}</p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {completed ? <Button type="button" onClick={() => certificate(lesson.lessonId)} className="bg-skillswap-teal text-white"><Award size={17} className="mr-2" /> Gerar certificado</Button> : <Button type="button" onClick={() => confirm(lesson.lessonId)} disabled={workingId === lesson.lessonId} variant={currentUserConfirmed ? 'outline' : 'default'}><CheckCircle2 size={17} className="mr-2" />{currentUserConfirmed ? 'Confirmação registrada' : 'Concluir aula'}</Button>}
+                </div>
+              </div>
+              {!completed && <p className="text-xs text-muted-foreground mt-4">A aula só será concluída depois que professor e aluno confirmarem. O certificado será liberado depois disso.</p>}
+            </Card>;
+          })}
+        </div>
+      )}
+      <p className="mt-6 text-xs text-muted-foreground flex items-center gap-2"><Printer size={14} /> O botão gera uma página acessível para impressão ou salvamento em PDF pelo navegador.</p>
+    </main>
   );
 };
 

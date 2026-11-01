@@ -80,7 +80,7 @@ public class ProfileServiceImpl implements ProfileService {
         String description = profileDetails.getDescription();
         int maxBio = 500 + existingProfile.getExtraBioChars();
         if (description != null && description.length() > maxBio) {
-            throw new IllegalArgumentException("A biografia ultrapassa o limite técnico gratuito de " + maxBio + " caracteres.");
+            throw new IllegalArgumentException("A biografia ultrapassa o limite de " + maxBio + " caracteres. Compre um aumento de limite em Premium.");
         }
         existingProfile.setDescription(description);
         existingProfile.setImageUrl(profileDetails.getImageUrl());
@@ -120,7 +120,7 @@ public class ProfileServiceImpl implements ProfileService {
         int maxPost = 1000 + (profile == null ? 0 : profile.getExtraPostChars());
         if (content == null || content.isBlank()) throw new IllegalArgumentException("O post precisa ter conteudo.");
         if (content.length() > maxPost) {
-            throw new IllegalArgumentException("O post ultrapassa o limite técnico gratuito de " + maxPost + " caracteres.");
+            throw new IllegalArgumentException("O post ultrapassa o limite de " + maxPost + " caracteres. Compre um aumento de limite em Premium.");
         }
         Post post = new Post();
         post.setUser(user);

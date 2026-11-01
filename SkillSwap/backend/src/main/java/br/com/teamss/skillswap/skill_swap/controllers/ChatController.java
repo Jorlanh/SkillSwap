@@ -5,8 +5,6 @@ import br.com.teamss.skillswap.skill_swap.dto.UserDTO;
 import br.com.teamss.skillswap.skill_swap.model.entities.ChatMessage;
 import br.com.teamss.skillswap.skill_swap.model.services.ChatService;
 import br.com.teamss.skillswap.skill_swap.model.services.UserServiceDTO;
-import br.com.teamss.skillswap.skill_swap.model.services.MinorSafetyService;
-import br.com.teamss.skillswap.skill_swap.model.repositories.UserRepository;
 import java.io.IOException;
 import java.util.List;
 import java.util.UUID;
@@ -26,12 +24,6 @@ public class ChatController {
 
     @Autowired
     private UserServiceDTO userServiceDTO;
-
-    @Autowired
-    private MinorSafetyService minorSafetyService;
-
-    @Autowired
-    private UserRepository userRepository;
 
     @GetMapping("/conversations")
     public ResponseEntity<List<Map<String, Object>>> getMyConversations() {
@@ -70,15 +62,6 @@ public class ChatController {
 
     @GetMapping("/history/{userId1}/{userId2}")
     public List<ChatMessage> getChatHistory(@PathVariable UUID userId1, @PathVariable UUID userId2) {
-        UUID authenticatedId = userServiceDTO.getAuthenticatedUser().getUserId();
-        if (!authenticatedId.equals(userId1) && !authenticatedId.equals(userId2)) {
-            throw new AccessDeniedException("Você não pertence a esta conversa.");
-        }
-        var first = userRepository.findById(userId1)
-            .orElseThrow(() -> new jakarta.persistence.EntityNotFoundException("Primeiro participante não encontrado."));
-        var second = userRepository.findById(userId2)
-            .orElseThrow(() -> new jakarta.persistence.EntityNotFoundException("Segundo participante não encontrado."));
-        minorSafetyService.assertDirectInteractionAllowed(first, second);
         return chatService.getChatHistory(userId1, userId2);
     }
 }

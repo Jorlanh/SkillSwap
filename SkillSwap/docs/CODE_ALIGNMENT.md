@@ -14,8 +14,8 @@
 | Recomendação explicável | `AccessRecommendationDTO` e regra determinística | implementado como MVP |
 | FCM | `DeviceController` e `messaging.ts` | condicional à configuração |
 | Chat seguro | `ChatWebSocketHandler` e primeiro frame autenticado | incrementado |
-| PostgreSQL | JPA e migrations V1–V5 | implementado |
+| PostgreSQL | JPA e migrations V1–V7 | implementado |
 | Prometheus | Actuator endpoint documentado | condicional à exposição segura |
 | Hardware | nenhum | fora do escopo |
 
-O estado “condicional” não é apresentado como prova de produção. Firebase, Railway, banco, Stripe, FCM, vídeo e observabilidade precisam de homologação com credenciais privadas.
+O estado “condicional” não é apresentado como prova de produção. Firebase, Railway, banco, FCM, vídeo e observabilidade precisam de homologação com credenciais privadas.

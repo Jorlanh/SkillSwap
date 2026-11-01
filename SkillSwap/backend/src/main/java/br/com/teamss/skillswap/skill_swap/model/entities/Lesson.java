@@ -27,24 +27,24 @@ public class Lesson {
     @JoinColumn(name = "student_id")
     private User student;
 
+    @Column(name = "title", nullable = false, length = 180)
+    private String title = "Aula SkillSwap";
+
     @Column(name = "scheduled_time")
     private Instant scheduledTime;
+
+    @Column(name = "duration_minutes", nullable = false)
+    private Integer durationMinutes = 60;
 
     @Column(name = "status")
     private String status;
 
-    @Column(name = "title", length = 200)
-    private String title;
+    @Column(name = "teacher_confirmed", nullable = false)
+    private boolean teacherConfirmed;
 
-    @Column(name = "introduction", columnDefinition = "TEXT")
-    private String introduction;
-
-    @Column(name = "duration_minutes", nullable = false)
-    private int durationMinutes = 60;
+    @Column(name = "student_confirmed", nullable = false)
+    private boolean studentConfirmed;
 
     @Column(name = "completed_at")
     private Instant completedAt;
-
-    @Column(name = "certificate_code", length = 80, unique = true)
-    private String certificateCode;
 }

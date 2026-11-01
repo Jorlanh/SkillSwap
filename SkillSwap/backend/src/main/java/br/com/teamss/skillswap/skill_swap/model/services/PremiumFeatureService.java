@@ -9,7 +9,6 @@ import java.time.ZoneId;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.beans.factory.annotation.Value;
 
 /** Applies monthly freemium allowances and records paid consumption in the ledger. */
 @Service
@@ -18,15 +17,12 @@ public class PremiumFeatureService {
     private final PremiumUsageRepository usageRepository;
     private final UserRepository userRepository;
     private final SwapCoinWalletService walletService;
-    private final boolean commerceEnabled;
 
     public PremiumFeatureService(PremiumUsageRepository usageRepository, UserRepository userRepository,
-                                 SwapCoinWalletService walletService,
-                                 @Value("${app.commerce.enabled:false}") boolean commerceEnabled) {
+                                 SwapCoinWalletService walletService) {
         this.usageRepository = usageRepository;
         this.userRepository = userRepository;
         this.walletService = walletService;
-        this.commerceEnabled = commerceEnabled;
     }
 
     @Transactional
@@ -45,9 +41,7 @@ public class PremiumFeatureService {
             usageRepository.save(usage);
             return PremiumCharge.free(userId, featureCode);
         }
-        // O modo gratuito mantém a telemetria de uso, mas nunca debita
-        // SwapCoin nem exige pagamento do usuário.
-        if (!commerceEnabled || cost == 0) return PremiumCharge.free(userId, featureCode);
+        if (cost == 0) return PremiumCharge.free(userId, featureCode);
         String key = "premium:" + featureCode + ":" + UUID.randomUUID();
         walletService.debitForFeature(userId, cost, "Uso premium: " + featureCode, key);
         return new PremiumCharge(userId, featureCode, cost, true, key);
@@ -67,8 +61,6 @@ public class PremiumFeatureService {
         int used = usageRepository.findByOwner_UserIdAndPeriodStart(userId, period)
             .map(PremiumUsage::getFreeAiPromptsUsed).orElse(0);
         return java.util.Map.of("periodStart", period, "monthlyQuota", monthlyQuota,
-            "used", used, "remaining", Math.max(0, monthlyQuota - used),
-            "paidCostAfterQuota", commerceEnabled ? 1 : 0,
-            "mode", commerceEnabled ? "COMMERCE_ENABLED" : "FREE");
+            "used", used, "remaining", Math.max(0, monthlyQuota - used), "paidCostAfterQuota", 1);
     }
 }

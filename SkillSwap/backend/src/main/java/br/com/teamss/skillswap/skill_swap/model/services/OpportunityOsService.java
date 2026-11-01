@@ -157,9 +157,6 @@ public class OpportunityOsService {
         User user = currentUser();
         AccessOpportunity opportunity = opportunityRepository.findById(opportunityId)
             .orElseThrow(() -> new EntityNotFoundException("Oportunidade não encontrada."));
-        if (!"OPEN".equalsIgnoreCase(opportunity.getStatus())) {
-            throw new IllegalArgumentException("Esta oportunidade não está aberta para candidaturas.");
-        }
         if (applicationRepository.existsByApplicant_UserIdAndOpportunity_OpportunityId(user.getUserId(), opportunityId)) {
             throw new IllegalArgumentException("Você já se candidatou a esta oportunidade.");
         }

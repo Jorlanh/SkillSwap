@@ -18,7 +18,8 @@ public interface ChatRepository extends JpaRepository<ChatMessage, Long> {
            "(cm.sender.userId = :id2 AND cm.receiver.userId = :id1) " +
            "ORDER BY cm.sentAt ASC")
     List<ChatMessage> findBySenderIdAndReceiverIdOrSenderIdAndReceiverId(
-            @Param("id1") UUID id1, @Param("id2") UUID id2);
+            @Param("id1") UUID id1, @Param("id2") UUID id2, 
+            @Param("id2_alt") UUID id2_alt, @Param("id1_alt") UUID id1_alt);
 
     // Busca TODAS as mensagens de um usuário para compor a lista de conversas ativas
     @Query("SELECT m FROM ChatMessage m WHERE m.sender.userId = :userId OR m.receiver.userId = :userId ORDER BY m.sentAt DESC")

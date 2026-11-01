@@ -6,14 +6,14 @@ import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 
 import { auth, googleProvider, githubProvider } from '@/lib/firebase';
+import { requestNotificationPermission } from '@/lib/messaging'; 
 import { 
   signInWithEmailAndPassword, 
   createUserWithEmailAndPassword, 
   signInWithPopup,
-  updateProfile,
-  deleteUser
+  updateProfile
 } from 'firebase/auth';
-import { PrivacyService, UserService } from '@/services/api'; 
+import { UserService } from '@/services/api'; 
 
 interface AuthPageProps {
   isModal?: boolean;
@@ -31,45 +31,12 @@ const AuthPage = ({ isModal, onClose }: AuthPageProps) => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [fullName, setFullName] = useState('');
   const [username, setUsername] = useState('');
-  const [birthDate, setBirthDate] = useState('');
-  const [guardianName, setGuardianName] = useState('');
-  const [guardianEmail, setGuardianEmail] = useState('');
-  const [guardianRelationship, setGuardianRelationship] = useState('');
-  const [acceptedRequiredPolicies, setAcceptedRequiredPolicies] = useState(false);
-
-  const ageFromBirthDate = (value: string) => {
-    if (!value) return null;
-    const birth = new Date(`${value}T00:00:00`);
-    const today = new Date();
-    let age = today.getFullYear() - birth.getFullYear();
-    const birthdayNotReached = today.getMonth() < birth.getMonth()
-      || (today.getMonth() === birth.getMonth() && today.getDate() < birth.getDate());
-    if (birthdayNotReached) age -= 1;
-    return age;
-  };
-  const isMinorCandidate = (ageFromBirthDate(birthDate) ?? 18) < 18;
-
-  const completeRegistrationCompliance = async () => {
-    if (!birthDate || !acceptedRequiredPolicies) {
-      throw new Error('Data de nascimento e aceite da política são obrigatórios.');
-    }
-    if (isMinorCandidate && (!guardianName.trim() || !guardianEmail.trim() || !guardianRelationship.trim())) {
-      throw new Error('Para menores de 18 anos, informe os dados de um responsável.');
-    }
-    const ageGateResponse = await PrivacyService.ageGate(birthDate, isMinorCandidate ? {
-      guardianName,
-      guardianEmail,
-      guardianRelationship,
-      locale: 'pt-BR',
-    } : undefined);
-    await PrivacyService.recordConsent('PRIVACY_POLICY', true);
-    await PrivacyService.recordConsent('TERMS_OF_SERVICE', true);
-    return ageGateResponse.data;
-  };
 
   const handleSuccess = async (user: any) => {
     try {
       await user.getIdToken(true);
+      const fcmToken = await requestNotificationPermission();
+      if (fcmToken) await UserService.updateFcmToken(fcmToken);
 
       const profile = await UserService.getMe();
       const isAdmin = profile.data.roles?.some((role: string) => role.toUpperCase() === 'ADMIN');
@@ -86,7 +53,7 @@ const AuthPage = ({ isModal, onClose }: AuthPageProps) => {
         onClose();
         window.location.reload(); // Atualiza o estado global de auth
       } else {
-        navigate(localStorage.getItem('activeMode') === 'admin' ? '/admin' : '/');
+        navigate(!isLogin ? '/preferencias?setup=1' : (localStorage.getItem('activeMode') === 'admin' ? '/admin' : '/'));
       }
     } catch (error) {
       console.error("Erro no pós-login:", error);
@@ -105,16 +72,10 @@ const AuthPage = ({ isModal, onClose }: AuthPageProps) => {
       } else {
         const result = await createUserWithEmailAndPassword(auth, email, password);
         await updateProfile(result.user, { displayName: username || fullName });
-        const compliance = await completeRegistrationCompliance();
-        if (compliance?.minor) {
-          localStorage.setItem('guardianConsentStatus', compliance.guardianStatus || 'PENDING_GUARDIAN');
-          toast.info('Conta criada. O responsável precisa confirmar o cadastro, mas você já pode acessar a plataforma.');
-        }
         await handleSuccess(result.user);
       }
     } catch (error: any) {
-      if (!isLogin && auth.currentUser) await deleteUser(auth.currentUser).catch(() => undefined);
-      toast.error(error?.response?.data?.error || error?.message || "Falha na autenticação.");
+      toast.error("Falha na autenticação.");
     } finally {
       setLoading(false);
     }
@@ -125,17 +86,9 @@ const AuthPage = ({ isModal, onClose }: AuthPageProps) => {
     try {
       const provider = providerName === 'Google' ? googleProvider : githubProvider;
       const result = await signInWithPopup(auth, provider);
-      if (!isLogin) {
-        const compliance = await completeRegistrationCompliance();
-        if (compliance?.minor) {
-          localStorage.setItem('guardianConsentStatus', compliance.guardianStatus || 'PENDING_GUARDIAN');
-          toast.info('Conta criada. O responsável precisa confirmar o cadastro, mas você já pode acessar a plataforma.');
-        }
-      }
       await handleSuccess(result.user);
     } catch (error) {
-      if (!isLogin && auth.currentUser) await deleteUser(auth.currentUser).catch(() => undefined);
-      toast.error((error as any)?.response?.data?.error || (error as any)?.message || `Falha ao conectar.`);
+      toast.error(`Falha ao conectar.`);
     } finally {
       setLoading(false);
     }
@@ -173,26 +126,6 @@ const AuthPage = ({ isModal, onClose }: AuthPageProps) => {
                 <AtSign className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
                 <Input placeholder="Usuário" value={username} onChange={e => setUsername(e.target.value.toLowerCase())} className="pl-10 h-12" />
               </div>
-              <div className="space-y-2">
-                <label htmlFor="birthDate" className="text-sm font-medium text-foreground">Data de nascimento</label>
-                <Input id="birthDate" type="date" value={birthDate} onChange={e => setBirthDate(e.target.value)} className="h-12" required />
-                <p className="text-xs text-muted-foreground">Pessoas menores de 18 anos também podem usar o SkillSwap. Nesse caso, solicitamos a confirmação de um responsável por e-mail.</p>
-              </div>
-              {isMinorCandidate && (
-                <div className="space-y-3 rounded-xl border border-skillswap-teal/30 bg-skillswap-teal/5 p-4" role="group" aria-labelledby="guardian-heading">
-                  <div>
-                    <h2 id="guardian-heading" className="text-sm font-semibold text-foreground">Confirmação de responsável</h2>
-                    <p className="mt-1 text-xs text-muted-foreground">O responsável receberá um link seguro. A conta não será bloqueada enquanto a confirmação estiver pendente.</p>
-                  </div>
-                  <Input aria-label="Nome do responsável" placeholder="Nome do responsável" value={guardianName} onChange={e => setGuardianName(e.target.value)} required className="h-11" />
-                  <Input aria-label="E-mail do responsável" type="email" placeholder="E-mail do responsável" value={guardianEmail} onChange={e => setGuardianEmail(e.target.value)} required className="h-11" />
-                  <Input aria-label="Vínculo com o responsável" placeholder="Vínculo (ex.: mãe, pai, tutor)" value={guardianRelationship} onChange={e => setGuardianRelationship(e.target.value)} required className="h-11" />
-                </div>
-                )}
-              <label className="flex items-start gap-3 text-sm text-muted-foreground">
-                <input type="checkbox" checked={acceptedRequiredPolicies} onChange={e => setAcceptedRequiredPolicies(e.target.checked)} className="mt-1" required />
-                <span>Li e aceito a <a href="/privacidade" target="_blank" rel="noreferrer" className="text-skillswap-teal underline">Política de Privacidade</a> e os Termos de Uso.</span>
-              </label>
             </div>
           )}
 

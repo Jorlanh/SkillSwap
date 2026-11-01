@@ -51,7 +51,7 @@ public class AccessController {
 
     @GetMapping("/opportunities")
     public List<AccessOpportunity> opportunities() {
-        return opportunityRepository.findTop30ByStatusOrderByCreatedAtDesc("OPEN");
+        return opportunityRepository.findTop30ByOrderByCreatedAtDesc();
     }
 
     @GetMapping("/recommendations")
@@ -66,7 +66,7 @@ public class AccessController {
         String profileText = user.getProfile() == null ? "" : String.join(" ",
             safe(user.getProfile().getInterests()), safe(user.getProfile().getDescription())).toLowerCase(Locale.ROOT);
 
-        return opportunityRepository.findTop30ByStatusOrderByCreatedAtDesc("OPEN").stream()
+        return opportunityRepository.findTop30ByOrderByCreatedAtDesc().stream()
             .map(opportunity -> toRecommendation(opportunity, skills, profileText))
             .sorted(Comparator.comparingInt(AccessRecommendationDTO::score).reversed())
             .limit(10)

@@ -1,26 +1,21 @@
 package br.com.teamss.skillswap.skill_swap.model.services.impl;
 
 import br.com.teamss.skillswap.skill_swap.model.services.ContentModerationService;
-import br.com.teamss.skillswap.skill_swap.model.services.ModerationAssessment;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.util.List;
 import java.util.Map;
 
-/**
- * A IA faz triagem de conteúdo. Ela não possui permissão para suspender ou
- * banir contas; essa decisão é exclusiva do fluxo administrativo humano.
- */
 @Service
 public class GeminiApiModerationService implements ContentModerationService {
 
-    @Value("${gemini.api.key:}")
+    @Value("${gemini.api.key}")
     private String apiKey;
 
     @Value("${gemini.api.model:gemini-2.5-flash}")
@@ -35,25 +30,25 @@ public class GeminiApiModerationService implements ContentModerationService {
     }
 
     @Override
-    public ModerationAssessment assess(String text) {
-        if (text == null || text.isBlank()) {
-            return new ModerationAssessment("EMPTY", 1.0, "ALLOW", false, "Texto vazio.");
-        }
-        if (apiKey == null || apiKey.isBlank()) {
-            return unavailableAssessment("Chave Gemini não configurada; conteúdo contido para revisão.");
+    public boolean isContentInappropriate(String text) {
+        if (apiKey == null || apiKey.isBlank() || text == null || text.isBlank()) {
+            System.err.println("AVISO: Credenciais da API Gemini não configuradas ou texto vazio. Moderação desativada.");
+            return false;
         }
 
         try {
-            String prompt = "Você é um classificador de segurança da plataforma SkillSwap. "
-                    + "Analise o texto para discurso de ódio, assédio, violência, conteúdo sexual, ameaça, spam "
-                    + "ou incentivo à automutilação. Não aplique punição. Responda somente JSON válido com as chaves "
-                    + "category, confidence (0 a 1), recommendation (ALLOW, REVIEW ou BLOCK), blocked (true/false) "
-                    + "e explanation. Use REVIEW quando houver dúvida. Texto: " + text;
+            String prompt = String.format(
+                "Você é um moderador de conteúdo para uma plataforma social chamada SkillSwap. " +
+                "Sua tarefa é analisar o texto a seguir e determinar se ele viola alguma das seguintes categorias: " +
+                "discurso de ódio, assédio, violência explícita, conteúdo sexualmente explícito, ameaças, spam, ou incentivo à automutilação. " +
+                "Responda apenas com 'SIM' se violar alguma categoria, ou 'NÃO' se for seguro. Não dê nenhuma outra explicação. " +
+                "Texto para analisar: \"%s\"", text
+            );
 
-            String url = "https://generativelanguage.googleapis.com/v1beta/models/"
-                    + model + ":generateContent";
+            String url = "https://generativelanguage.googleapis.com/v1beta/models/" + model + ":generateContent";
+
             Map<String, Object> requestBody = Map.of(
-                    "contents", List.of(Map.of("parts", List.of(Map.of("text", prompt))))
+                "contents", List.of(Map.of("parts", List.of(Map.of("text", prompt))))
             );
 
             String responseJson = webClient.post()
@@ -65,45 +60,14 @@ public class GeminiApiModerationService implements ContentModerationService {
                     .bodyToMono(String.class)
                     .block();
 
-            JsonNode root = objectMapper.readTree(responseJson);
-            JsonNode candidates = root.path("candidates");
-            if (!candidates.isArray() || candidates.isEmpty()) {
-                return unavailableAssessment("A resposta da IA não trouxe uma classificação válida.");
-            }
-            String raw = candidates.get(0).path("content").path("parts").get(0)
-                    .path("text").asText("").trim();
-            JsonNode result = objectMapper.readTree(extractJson(raw));
-            String category = result.path("category").asText("UNSPECIFIED");
-            double confidence = result.path("confidence").asDouble(0.0);
-            String recommendation = result.path("recommendation").asText("REVIEW").toUpperCase();
-            boolean blocked = result.path("blocked").asBoolean(!"ALLOW".equals(recommendation));
-            String explanation = result.path("explanation").asText("Classificação automática enviada para revisão.");
-            return new ModerationAssessment(category, confidence, recommendation, blocked, explanation);
-        } catch (Exception exception) {
-            // Fail-closed para o conteúdo, mas sem punição de conta. O caso
-            // continua elegível para revisão humana pelo painel.
-            System.err.println("Falha na triagem Gemini; conteúdo colocado em contenção: "
-                    + exception.getMessage());
-            return unavailableAssessment("Serviço de moderação indisponível; revisão humana necessária.");
+            JsonNode rootNode = objectMapper.readTree(responseJson);
+            String modelResponse = rootNode.path("candidates").get(0).path("content").path("parts").get(0).path("text").asText().trim();
+
+            return "SIM".equalsIgnoreCase(modelResponse);
+
+        } catch (Exception e) {
+            System.err.println("Erro ao comunicar com a API do Google AI Studio (Gemini): " + e.getMessage());
+            return false;
         }
-    }
-
-    @Override
-    public boolean isContentInappropriate(String text) {
-        return assess(text).blocked();
-    }
-
-    private ModerationAssessment unavailableAssessment(String explanation) {
-        return new ModerationAssessment("MODERATION_UNAVAILABLE", 0.0, "REVIEW", true, explanation);
-    }
-
-    private String extractJson(String raw) {
-        String normalized = raw.replace("```json", "").replace("```", "").trim();
-        int start = normalized.indexOf('{');
-        int end = normalized.lastIndexOf('}');
-        if (start >= 0 && end > start) {
-            return normalized.substring(start, end + 1);
-        }
-        return normalized;
     }
 }

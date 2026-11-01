@@ -8,7 +8,6 @@ import SkillBadge from '@/components/SkillBadge';
 import PostCard from '@/components/PostCard';
 import RightSidebar from '@/components/RightSidebar';
 import VerifiedBadge from '@/components/VerifiedBadge';
-import VisualMarker from '@/components/VisualMarker';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent } from '@/components/ui/card';
 import { toast } from 'sonner';
@@ -381,7 +380,6 @@ const ProfilePage = () => {
               <div>
                 <h1 className="font-display font-bold text-2xl text-foreground flex items-center gap-2 truncate">
                   {user?.name || user?.username} <VerifiedBadge user={user} />
-                  <VisualMarker marker={user?.accessibilityVisualMarker} />
                 </h1>
                 <p className="text-skillswap-teal font-semibold">@{user?.username?.toLowerCase()}</p>
               </div>
@@ -422,7 +420,6 @@ const ProfilePage = () => {
             <div className="flex gap-6 pt-4 border-t border-border/50">
               <div className="text-center"><p className="font-bold text-lg">{user?.followers || 0}</p><p className="text-[10px] uppercase text-muted-foreground font-bold">Seguidores</p></div>
               <div className="text-center"><p className="font-bold text-lg">{user?.following || 0}</p><p className="text-[10px] uppercase text-muted-foreground font-bold">Seguindo</p></div>
-              <div className="text-center"><p className="font-bold text-lg text-skillswap-teal">{user?.swapCoins || 0}</p><p className="text-[10px] uppercase text-muted-foreground font-bold">SwapCoins</p></div>
             </div>
           </div>
 

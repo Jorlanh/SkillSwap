@@ -189,24 +189,15 @@ public class UserServiceImpl implements UserService {
 
     @Override
     @Transactional 
-    public User updateAccessibilitySettings(UUID userId, boolean librasAvatarEnabled, String preferredTheme,
-                             String accessibilityVisualMarker, boolean accessibilityVisualMarkerPublic) {
+    public User updateAccessibilitySettings(UUID userId, boolean librasAvatarEnabled, String preferredTheme) {
         User user = findById(userId); 
         user.setLibrasAvatarEnabled(librasAvatarEnabled);
 
-        if (StringUtils.hasText(preferredTheme) && List.of("default", "high-contrast", "high-contrast-dark", "high-contrast-light").contains(preferredTheme)) {
+        if (StringUtils.hasText(preferredTheme) && List.of("default", "high-contrast-dark", "high-contrast-light").contains(preferredTheme)) {
             user.setPreferredTheme(preferredTheme);
         } else if (preferredTheme != null) {
             System.err.println("WARN: Tentativa de definir tema de acessibilidade inválido: " + preferredTheme);
         }
-
-        if (StringUtils.hasText(accessibilityVisualMarker)
-                && List.of("BLUE_TRIANGLE", "ORANGE_SQUARE", "NEUTRAL_CIRCLE").contains(accessibilityVisualMarker)) {
-            user.setAccessibilityVisualMarker(accessibilityVisualMarker);
-        } else if (accessibilityVisualMarker != null) {
-            System.err.println("WARN: Tentativa de definir marcador visual inválido: " + accessibilityVisualMarker);
-        }
-        user.setAccessibilityVisualMarkerPublic(accessibilityVisualMarkerPublic);
         return userRepository.save(user);
     }
 

@@ -11,7 +11,6 @@ import ChatPage from '@/pages/ChatPage';
 import ProfilePage from '@/pages/ProfilePage';
 import SearchPage from '@/pages/SearchPage';
 import CommunitiesPage from '@/pages/CommunitiesPage';
-import FinancePage from '@/pages/FinancePage';
 import ActivitiesPage from '@/pages/ActivitiesPage';
 import ProposalsPage from '@/pages/ProposalsPage';
 import PreferencesPage from '@/pages/PreferencesPage';
@@ -21,12 +20,9 @@ import RankingsPage from '@/pages/RankingsPage';
 import NotFound from './pages/NotFound';
 import AdminConsole from '@/pages/AdminConsole';
 import OpportunityOsPage from '@/pages/OpportunityOsPage';
-import InstitutionalWorkspacePage from '@/pages/InstitutionalWorkspacePage';
-import PrivacyPage from '@/pages/PrivacyPage';
 import { ChatbotELOS } from '@/components/ChatbotELOS';
 import AuthPage from '@/pages/AuthPage';
-import GuardianConsentPage from '@/pages/GuardianConsentPage';
-import { onMessageListener } from './lib/messaging';
+import { requestNotificationPermission, onMessageListener } from './lib/messaging';
 import { auth } from './lib/firebase';
 import { onIdTokenChanged } from 'firebase/auth';
 
@@ -42,6 +38,7 @@ const App = () => {
   useEffect(() => onIdTokenChanged(auth, async (user) => {
     if (user) {
       setIsAuthenticated(true);
+      requestNotificationPermission();
       onMessageListener();
     } else {
       setIsAuthenticated(false);
@@ -66,15 +63,12 @@ const App = () => {
           {showAuthModal && <AuthPage isModal onClose={() => setShowAuthModal(false)} />}
           <Routes>
             <Route path="/login" element={<AuthPage />} />
-            <Route path="/privacidade" element={<PrivacyPage />} />
-            <Route path="/consentimento-responsavel" element={<GuardianConsentPage />} />
             <Route element={<MainLayout requireAuth={requireAuth} />}>
               <Route path="/" element={<FeedPage />} />
               <Route path="/mensagens" element={<ChatPage />} />
               <Route path="/perfil/:username?" element={<ProfilePage />} />
               <Route path="/busca" element={<SearchPage />} />
               <Route path="/comunidades" element={<CommunitiesPage />} />
-              <Route path="/financeiro" element={<FinancePage />} />
               <Route path="/atividades" element={<ActivitiesPage />} />
               <Route path="/propostas" element={<ProposalsPage />} />
               <Route path="/preferencias" element={<PreferencesPage />} />
@@ -85,7 +79,6 @@ const App = () => {
               <Route path="/admin" element={<AdminConsole />} />
               <Route path="/acesso" element={<ProtectedRoute><OpportunityOsPage /></ProtectedRoute>} />
               <Route path="/jornada" element={<ProtectedRoute><OpportunityOsPage /></ProtectedRoute>} />
-              <Route path="/institucional" element={<ProtectedRoute><InstitutionalWorkspacePage /></ProtectedRoute>} />
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>

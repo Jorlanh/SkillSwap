@@ -70,18 +70,6 @@ public class EmailServiceImpl implements EmailService {
     }
 
     @Override
-    public void sendGuardianConsentEmail(String to, String guardianName, String minorName, String confirmationLink) {
-        String subject = "SkillSwap - confirmação de responsável";
-        String body = "Olá, " + guardianName + ",\n\n"
-            + "Foi informado que você é responsável por " + minorName
-            + " em um cadastro no SkillSwap. Para confirmar o consentimento, acesse o link abaixo:\n\n"
-            + confirmationLink + "\n\n"
-            + "O link é individual e expira em 72 horas. Se você não reconhece essa solicitação, não confirme e entre em contato com a equipe do SkillSwap.\n\n"
-            + "Esta confirmação valida o controle deste endereço de e-mail. A equipe deve avaliar requisitos jurídicos adicionais antes de publicar a plataforma em cada país.";
-        sendNotification(to, subject, body);
-    }
-
-    @Override
     public void sendLessonNotification(String toEmail, String lessonDetails) {
         sendNotification(toEmail, "Lembrete de Aula", "Lembrete de Aula: " + lessonDetails);
     }

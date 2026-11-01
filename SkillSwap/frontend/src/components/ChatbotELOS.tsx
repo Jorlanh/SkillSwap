@@ -36,10 +36,8 @@ export const ChatbotELOS = () => {
       const { data } = await ChatbotService.ask(userMsg, simplify);
       setHistory((previous) => [...previous, { role: 'bot', text: data.response }]);
       if (voiceMode) speak(data.response);
-    } catch (error: any) {
-      const fallback = error?.response?.status === 428
-        ? 'Para usar o assistente, permita a integração de IA no Centro de Privacidade.'
-        : 'Não foi possível conectar ao assistente. Tente novamente.';
+    } catch {
+      const fallback = 'Não foi possível conectar ao assistente. Tente novamente.';
       setHistory((previous) => [...previous, { role: 'bot', text: fallback }]);
       if (voiceMode) speak(fallback);
     } finally { setIsLoading(false); }

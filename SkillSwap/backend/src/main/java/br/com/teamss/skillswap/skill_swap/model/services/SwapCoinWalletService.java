@@ -63,7 +63,6 @@ public class SwapCoinWalletService {
     private final boolean rabbitEnabled;
     private final String rabbitExchange;
     private final String rabbitRoutingKey;
-    private final boolean commerceEnabled;
 
     public SwapCoinWalletService(
         UserRepository userRepository,
@@ -77,8 +76,7 @@ public class SwapCoinWalletService {
         RabbitTemplate rabbitTemplate,
         @Value("${app.messaging.rabbitmq.enabled:true}") boolean rabbitEnabled,
         @Value("${app.messaging.rabbitmq.exchange:skillswap.payments}") String rabbitExchange,
-        @Value("${app.messaging.rabbitmq.routing-key:payment.fulfillment}") String rabbitRoutingKey,
-        @Value("${app.commerce.enabled:false}") boolean commerceEnabled
+        @Value("${app.messaging.rabbitmq.routing-key:payment.fulfillment}") String rabbitRoutingKey
     ) {
         this.userRepository = userRepository;
         this.walletRepository = walletRepository;
@@ -92,17 +90,12 @@ public class SwapCoinWalletService {
         this.rabbitEnabled = rabbitEnabled;
         this.rabbitExchange = rabbitExchange;
         this.rabbitRoutingKey = rabbitRoutingKey;
-        this.commerceEnabled = commerceEnabled;
     }
 
     @Transactional
     public SwapCoinWalletResponse getWallet(UUID userId) {
         SwapCoinWallet wallet = getOrCreateWallet(userId);
         return new SwapCoinWalletResponse(wallet.getBalance(), wallet.getVersion());
-    }
-
-    public boolean isCommerceEnabled() {
-        return commerceEnabled;
     }
 
     @Transactional(readOnly = true)
@@ -113,9 +106,6 @@ public class SwapCoinWalletService {
 
     @Transactional
     public CreateCheckoutSessionResponse createCheckoutSession(UUID userId, String packageCode) {
-        if (!commerceEnabled) {
-            throw new IllegalStateException("A compra de SwapCoins está desativada no modo gratuito do SkillSwap.");
-        }
         ensureStripeApiKey();
         SwapCoinPackage selectedPackage = SwapCoinPackage.fromCode(packageCode);
         User user = getUser(userId);
@@ -147,7 +137,6 @@ public class SwapCoinWalletService {
     /** Verifies Stripe's signature before any persistence action. */
     @Transactional
     public void handleStripeWebhook(String payload, String signature) {
-        if (!commerceEnabled) return;
         if (!StringUtils.hasText(stripeWebhookSecret)) {
             throw new IllegalStateException("O segredo de webhook da Stripe não está configurado.");
         }
@@ -168,7 +157,6 @@ public class SwapCoinWalletService {
         if (eventObject.isEmpty() || !(eventObject.get() instanceof Session session)) {
             throw new IllegalArgumentException("Evento da Stripe sem sessão de checkout utilizável.");
         }
-        if (session.getMetadata() == null || !session.getMetadata().containsKey("payment_id")) return;
         if (!"paid".equalsIgnoreCase(session.getPaymentStatus())) {
             return;
         }
@@ -258,7 +246,6 @@ public class SwapCoinWalletService {
 
     @Transactional
     public void fulfillPaidCheckout(String sessionId, Long amountTotal, String currency, String paymentIntent) {
-        if (!commerceEnabled) return;
         fulfillPaidCheckoutValues(sessionId, amountTotal, currency, paymentIntent);
     }
 

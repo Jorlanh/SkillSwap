@@ -12,6 +12,4 @@ public interface EmailService {
     void sendVerificationCode(String to, String code);
 
     void sendVerificationCodeViaSMS(String phoneNumber, String code); // Adicionado
-
-    void sendGuardianConsentEmail(String to, String guardianName, String minorName, String confirmationLink);
 }

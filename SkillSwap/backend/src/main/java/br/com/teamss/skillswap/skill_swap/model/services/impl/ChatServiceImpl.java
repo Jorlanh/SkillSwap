@@ -11,9 +11,6 @@ import br.com.teamss.skillswap.skill_swap.model.repositories.UserRepository;
 import br.com.teamss.skillswap.skill_swap.model.services.ChatService;
 import br.com.teamss.skillswap.skill_swap.model.services.ContentModerationService;
 import br.com.teamss.skillswap.skill_swap.model.services.EmailService;
-import br.com.teamss.skillswap.skill_swap.model.services.MinorSafetyService;
-import br.com.teamss.skillswap.skill_swap.model.services.ModerationAssessment;
-import br.com.teamss.skillswap.skill_swap.model.services.ReportService;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -36,25 +33,18 @@ public class ChatServiceImpl implements ChatService {
     private UserRepository userRepository;
     @Autowired
     private ContentModerationService moderationService;
-    @Autowired
-    private MinorSafetyService minorSafetyService;
-    @Autowired
-    private ReportService reportService;
 
     @Override
     @Transactional
     public ChatMessage sendMessage(ChatMessageRequestDTO messageRequest) {
-        User sender = userRepository.findById(messageRequest.getSenderId())
-                .orElseThrow(() -> new EntityNotFoundException("Remetente não encontrado"));
-        ModerationAssessment assessment = moderationService.assess(messageRequest.getContent());
-        if (assessment.blocked()) {
-            reportService.createAutomatedCase(sender, messageRequest.getContent(), "chat", assessment);
+        if (moderationService.isContentInappropriate(messageRequest.getContent())) {
             throw new InappropriateContentException("A sua mensagem viola as diretrizes da comunidade.");
         }
 
+        User sender = userRepository.findById(messageRequest.getSenderId())
+                .orElseThrow(() -> new EntityNotFoundException("Remetente não encontrado"));
         User receiver = userRepository.findById(messageRequest.getReceiverId())
                 .orElseThrow(() -> new EntityNotFoundException("Destinatário não encontrado"));
-        minorSafetyService.assertDirectInteractionAllowed(sender, receiver);
 
         ChatMessage message = new ChatMessage();
         message.setSender(sender);
@@ -72,7 +62,6 @@ public class ChatServiceImpl implements ChatService {
                 .orElseThrow(() -> new EntityNotFoundException("Remetente não encontrado"));
         User receiver = userRepository.findById(receiverId)
                 .orElseThrow(() -> new EntityNotFoundException("Destinatário não encontrado"));
-        minorSafetyService.assertDirectInteractionAllowed(sender, receiver);
 
         ChatMessage message = new ChatMessage();
         message.setSender(sender);
@@ -90,7 +79,6 @@ public class ChatServiceImpl implements ChatService {
                 .orElseThrow(() -> new EntityNotFoundException("Remetente não encontrado"));
         User receiver = userRepository.findById(receiverId)
                 .orElseThrow(() -> new EntityNotFoundException("Destinatário não encontrado"));
-        minorSafetyService.assertDirectInteractionAllowed(sender, receiver);
 
         ChatMessage message = new ChatMessage();
         message.setSender(sender);
@@ -123,7 +111,7 @@ public class ChatServiceImpl implements ChatService {
     @Override
     @Transactional(readOnly = true)
     public List<ChatMessage> getChatHistory(UUID userId1, UUID userId2) {
-        return chatRepository.findBySenderIdAndReceiverIdOrSenderIdAndReceiverId(userId1, userId2);
+        return chatRepository.findBySenderIdAndReceiverIdOrSenderIdAndReceiverId(userId1, userId2, userId1, userId2);
     }
 
     @Override

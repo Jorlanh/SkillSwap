@@ -86,8 +86,6 @@ public class UserServiceDTOImpl implements UserServiceDTO {
         // --- START: Accessibility Settings ---
         userDTO.setLibrasAvatarEnabled(user.isLibrasAvatarEnabled());
         userDTO.setPreferredTheme(user.getPreferredTheme());
-        userDTO.setAccessibilityVisualMarker(user.getAccessibilityVisualMarker());
-        userDTO.setAccessibilityVisualMarkerPublic(user.isAccessibilityVisualMarkerPublic());
         // --- END: Accessibility Settings ---
 
         return userDTO;
@@ -211,8 +209,7 @@ public class UserServiceDTOImpl implements UserServiceDTO {
         if (user == null) return null;
         Profile profile = user.getProfile();
         ProfileDTO profileDTO = null;
-        boolean profilePrivate = profile != null && Boolean.TRUE.equals(profile.getIsPrivate());
-        if (profile != null && !profilePrivate) {
+        if (profile != null) {
             profileDTO = new ProfileDTO(
                 profile.getProfileId(), profile.getDescription(), profile.getImageUrl(),
                 profile.getLocation(), profile.getContactInfo(), profile.getSocialMediaLinks(),
@@ -221,12 +218,11 @@ public class UserServiceDTOImpl implements UserServiceDTO {
             );
         }
 
-        Set<SkillDTO> skills = (!profilePrivate && user.getSkills() != null) ? user.getSkills().stream()
+        Set<SkillDTO> skills = (user.getSkills() != null) ? user.getSkills().stream()
             .map(skill -> new SkillDTO(skill.getSkillId(), skill.getName(), skill.getDescription(), skill.getCategory(), skill.getLevel()))
             .collect(Collectors.toSet()) : Collections.emptySet();
 
-        return new UserPublicProfileDTO(user.getUsername(), user.getName(), user.isVerifiedBadge(), profileDTO,
-                skills, user.isAccessibilityVisualMarkerPublic() ? user.getAccessibilityVisualMarker() : null);
+        return new UserPublicProfileDTO(user.getUsername(), user.getName(), user.isVerifiedBadge(), profileDTO, skills);
     }
 
     @Override
@@ -255,9 +251,7 @@ public class UserServiceDTOImpl implements UserServiceDTO {
             user.isVerifiedBadge(), profileDTO, skills, roles,
             // --- START: Accessibility Settings ---
             user.isLibrasAvatarEnabled(),
-            user.getPreferredTheme(),
-            user.getAccessibilityVisualMarker(),
-            user.isAccessibilityVisualMarkerPublic()
+            user.getPreferredTheme()
             // --- END: Accessibility Settings ---
         );
     }
@@ -272,10 +266,8 @@ public class UserServiceDTOImpl implements UserServiceDTO {
 
     @Override
     @Transactional 
-    public UserDTO updateAccessibilitySettingsDTO(UUID userId, boolean librasAvatarEnabled, String preferredTheme,
-                                      String accessibilityVisualMarker, boolean accessibilityVisualMarkerPublic) {
-        User updatedUser = userService.updateAccessibilitySettings(userId, librasAvatarEnabled, preferredTheme,
-            accessibilityVisualMarker, accessibilityVisualMarkerPublic);
+    public UserDTO updateAccessibilitySettingsDTO(UUID userId, boolean librasAvatarEnabled, String preferredTheme) {
+        User updatedUser = userService.updateAccessibilitySettings(userId, librasAvatarEnabled, preferredTheme);
         return toUserDTO(updatedUser);
     }
 }

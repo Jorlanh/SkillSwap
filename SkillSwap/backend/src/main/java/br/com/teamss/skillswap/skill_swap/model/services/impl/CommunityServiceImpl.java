@@ -6,8 +6,6 @@ import br.com.teamss.skillswap.skill_swap.model.exception.InappropriateContentEx
 import br.com.teamss.skillswap.skill_swap.model.repositories.*;
 import br.com.teamss.skillswap.skill_swap.model.services.CommunityService;
 import br.com.teamss.skillswap.skill_swap.model.services.ContentModerationService;
-import br.com.teamss.skillswap.skill_swap.model.services.ModerationAssessment;
-import br.com.teamss.skillswap.skill_swap.model.services.ReportService;
 import br.com.teamss.skillswap.skill_swap.model.services.FileUploadService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -32,7 +30,6 @@ public class CommunityServiceImpl implements CommunityService {
     private final ShareLinkRepository shareLinkRepository;
     private final FileUploadService fileUploadService;
     private final ContentModerationService moderationService;
-    private final ReportService reportService;
 
     @Autowired
     public CommunityServiceImpl(
@@ -41,7 +38,7 @@ public class CommunityServiceImpl implements CommunityService {
             ProfileRepository profileRepository, LikeRepository likeRepository,
             CommentRepository commentRepository, RepostRepository repostRepository,
             ShareLinkRepository shareLinkRepository, FileUploadService fileUploadService,
-            ContentModerationService moderationService, ReportService reportService) {
+            ContentModerationService moderationService) {
         this.communityRepository = communityRepository;
         this.userRepository = userRepository;
         this.postRepository = postRepository;
@@ -53,21 +50,17 @@ public class CommunityServiceImpl implements CommunityService {
         this.shareLinkRepository = shareLinkRepository;
         this.fileUploadService = fileUploadService;
         this.moderationService = moderationService;
-        this.reportService = reportService;
     }
 
     @Override
     public Post createCommunityPost(UUID communityId, UUID userId, String title, String content,
                                     MultipartFile image, MultipartFile video) throws IOException {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("Usuário não encontrado!"));
-        ModerationAssessment titleAssessment = moderationService.assess(title);
-        ModerationAssessment contentAssessment = moderationService.assess(content);
-        if (titleAssessment.blocked() || contentAssessment.blocked()) {
-            ModerationAssessment assessment = contentAssessment.blocked() ? contentAssessment : titleAssessment;
-            reportService.createAutomatedCase(user, content, "post de comunidade", assessment);
+        if (moderationService.isContentInappropriate(title) || moderationService.isContentInappropriate(content)) {
             throw new InappropriateContentException("O seu post não pôde ser publicado pois contém texto que viola as nossas diretrizes da comunidade.");
         }
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("Usuário não encontrado!"));
         Community community = communityRepository.findById(communityId)
                 .orElseThrow(() -> new RuntimeException("Comunidade não encontrada!"));
         Profile profile = profileRepository.findByUser_UserId(userId)
@@ -90,15 +83,14 @@ public class CommunityServiceImpl implements CommunityService {
     
     @Override
     public Comment commentPost(UUID communityId, Long postId, CommentDTO commentDTO) {
+        if (moderationService.isContentInappropriate(commentDTO.getContent())) {
+            throw new InappropriateContentException("O seu comentário não pôde ser publicado pois contém texto que viola as nossas diretrizes da comunidade.");
+        }
+    
         Post post = postRepository.findById(postId)
                 .orElseThrow(() -> new RuntimeException("Post não encontrado!"));
         User user = userRepository.findById(commentDTO.getUserId())
                 .orElseThrow(() -> new RuntimeException("Usuário não encontrado!"));
-        ModerationAssessment assessment = moderationService.assess(commentDTO.getContent());
-        if (assessment.blocked()) {
-            reportService.createAutomatedCase(user, commentDTO.getContent(), "comentário de comunidade", assessment);
-            throw new InappropriateContentException("O seu comentário não pôde ser publicado pois contém texto que viola as nossas diretrizes da comunidade.");
-        }
 
         Comment comment = new Comment();
         comment.setPost(post);

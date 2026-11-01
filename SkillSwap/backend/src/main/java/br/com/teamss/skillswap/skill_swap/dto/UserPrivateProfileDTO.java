@@ -18,9 +18,7 @@ public record UserPrivateProfileDTO(
     Set<String> roles,
     // --- START: Accessibility Settings ---
     boolean librasAvatarEnabled,
-    String preferredTheme,
-    String accessibilityVisualMarker,
-    boolean accessibilityVisualMarkerPublic
+    String preferredTheme
     // --- END: Accessibility Settings ---
 ) {
      // Construtor canônico gerado pelo record.

@@ -122,91 +122,33 @@
   }
 }
 
-/* Alto contraste: áreas de fundo ficam escuras, textos claros recebem destaque
-   vermelho e os elementos interativos ganham bordas e foco visíveis. */
-.high-contrast {
-  --background: 0 0% 4%;
-  --foreground: 0 100% 86%;
-  --card: 0 0% 9%;
-  --card-foreground: 0 100% 92%;
-  --popover: 0 0% 8%;
-  --popover-foreground: 0 100% 92%;
-  --primary: 0 100% 68%;
-  --primary-foreground: 0 0% 4%;
-  --secondary: 0 0% 18%;
-  --secondary-foreground: 0 100% 92%;
-  --muted: 0 0% 15%;
-  --muted-foreground: 0 100% 86%;
-  --accent: 0 100% 20%;
-  --accent-foreground: 0 100% 96%;
-  --border: 0 0% 94%;
-  --input: 0 0% 94%;
-  --ring: 0 100% 80%;
-  --sidebar-background: 0 0% 3%;
-  --sidebar-foreground: 0 100% 86%;
-  --sidebar-primary: 0 100% 68%;
-  --sidebar-primary-foreground: 0 0% 4%;
-  --sidebar-accent: 0 100% 20%;
-  --sidebar-accent-foreground: 0 100% 96%;
-  --sidebar-border: 0 0% 94%;
-  --sidebar-ring: 0 100% 80%;
-  --skillswap-teal: 0 100% 68%;
-  --skillswap-light-blue: 0 100% 25%;
+/* Preferência de contraste escolhida pelo usuário. O texto nunca depende apenas de cor. */
+html[data-contrast="high"] {
+  --background: 0 0% 5%;
+  --foreground: 0 0% 100%;
+  --card: 0 0% 10%;
+  --card-foreground: 0 0% 100%;
+  --popover: 0 0% 10%;
+  --popover-foreground: 0 0% 100%;
+  --primary: 45 100% 65%;
+  --primary-foreground: 0 0% 0%;
+  --muted: 0 0% 18%;
+  --muted-foreground: 0 0% 93%;
+  --accent: 195 100% 65%;
+  --accent-foreground: 0 0% 0%;
+  --border: 0 0% 86%;
+  --input: 0 0% 86%;
+  --ring: 45 100% 65%;
+  --skillswap-teal: 45 100% 65%;
+  --skillswap-light-blue: 195 100% 65%;
   --skillswap-card-bg: 0 0% 10%;
-  --skillswap-gold: 45 100% 75%;
-  --skillswap-accept: 120 100% 70%;
-  --skillswap-reject: 0 100% 75%;
 }
 
-.high-contrast button,
-.high-contrast a,
-.high-contrast [role="button"],
-.high-contrast input,
-.high-contrast textarea,
-.high-contrast select {
-  border-width: 2px;
-}
-
-.high-contrast button:focus-visible,
-.high-contrast a:focus-visible,
-.high-contrast input:focus-visible,
-.high-contrast textarea:focus-visible,
-.high-contrast select:focus-visible,
-.high-contrast [tabindex]:focus-visible {
-  outline: 3px solid #ffffff;
+html[data-contrast="high"] :focus-visible {
+  outline: 3px solid hsl(45 100% 65%);
   outline-offset: 3px;
-  box-shadow: 0 0 0 6px #ff5c5c;
 }
 
-.visual-marker {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  vertical-align: middle;
-}
-
-.visual-marker-shape {
-  display: inline-block;
-  flex: 0 0 auto;
-  border: 2px solid #111827;
-}
-
-.visual-marker-shape-triangle {
-  background: #1683d8;
-  clip-path: polygon(50% 0%, 100% 100%, 0% 100%);
-  border-radius: 2px;
-}
-
-.visual-marker-shape-square {
-  background: #f27b22;
-  border-radius: 3px;
-}
-
-.visual-marker-shape-circle {
-  background: #ffffff;
-  border-radius: 9999px;
-}
-
-.high-contrast .visual-marker-shape {
-  border-color: #ffffff;
-}
+html[data-font-scale="small"] { font-size: 87.5%; }
+html[data-font-scale="medium"] { font-size: 100%; }
+html[data-font-scale="large"] { font-size: 118%; }

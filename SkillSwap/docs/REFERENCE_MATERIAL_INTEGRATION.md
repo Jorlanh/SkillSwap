@@ -7,7 +7,7 @@ Os PDFs e documentos enviados pela equipe foram tratados como referências de re
 | `C4SkillSwap.pdf` | Contextos de usuário, aplicação, dados e integrações. |
 | `Cores.pdf` | Identidade visual e verificação de contraste. |
 | `Descritivo.pdf` | Problema, proposta de valor e funções de troca. |
-| `Diagrama de Classe.pdf` | Domínio de usuário, perfil, habilidade, proposta, comunidade e carteira. |
+| `Diagrama de Classe.pdf` | Domínio de usuário, perfil, habilidade, proposta e comunidade. |
 | `Icones.pdf` | Referência visual para ações de perfil, troca, comunicação e Access. |
 | `Levantamento de Documentos.pdf` | Lista de requisitos de arquitetura, segurança, teste, deploy e documentação. |
 | `Metodologia Ágil.pdf` | Ciclos curtos, backlog, validação incremental e revisão coletiva. |

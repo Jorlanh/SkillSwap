@@ -37,8 +37,7 @@ public interface UserServiceDTO {
      * @param preferredTheme A nova string do tema preferido.
      * @return O UserDTO atualizado refletindo as alterações.
      */
-    UserDTO updateAccessibilitySettingsDTO(UUID userId, boolean librasAvatarEnabled, String preferredTheme,
-                                           String accessibilityVisualMarker, boolean accessibilityVisualMarkerPublic);
+    UserDTO updateAccessibilitySettingsDTO(UUID userId, boolean librasAvatarEnabled, String preferredTheme);
     // --- END: Accessibility Settings Specific Update DTO Method ---
 }
 

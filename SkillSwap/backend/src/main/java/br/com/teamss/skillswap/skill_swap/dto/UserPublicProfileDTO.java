@@ -8,6 +8,5 @@ public record UserPublicProfileDTO(
     String name,
     boolean verifiedBadge, // NOVO CAMPO
     ProfileDTO profile,
-    Set<SkillDTO> skills,
-    String accessibilityVisualMarker
+    Set<SkillDTO> skills
 ) {}

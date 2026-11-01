@@ -13,8 +13,7 @@ public interface UserService {
     User update(UUID id, User user); 
     void delete(UUID id); 
 
-    User updateAccessibilitySettings(UUID userId, boolean librasAvatarEnabled, String preferredTheme,
-                                     String accessibilityVisualMarker, boolean accessibilityVisualMarkerPublic);
+    User updateAccessibilitySettings(UUID userId, boolean librasAvatarEnabled, String preferredTheme);
 
     // Incremento vital para sincronização de Perfil e Avatar
     void updateUserIdentityAndSkills(UUID userId, String name, String username, List<String> skillNames);

@@ -49,17 +49,6 @@ export const AdminService = {
   unbanUser: (userId: string) => api.post(`/console-management/users/${userId}/unban`),
   setRole: (userId: string, role: string, enabled: boolean) =>
     api.put(`/console-management/users/${userId}/role`, { role, enabled }),
-  getModerationCases: () => api.get('/console-management/moderation/cases'),
-  getModerationPolicy: () => api.get('/console-management/moderation/policy'),
-  updateModerationPolicy: (data: { automaticTemporaryBanEnabled: boolean; automaticTemporaryBanHours: number }) =>
-    api.put('/console-management/moderation/policy', data),
-  decideModeration: (reportId: number, data: {
-    action: 'RELEASE' | 'WARNING' | 'SUSPEND_DAYS' | 'SUSPEND_MONTHS' | 'PERMANENT_BAN';
-    reason: string;
-    evidence?: string;
-    durationDays?: number;
-    humanConfirmation: boolean;
-  }) => api.post(`/console-management/moderation/cases/${reportId}/decision`, data),
 };
 
 // ==========================================
@@ -193,8 +182,8 @@ export const LessonService = {
   schedule: (data: any) => api.post('/lesson/schedule', data),
   getUpcoming: (userId: string | number) => api.get(`/lesson/upcoming/${userId}`),
   getMine: () => api.get('/lesson/mine'),
-  complete: (lessonId: number) => api.post(`/lesson/${lessonId}/complete`),
-  getCertificate: (lessonId: number) => api.get(`/lesson/certificate/${lessonId}`),
+  confirmCompletion: (lessonId: number) => api.patch(`/lesson/${lessonId}/complete`),
+  getCertificate: (lessonId: number) => api.get(`/lesson/${lessonId}/certificate`),
   notify: (lessonId: number) => api.post(`/lesson/notify/${lessonId}`),
 };
 
@@ -272,43 +261,11 @@ export const PermissionService = {
 // ==========================================
 // FINANCEIRO & CONFIGURAÇÕES & REPORTES
 // ==========================================
-export const FinanceService = {
-  getWallet: () => api.get('/wallet'),
-  getPackages: () => api.get('/wallet/packages'),
-  createCheckoutSession: (packageCode: string) => api.post('/wallet/checkout-sessions', { packageCode }),
-  getHistory: (page = 0, size = 20) => api.get('/wallet/ledger', { params: { page, size } }),
-  transfer: (recipientUserId: string, amount: number, note?: string) =>
-    api.post('/wallet/transfers', { recipientUserId, amount, note }),
-  tip: (recipientUserId: string) => api.post('/wallet/tips', { recipientUserId, amount: 5 }),
-};
-
 export const AccessService = {
   getOverview: () => api.get('/access/overview'),
   getRecommendations: () => api.get('/access/recommendations'),
   getOpportunities: () => api.get('/access/opportunities'),
   createOpportunity: (data: any) => api.post('/access/opportunities', data),
-};
-
-// ==========================================
-// WORKSPACE INSTITUCIONAL B2B2C
-// ==========================================
-export const InstitutionalService = {
-  getCatalog: () => api.get('/institutional/catalog'),
-  getOrganizations: () => api.get('/institutional/organizations'),
-  createOrganization: (data: unknown) => api.post('/institutional/organizations', data),
-  getDashboard: (organizationId: string) => api.get(`/institutional/organizations/${organizationId}/dashboard`),
-  getMembers: (organizationId: string) => api.get(`/institutional/organizations/${organizationId}/members`),
-  addMember: (organizationId: string, data: unknown) => api.post(`/institutional/organizations/${organizationId}/members`, data),
-  updateMember: (organizationId: string, membershipId: string, data: unknown) => api.patch(`/institutional/organizations/${organizationId}/members/${membershipId}`, data),
-  removeMember: (organizationId: string, membershipId: string) => api.delete(`/institutional/organizations/${organizationId}/members/${membershipId}`),
-  getOpportunities: (organizationId: string) => api.get(`/institutional/organizations/${organizationId}/opportunities`),
-  createOpportunity: (organizationId: string, data: unknown) => api.post(`/institutional/organizations/${organizationId}/opportunities`, data),
-  updateOpportunityStatus: (organizationId: string, opportunityId: string, status: string) => api.patch(`/institutional/organizations/${organizationId}/opportunities/${opportunityId}/status`, { status }),
-  getApplications: (organizationId: string) => api.get(`/institutional/organizations/${organizationId}/applications`),
-  updateApplicationStatus: (organizationId: string, applicationId: string, status: string) => api.patch(`/institutional/organizations/${organizationId}/applications/${applicationId}/status`, { status }),
-  getSubscription: (organizationId: string) => api.get(`/institutional/organizations/${organizationId}/subscription`),
-  updateSubscription: (organizationId: string, data: unknown) => api.put(`/institutional/organizations/${organizationId}/subscription`, data),
-  createBillingCheckout: (organizationId: string, data: unknown) => api.post(`/institutional/organizations/${organizationId}/billing/checkout`, data),
 };
 
 // ==========================================
@@ -326,21 +283,6 @@ export const OpportunityOsService = {
   apply: (opportunityId: string, message?: string) => api.post(`/opportunity-os/opportunities/${opportunityId}/apply`, { message }),
 };
 
-export const PremiumService = {
-  getCatalog: () => api.get('/premium/catalog'),
-  getAiUsage: () => api.get('/premium/usage/ai'),
-  profilePlan: () => api.post('/premium/ai/profile-plan'),
-  boostProposal: (proposalId: number) => api.post(`/premium/proposals/${proposalId}/boost`),
-  highlightPost: (postId: number) => api.post(`/premium/posts/${postId}/highlight`),
-  sponsorProposal: (proposalId: number) => api.post(`/premium/proposals/${proposalId}/sponsor`),
-  sponsorPost: (postId: number) => api.post(`/premium/posts/${postId}/sponsor`),
-  addPortfolioSlot: () => api.post('/premium/profile/portfolio-slots'),
-  addBioLimit: () => api.post('/premium/profile/bio-limit'),
-  addPostLimit: () => api.post('/premium/profile/post-limit'),
-  buyExtraLessonHours: (lessonId: number, hours: number) =>
-    api.post(`/premium/lessons/${lessonId}/extra-hours`, { hours }),
-};
-
 export const KarmaService = {
   getMe: () => api.get('/karma/me'),
   getTop: () => api.get('/karma/top'),
@@ -353,36 +295,13 @@ export const SettingsService = {
   getPreferences: () => api.get('/settings/preferences'),
   updatePreferences: (data: any) => api.put('/settings/preferences', data),
   changePassword: (data: any) => api.put('/settings/security/password', data),
-  updateAccessibility: (data: {
-    preferredTheme?: string;
-    accessibilityVisualMarker?: string;
-    librasAvatarEnabled?: boolean;
-    accessibilityVisualMarkerPublic?: boolean;
-  }) => api.patch('/settings/accessibility/update', data),
-};
-
-export const PrivacyService = {
-  getPolicy: () => api.get('/privacy/policy'),
-  getMinorPolicy: () => api.get('/privacy/minor-policy'),
-  ageGate: (birthDate: string, guardian?: { guardianName?: string; guardianEmail?: string; guardianRelationship?: string; locale?: string }) =>
-    api.post('/privacy/me/age-gate', { birthDate, ...guardian }),
-  minorStatus: () => api.get('/privacy/me/minor-status'),
-  guardianConsentStatus: (token: string) => api.get('/privacy/guardian-consent', { params: { token } }),
-  confirmGuardianConsent: (data: { token: string; guardianName: string; relationship: string; consentGranted: boolean }) =>
-    api.post('/privacy/guardian-consent/confirm', data),
-  getConsents: () => api.get('/privacy/me/consents'),
-  recordConsent: (purpose: string, granted = true, policyVersion?: string, locale = 'pt-BR') =>
-    api.post('/privacy/me/consents', { purpose, granted, policyVersion, locale }),
-  grant: (purpose: string) => api.post('/privacy/me/consents', { purpose, granted: true, locale: 'pt-BR' }),
-  revoke: (purpose: string) => api.post(`/privacy/me/consents/${purpose}/revoke`),
-  exportData: () => api.get('/privacy/me/export'),
-  correctData: (data: Record<string, unknown>) => api.patch('/privacy/me', data),
-  deleteAccount: () => api.delete('/privacy/me'),
+  updateAccessibility: (data: any) => api.patch('/settings/accessibility/update', data),
+  getAccessibilityPreferences: () => api.get('/accessibility/preferences'),
+  updateAccessibilityPreferences: (data: any) => api.put('/accessibility/preferences', data),
 };
 
 export const ReportService = {
   create: (data: any) => api.post('/reports', data),
-  appeal: (reportId: number, reason: string) => api.post(`/reports/${reportId}/appeal`, { reason }),
 };
 
 export default api;

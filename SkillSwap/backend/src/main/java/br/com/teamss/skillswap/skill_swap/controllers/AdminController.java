@@ -8,11 +8,7 @@ import br.com.teamss.skillswap.skill_swap.dto.AdminOperationsReportDTO;
 import br.com.teamss.skillswap.skill_swap.dto.SwapCoinLedgerResponse;
 import br.com.teamss.skillswap.skill_swap.dto.AdminWalletAdjustmentRequest;
 import br.com.teamss.skillswap.skill_swap.dto.SwapCoinWalletResponse;
-import br.com.teamss.skillswap.skill_swap.dto.ModerationCaseDTO;
-import br.com.teamss.skillswap.skill_swap.dto.ModerationDecisionRequest;
-import br.com.teamss.skillswap.skill_swap.dto.ModerationPolicyDTO;
 import br.com.teamss.skillswap.skill_swap.model.services.AdminService;
-import br.com.teamss.skillswap.skill_swap.model.services.ReportService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -31,11 +27,9 @@ import org.springframework.data.domain.Sort;
 public class AdminController {
 
     private final AdminService adminService;
-    private final ReportService reportService;
 
-    public AdminController(AdminService adminService, ReportService reportService) {
+    public AdminController(AdminService adminService) {
         this.adminService = adminService;
-        this.reportService = reportService;
     }
 
     @GetMapping("/stats")
@@ -88,28 +82,5 @@ public class AdminController {
     @PutMapping("/users/{userId}/role")
     public ResponseEntity<UserManagementDTO> setRole(@PathVariable UUID userId, @Valid @RequestBody AdminRoleRequest request) {
         return ResponseEntity.ok(adminService.setRole(userId, request.role(), request.enabled()));
-    }
-
-    @GetMapping("/moderation/cases")
-    public ResponseEntity<List<ModerationCaseDTO>> getModerationCases() {
-        return ResponseEntity.ok(reportService.getModerationQueue());
-    }
-
-    @GetMapping("/moderation/policy")
-    public ResponseEntity<ModerationPolicyDTO> getModerationPolicy() {
-        return ResponseEntity.ok(reportService.getModerationPolicy());
-    }
-
-    @PutMapping("/moderation/policy")
-    public ResponseEntity<ModerationPolicyDTO> updateModerationPolicy(
-            @Valid @RequestBody ModerationPolicyDTO policy) {
-        return ResponseEntity.ok(reportService.updateModerationPolicy(policy));
-    }
-
-    @PostMapping("/moderation/cases/{reportId}/decision")
-    public ResponseEntity<ModerationCaseDTO> decideModeration(
-            @PathVariable Long reportId,
-            @Valid @RequestBody ModerationDecisionRequest request) {
-        return ResponseEntity.ok(reportService.decide(reportId, request));
     }
 }

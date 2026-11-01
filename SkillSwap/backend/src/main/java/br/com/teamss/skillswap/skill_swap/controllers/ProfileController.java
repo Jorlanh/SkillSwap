@@ -40,9 +40,9 @@ public class ProfileController {
     @GetMapping("/user/{username}")
     public ResponseEntity<?> getProfileByUsername(@PathVariable String username) {
         try {
-            // Nunca devolver a entidade User diretamente: ela contém campos
-            // internos e credenciais que não pertencem a um perfil público.
-            return ResponseEntity.ok(userServiceDTO.findPublicProfileByUsername(username));
+            User user = userRepository.findByUsername(username)
+                    .orElseThrow(() -> new RuntimeException("Usuário não encontrado."));
+            return ResponseEntity.ok(user);
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(Map.of("error", "Usuário não encontrado."));
         }

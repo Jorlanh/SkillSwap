@@ -49,7 +49,7 @@ public class OpportunityApplication {
     public AccessOpportunity getOpportunity() { return opportunity; }
     public void setOpportunity(AccessOpportunity value) { opportunity = value; }
     public String getStatus() { return status; }
-    public void setStatus(String value) { status = value; updatedAt = Instant.now(); }
+    public void setStatus(String value) { status = value; }
     public String getMessage() { return message; }
     public void setMessage(String value) { message = value; }
     public Instant getCreatedAt() { return createdAt; }

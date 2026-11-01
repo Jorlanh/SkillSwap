@@ -1,0 +1,97 @@
+% Adendo autoral da equipe. Escopo final exclusivamente de software.
+\section{Reposicionamento para o SkillSwap Access}
+
+O SkillSwap Access amplia a plataforma de troca de habilidades para uma jornada digital de aprendizagem, prática, evidência, recomendação e oportunidade. A mesma conta serve a usuários comuns e a pessoas com deficiência; a prioridade de acessibilidade é uma decisão de produto, não uma separação de público.
+
+Este reposicionamento responde a uma fragmentação concreta. Cursos, comunidades, portfólios, vagas, mentorias, comunicação e recursos de acessibilidade normalmente exigem cadastros e contextos distintos. A plataforma propõe uma camada de continuidade: a pessoa informa interesses e habilidades, realiza uma atividade, registra evidência, recebe uma sugestão explicada e pode iniciar uma conexão com um projeto ou oportunidade.
+
+\section{Declaração de autoria e limites de interpretação}
+
+A equipe utilizou inteligência artificial somente para correção ortográfica, pontuação e revisão formal da redação. A autoria, as escolhas de requisitos, o código, a seleção das referências, os dados, os testes e a validação pertencem aos cinco autores. Nenhum resultado de usuário, métrica de impacto ou conclusão de superioridade é apresentado sem evidência produzida pelo protocolo.
+
+\section{Problema, objetivo e hipótese}
+
+O problema de produto é a perda de contexto entre aprender, demonstrar uma habilidade e acessar uma oportunidade. O problema de inclusão é que barreiras de navegação, contraste, leitura, comunicação e negociação de adaptações podem aparecer antes mesmo de a pessoa conseguir participar.
+
+O objetivo é especificar e implementar uma plataforma acessível que una aprendizagem entre pares, evidência prática, recomendação explicável e oportunidades, com controles de privacidade e uma visão institucional agregada.
+
+A hipótese de engenharia é que uma jornada contínua e explicável pode reduzir fricção de descoberta e aumentar a compreensão da próxima ação. A hipótese será considerada somente após piloto, métricas e análise da equipe; o desenho técnico não é prova de impacto social.
+
+\section{Público universal e valor institucional}
+
+Qualquer usuário pode ensinar, aprender, participar de um projeto, procurar mentoria ou montar portfólio. Pessoas com deficiência orientam requisitos de acessibilidade desde o início, enquanto usuários sem deficiência também se beneficiam de texto simples, áudio, teclado, contraste, legendas e navegação previsível.
+
+Universidades podem acompanhar trilhas e evidências. Empresas podem divulgar desafios e oportunidades com critérios de acessibilidade. Instituições de inclusão podem conectar formação e apoio. Em todos os casos, indicadores devem ser agregados, autorizados e úteis para uma decisão de melhoria, nunca para reduzir pessoas a uma taxa.
+
+\section{Funcionalidades incrementadas}
+
+\begin{itemize}
+  \item formação em texto, áudio, vídeo opcional, legendas e linguagem simples;
+  \item desafios e projetos com evidências práticas, comentários e portfólio;
+  \item recomendação explicável de cursos, mentores, projetos e oportunidades;
+  \item catálogo de bolsas, projetos, mentorias e vagas com requisitos acessíveis;
+  \item painel institucional com capacitação, participação e barreiras agregadas;
+  \item chat e arquivos como caminho principal, com fallback textual quando vídeo não estiver disponível;
+  \item Firebase Cloud Messaging opcional para notificações, sem token de sessão no navegador;
+  \item mapas baseados em Leaflet/OpenStreetMap ou MapLibre quando úteis, sem bloquear o fluxo remoto;
+  \item módulos comerciais fora do escopo da versão gratuita;
+  \item observabilidade por Actuator e Prometheus, com Grafana opcional.
+\end{itemize}
+
+\section{Arquitetura de software}
+
+\begin{center}
+\fbox{\parbox{0.84\textwidth}{\centering Usuários e tecnologias assistivas\\[2pt] $\downarrow$\\[2pt] React + TypeScript + Vite\\[2pt] $\downarrow$\\[2pt] Firebase Auth/FCM \quad Spring Boot — monólito modular\\[2pt] $\downarrow$\\[2pt] PostgreSQL + Flyway \quad Actuator + Prometheus}}
+\end{center}
+
+A decisão pelo monólito modular é deliberada. Os módulos de identidade, perfis, aprendizagem, comunidades, chat, notificações e administração possuem responsabilidades e contratos claros, mas compartilham o ciclo de build e o deploy inicial. Isso reduz custo operacional e facilita a banca reproduzir o sistema. Microsserviços são uma opção de evolução depois de existir carga real, fronteiras estáveis, observabilidade e equipe para operar falhas distribuídas.
+
+\section{Contrato do módulo Access}
+
+O frontend autenticado usa a rota \texttt{/acesso}. O backend expõe \texttt{GET /api/access/overview}, \texttt{GET /api/access/opportunities}, \texttt{GET /api/access/recommendations} e \texttt{POST /api/access/opportunities}. A criação é protegida por \texttt{ADMIN}. A migração \texttt{V5\_\_skillswap\_access.sql} cria \texttt{tb\_access\_opportunities} e insere dados demonstrativos com identificadores idempotentes.
+
+A pontuação inicial normaliza habilidades e interesses, separa requisitos por vírgula, busca correspondência parcial ou exata e acrescenta pesos pequenos para apoio de acessibilidade e modalidade remota. A resposta contém pontuação e explicação. A regra é intencionalmente simples para que a pessoa possa entender, contestar e corrigir seus dados.
+
+\section{Acessibilidade como aceite}
+
+Os testes precisam cobrir teclado sem mouse, ordem de foco, rótulos, mensagens de erro, contraste, zoom de 200\%, leitor de tela, leitura em voz alta, legendas, texto alternativo, linguagem simples e conexão limitada. Voz e VLibras são complementares. Nenhuma tela pode depender exclusivamente de cor, áudio, hover ou gesto.
+
+\section{Segurança e privacidade}
+
+O Firebase ID token é obtido pelo SDK e enviado no cabeçalho HTTP; não é salvo em \texttt{localStorage} e não aparece em query string. WebSockets são autenticados pela primeira mensagem, sem credencial na URL. O servidor valida o token e desconsidera um identificador de remetente divergente. O webhook de pagamento valida assinatura, status e idempotência.
+
+Os segredos de banco, Firebase Admin, vídeo, e-mail e monitoramento devem ficar no gerenciador do Railway. Os arquivos reais fornecidos durante a preparação não entram na entrega; devem ser revogados e rotacionados. Logs não devem conter tokens, senhas, áudio bruto, conteúdo de chat ou dados pessoais desnecessários.
+
+\section{Observabilidade}
+
+Prometheus coleta séries temporais técnicas: latência, erros, disponibilidade, pool de banco, conexões WebSocket, tempo de recomendação, memória e CPU. Grafana visualiza esses dados, mas é opcional. Labels não devem conter e-mail, ID pessoal ou texto livre. O endpoint de métricas deve estar protegido e possuir retenção compatível com o custo do MVP.
+
+\section{IA do produto}
+
+O chatbot, a tradução, a simplificação de texto e a moderação usam o modelo estável \texttt{gemini-2.5-flash}. A variável \texttt{GEMINI\_MODEL} permite configuração explícita e a chave \texttt{GEMINI\_API\_KEY} fica somente no backend. O código envia a chave no cabeçalho da requisição, não na URL. A geração de imagens de conquistas é uma integração separada, pois este modelo Flash não é apresentado como gerador de imagens.
+
+\section{Deploy econômico}
+
+O primeiro deploy pode utilizar Railway para API e PostgreSQL, Firebase para identidade e FCM, e alternativas gratuitas para mapas e recursos de acessibilidade. Vídeo, SMS e pagamentos são condicionais; texto e arquivos garantem degradação segura. O backend deve iniciar com migrations, health check, CORS restrito, HTTPS, backups e evidência de restauração.
+
+\section{Estado da arte e diferencial proposto}
+
+ONTODAPS sustenta a necessidade de considerar deficiência no desenho de e-learning [10]. O estudo de interfaces de voz justifica manter canais complementares e não tratar voz como solução universal [11]. A recomendação educacional interpretável e sua revisão sistemática apoiam o uso de explicações e regras auditáveis [3, 9]. A aprendizagem entre pares orienta a inclusão de atividades e colaboração [12].
+
+Nossa hipótese de diferencial é a integração, em uma única jornada, de acessibilidade, aprendizagem entre pares, evidência prática, recomendação explicável e oportunidades para usuários comuns e pessoas com deficiência, com visão institucional. Isso não significa que cada componente seja inédito. A superioridade somente poderá ser discutida com estudo comparativo, tarefas, amostra, métricas e análise de vieses.
+
+\section{Métricas de validação}
+
+O protocolo deve registrar tempo de tarefa, erros, abandono, conclusão, compreensão da explicação, satisfação, acessibilidade percebida, latência, disponibilidade e incidentes de segurança. A equipe deve publicar amostra, instrumento, data, limitações e dados anonimizados ou agregados. Resultados inexistentes permanecem como trabalho futuro, não como números estimados.
+
+\section{Riscos e mitigação}
+
+Os principais riscos são baixa massa crítica, recomendação inadequada, exposição de dados, dependência de provedores, barreira de acessibilidade, fraude em créditos e custo de operação. Mitigações incluem regras explicáveis, revisão humana, minimização de dados, fallbacks, limites, ledger idempotente, backups, métricas e testes com tecnologias assistivas.
+
+\section{Roadmap}
+
+Na primeira fase, a equipe estabiliza autenticação, perfil, troca, comunidade, chat, Access e acessibilidade. Na segunda, valida evidências práticas e painel institucional com dados agregados. Na terceira, mede retenção, qualidade de recomendação e conexão com oportunidades. Escala, modelos avançados e extração de microsserviços só devem ocorrer depois de evidência de uso e capacidade operacional.
+
+\section{Conclusão do adendo}
+
+O SkillSwap Access é uma proposta de produto e de pesquisa aplicada. Seu valor está na integração verificável e na acessibilidade como requisito do caminho principal. A documentação diferencia implementação, integração condicional, hipótese e resultado medido. O escopo físico não faz parte do TCC; o pacote entregue é software, documentação e protocolo de validação.

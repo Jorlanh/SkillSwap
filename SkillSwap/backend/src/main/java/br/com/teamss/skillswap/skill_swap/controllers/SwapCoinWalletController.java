@@ -13,12 +13,10 @@ import br.com.teamss.skillswap.skill_swap.model.wallet.SwapCoinPackage;
 import jakarta.validation.Valid;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
-import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -46,8 +44,6 @@ public class SwapCoinWalletController {
 
     @GetMapping("/packages")
     public ResponseEntity<List<SwapCoinPackageResponse>> getPackages() {
-        // No modo gratuito, não oferecemos pacotes nem checkout aos usuários.
-        if (!walletService.isCommerceEnabled()) return ResponseEntity.ok(List.of());
         return ResponseEntity.ok(Arrays.stream(SwapCoinPackage.values()).map(SwapCoinPackageResponse::from).toList());
     }
 
@@ -61,11 +57,7 @@ public class SwapCoinWalletController {
     }
 
     @PostMapping("/checkout-sessions")
-    public ResponseEntity<?> createCheckout(@Valid @RequestBody CreateCheckoutSessionRequest request) {
-        if (!walletService.isCommerceEnabled()) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                .body(Map.of("error", "A plataforma é gratuita e não oferece compra de SwapCoins nesta versão."));
-        }
+    public ResponseEntity<CreateCheckoutSessionResponse> createCheckout(@Valid @RequestBody CreateCheckoutSessionRequest request) {
         return ResponseEntity.ok(walletService.createCheckoutSession(authenticatedUser().getUserId(), request.packageCode()));
     }
 

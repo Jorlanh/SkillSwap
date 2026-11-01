@@ -1,9 +1,8 @@
 package br.com.teamss.skillswap.skill_swap.model.services.impl;
 
 import br.com.teamss.skillswap.skill_swap.dto.LessonScheduleRequestDTO;
-import br.com.teamss.skillswap.skill_swap.dto.LessonCertificateDTO;
-import br.com.teamss.skillswap.skill_swap.dto.LessonViewDTO;
-import br.com.teamss.skillswap.skill_swap.dto.UserDTO;
+import br.com.teamss.skillswap.skill_swap.dto.LessonCompletionResponse;
+import br.com.teamss.skillswap.skill_swap.dto.LessonCertificateResponse;
 import br.com.teamss.skillswap.skill_swap.model.entities.Lesson;
 import br.com.teamss.skillswap.skill_swap.model.entities.User;
 import br.com.teamss.skillswap.skill_swap.model.repositories.LessonRepository;
@@ -12,7 +11,6 @@ import br.com.teamss.skillswap.skill_swap.model.repositories.UserRepository;
 import br.com.teamss.skillswap.skill_swap.model.services.EmailService;
 import br.com.teamss.skillswap.skill_swap.model.services.LessonService;
 import br.com.teamss.skillswap.skill_swap.model.services.UserServiceDTO;
-import br.com.teamss.skillswap.skill_swap.model.services.PrivacyConsentService;
 import com.google.api.client.googleapis.javanet.GoogleNetHttpTransport;
 import com.google.api.client.http.javanet.NetHttpTransport;
 import com.google.api.client.json.JsonFactory;
@@ -28,6 +26,7 @@ import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.stereotype.Service;
 
 import java.io.ByteArrayInputStream;
@@ -41,7 +40,6 @@ import java.time.ZonedDateTime;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
-import java.util.Objects;
 
 @Service
 public class LessonServiceImpl implements LessonService {
@@ -56,8 +54,6 @@ public class LessonServiceImpl implements LessonService {
     private UserRepository userRepository;
     @Autowired
     private UserServiceDTO userServiceDTO;
-    @Autowired
-    private PrivacyConsentService privacyConsentService;
 
     // Injeta o CONTEÚDO do JSON a partir da variável de ambiente
     @Value("${GOOGLE_CREDENTIALS_JSON:}")
@@ -75,9 +71,11 @@ public class LessonServiceImpl implements LessonService {
 
     @PostConstruct
     public void init() throws IOException, GeneralSecurityException {
-        if (!calendarEnabled || credentialsJsonString == null || credentialsJsonString.isBlank()) {
-            this.calendarService = null;
+        if (!calendarEnabled) {
             return;
+        }
+        if (credentialsJsonString == null || credentialsJsonString.isBlank()) {
+            throw new IllegalStateException("A variável de ambiente 'GOOGLE_CREDENTIALS_JSON' não foi definida.");
         }
 
         // Cria um InputStream a partir da String da variável de ambiente
@@ -102,21 +100,20 @@ public class LessonServiceImpl implements LessonService {
         Lesson lesson = new Lesson();
         lesson.setTeacher(teacher);
         lesson.setStudent(student);
+        lesson.setTitle("Aula SkillSwap");
+        lesson.setDurationMinutes(60);
         lesson.setScheduledTime(lessonRequest.getScheduledTime());
         lesson.setStatus("SCHEDULED");
-        lesson.setTitle(lessonRequest.getTitle());
-        lesson.setIntroduction(lessonRequest.getIntroduction());
-        lesson.setDurationMinutes(lessonRequest.getDurationMinutes() > 0 ? lessonRequest.getDurationMinutes() : 60);
-        if (privacyConsentService.isGranted(teacher.getUserId(), "OPTIONAL_CALENDAR")
-                && privacyConsentService.isGranted(student.getUserId(), "OPTIONAL_CALENDAR")) {
-            createCalendarEvent(lesson, teacher.getEmail(), student.getEmail());
-        }
+        createCalendarEvent(lesson, teacher.getEmail(), student.getEmail());
         return lessonRepository.save(lesson);
     }
 
     private void createCalendarEvent(Lesson lesson, String teacherEmail, String studentEmail) {
-        if (calendarService == null) {
+        if (!calendarEnabled) {
             return;
+        }
+        if (calendarService == null) {
+            throw new IllegalStateException("O Google Calendar está habilitado, mas não foi inicializado.");
         }
         Event event = new Event()
                 .setSummary("Aula SkillSwap: " + lesson.getTeacher().getUsername() + " e " + lesson.getStudent().getUsername())
@@ -141,97 +138,60 @@ public class LessonServiceImpl implements LessonService {
         }
     }
 
+
+    @Override
+    public List<Lesson> getLessonsForUser(UUID userId) {
+        return lessonRepository.findByTeacher_UserIdOrStudent_UserIdOrderByScheduledTimeDesc(userId, userId);
+    }
+
+    @Override
+    @Transactional
+    public LessonCompletionResponse confirmCompletion(Long lessonId) {
+        Lesson lesson = lessonRepository.findById(lessonId)
+            .orElseThrow(() -> new EntityNotFoundException("Aula não encontrada."));
+        UUID currentUserId = userServiceDTO.getAuthenticatedUser().getUserId();
+        if (lesson.getTeacher() == null || lesson.getStudent() == null
+            || (!currentUserId.equals(lesson.getTeacher().getUserId())
+                && !currentUserId.equals(lesson.getStudent().getUserId()))) {
+            throw new SecurityException("Somente participantes podem confirmar a aula.");
+        }
+        if (currentUserId.equals(lesson.getTeacher().getUserId())) {
+            lesson.setTeacherConfirmed(true);
+        }
+        if (currentUserId.equals(lesson.getStudent().getUserId())) {
+            lesson.setStudentConfirmed(true);
+        }
+        if (lesson.isTeacherConfirmed() && lesson.isStudentConfirmed()) {
+            lesson.setStatus("COMPLETED");
+            lesson.setCompletedAt(Instant.now());
+        }
+        lessonRepository.save(lesson);
+        boolean confirmed = currentUserId.equals(lesson.getTeacher().getUserId())
+            ? lesson.isTeacherConfirmed() : lesson.isStudentConfirmed();
+        return new LessonCompletionResponse(lesson.getLessonId(), lesson.getStatus(), confirmed,
+            "COMPLETED".equals(lesson.getStatus()));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public LessonCertificateResponse getCertificate(Long lessonId) {
+        Lesson lesson = lessonRepository.findById(lessonId)
+            .orElseThrow(() -> new EntityNotFoundException("Aula não encontrada."));
+        UUID currentUserId = userServiceDTO.getAuthenticatedUser().getUserId();
+        if (lesson.getStudent() == null || !currentUserId.equals(lesson.getStudent().getUserId())) {
+            throw new SecurityException("O certificado está disponível para o aluno participante.");
+        }
+        if (!"COMPLETED".equals(lesson.getStatus()) || lesson.getCompletedAt() == null) {
+            throw new IllegalStateException("O certificado será liberado após a confirmação dos dois participantes.");
+        }
+        String certificateId = "SKILLSWAP-" + lesson.getLessonId() + "-" + lesson.getCompletedAt().toEpochMilli();
+        return new LessonCertificateResponse(certificateId, lesson.getStudent().getName(),
+            lesson.getTeacher().getName(), lesson.getTitle(), lesson.getDurationMinutes(), lesson.getCompletedAt());
+    }
     @Override
     public List<Lesson> getUpcomingLessons(UUID userId) {
         Instant now = Instant.now();
         return lessonRepository.findByTeacher_UserIdOrStudent_UserIdAndScheduledTimeAfter(userId, userId, now);
-    }
-
-    @Override
-    public List<LessonViewDTO> getMyLessons() {
-        UserDTO authenticatedUser = userServiceDTO.getAuthenticatedUser();
-        return lessonRepository.findByTeacher_UserIdOrStudent_UserIdOrderByScheduledTimeDesc(
-                        authenticatedUser.getUserId(), authenticatedUser.getUserId())
-                .stream()
-                .map(this::toView)
-                .toList();
-    }
-
-    @Override
-    public LessonCertificateDTO completeLesson(Long lessonId) {
-        Lesson lesson = findParticipantLesson(lessonId);
-        if ("CANCELLED".equalsIgnoreCase(lesson.getStatus())) {
-            throw new IllegalStateException("Uma aula cancelada não pode gerar certificado.");
-        }
-
-        if (!"COMPLETED".equalsIgnoreCase(lesson.getStatus())) {
-            lesson.setStatus("COMPLETED");
-            lesson.setCompletedAt(Instant.now());
-            if (lesson.getCertificateCode() == null || lesson.getCertificateCode().isBlank()) {
-                lesson.setCertificateCode("SS-" + UUID.randomUUID().toString().replace("-", "").substring(0, 20).toUpperCase());
-            }
-            lessonRepository.save(lesson);
-        }
-        return toCertificate(lesson);
-    }
-
-    @Override
-    public LessonCertificateDTO getCertificate(Long lessonId) {
-        Lesson lesson = findParticipantLesson(lessonId);
-        if (!"COMPLETED".equalsIgnoreCase(lesson.getStatus())) {
-            throw new IllegalStateException("O certificado estará disponível após a conclusão da aula.");
-        }
-        if (lesson.getCertificateCode() == null || lesson.getCertificateCode().isBlank()) {
-            lesson.setCertificateCode("SS-" + UUID.randomUUID().toString().replace("-", "").substring(0, 20).toUpperCase());
-            lessonRepository.save(lesson);
-        }
-        return toCertificate(lesson);
-    }
-
-    private Lesson findParticipantLesson(Long lessonId) {
-        Lesson lesson = lessonRepository.findById(lessonId)
-                .orElseThrow(() -> new EntityNotFoundException("Aula não encontrada."));
-        UUID authenticatedId = userServiceDTO.getAuthenticatedUser().getUserId();
-        boolean participant = lesson.getTeacher() != null && Objects.equals(lesson.getTeacher().getUserId(), authenticatedId)
-                || lesson.getStudent() != null && Objects.equals(lesson.getStudent().getUserId(), authenticatedId);
-        if (!participant) {
-            throw new org.springframework.security.access.AccessDeniedException("Você não participa desta aula.");
-        }
-        return lesson;
-    }
-
-    private LessonViewDTO toView(Lesson lesson) {
-        return new LessonViewDTO(
-                lesson.getLessonId(),
-                lesson.getTeacher() != null ? lesson.getTeacher().getName() : "Professor",
-                lesson.getStudent() != null ? lesson.getStudent().getName() : "Aluno",
-                lesson.getScheduledTime(),
-                lesson.getStatus(),
-                lesson.getTitle(),
-                lesson.getIntroduction(),
-                lesson.getDurationMinutes(),
-                lesson.getCompletedAt(),
-                "COMPLETED".equalsIgnoreCase(lesson.getStatus())
-        );
-    }
-
-    private LessonCertificateDTO toCertificate(Lesson lesson) {
-        String title = lesson.getTitle() == null || lesson.getTitle().isBlank()
-                ? "Aula de troca de habilidades" : lesson.getTitle();
-        String introduction = lesson.getIntroduction() == null || lesson.getIntroduction().isBlank()
-                ? "Certificamos a conclusão da aula realizada na plataforma SkillSwap."
-                : lesson.getIntroduction();
-        return new LessonCertificateDTO(
-                lesson.getLessonId(),
-                lesson.getCertificateCode(),
-                lesson.getStudent() != null ? lesson.getStudent().getName() : "Aluno",
-                lesson.getStudent() != null ? lesson.getStudent().getUsername() : "aluno",
-                lesson.getTeacher() != null ? lesson.getTeacher().getName() : "Professor",
-                title,
-                introduction,
-                lesson.getDurationMinutes(),
-                lesson.getCompletedAt()
-        );
     }
 
     @Override

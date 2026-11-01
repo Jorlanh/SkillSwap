@@ -18,8 +18,6 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import br.com.teamss.skillswap.skill_swap.model.entities.User;
 import br.com.teamss.skillswap.skill_swap.model.repositories.UserRepository;
-import br.com.teamss.skillswap.skill_swap.model.services.MinorSafetyService;
-import java.util.UUID;
 
 @Component
 public class ChatWebSocketHandler extends TextWebSocketHandler {
@@ -29,7 +27,6 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
     private final ObjectMapper objectMapper;
     private final JwtDecoder jwtDecoder;
     private final UserRepository userRepository;
-    private final MinorSafetyService minorSafetyService;
 
     // Chaves do Redis para mapear usuário -> sessão
     private static final String REDIS_KEY_USER_TO_SESSION = "skillswap:chat:user_sessions";
@@ -43,14 +40,12 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
                                 ChannelTopic chatTopic,
                                 ObjectMapper objectMapper,
                                 JwtDecoder jwtDecoder,
-                                UserRepository userRepository,
-                                MinorSafetyService minorSafetyService) {
+                                UserRepository userRepository) {
         this.redisTemplate = redisTemplate;
         this.chatTopic = chatTopic;
         this.objectMapper = objectMapper;
         this.jwtDecoder = jwtDecoder;
         this.userRepository = userRepository;
-        this.minorSafetyService = minorSafetyService;
     }
 
     @Override
@@ -90,18 +85,6 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
         if (jsonMessage.has("senderId") && !authenticatedUserId.equals(jsonMessage.get("senderId").asText())) {
             session.close(CloseStatus.POLICY_VIOLATION);
             return;
-        }
-        if (jsonMessage.has("receiverId") && !jsonMessage.get("receiverId").asText().isBlank()) {
-            try {
-                User sender = userRepository.findById(UUID.fromString(authenticatedUserId))
-                    .orElseThrow(() -> new IllegalArgumentException("remetente não encontrado"));
-                User receiver = userRepository.findById(UUID.fromString(jsonMessage.get("receiverId").asText()))
-                    .orElseThrow(() -> new IllegalArgumentException("destinatário não encontrado"));
-                minorSafetyService.assertDirectInteractionAllowed(sender, receiver);
-            } catch (Exception exception) {
-                session.sendMessage(new TextMessage("{\"type\":\"error\",\"code\":\"MINOR_SAFETY\",\"message\":\"Esta interação precisa estar vinculada a uma aula registrada.\"}"));
-                return;
-            }
         }
         if (jsonMessage.isObject()) {
             ((com.fasterxml.jackson.databind.node.ObjectNode) jsonMessage).put("senderId", authenticatedUserId);

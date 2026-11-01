@@ -9,7 +9,7 @@ Usuário comum / pessoa com deficiência / instituição
                  |
       Spring Boot — monólito modular
   identidade | perfis | aprendizagem | Access
-  comunidades | chat | carteira | pagamentos | admin
+  comunidades | chat | notificações | admin
                  |
        PostgreSQL + Flyway + Actuator
                  |
@@ -34,4 +34,4 @@ Chat e saldo usam WebSocket sem token em URL. A primeira mensagem contém o ID t
 
 ## Segurança
 
-Segredos ficam no Railway Secret Manager. O navegador não armazena o ID token em localStorage. CORS é restrito, webhook Stripe valida assinatura e idempotência, logs não contêm tokens, e o Actuator deve ser limitado em produção. FCM registra apenas token de dispositivo protegido por sessão e permite revogação.
+Segredos ficam no Railway Secret Manager. O navegador não armazena o ID token em localStorage. CORS é restrito, as rotas comerciais permanecem bloqueadas, logs não contêm tokens, e o Actuator deve ser limitado em produção. FCM registra apenas token de dispositivo protegido por sessão e permite revogação.

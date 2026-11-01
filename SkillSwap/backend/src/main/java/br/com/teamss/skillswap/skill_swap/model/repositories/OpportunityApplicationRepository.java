@@ -9,7 +9,4 @@ public interface OpportunityApplicationRepository extends JpaRepository<Opportun
     List<OpportunityApplication> findByApplicant_UserIdOrderByCreatedAtDesc(UUID applicantId);
     boolean existsByApplicant_UserIdAndOpportunity_OpportunityId(UUID applicantId, UUID opportunityId);
     long countByApplicant_UserId(UUID applicantId);
-    List<OpportunityApplication> findByOpportunity_Organization_OrganizationIdOrderByCreatedAtDesc(UUID organizationId);
-    long countByOpportunity_Organization_OrganizationId(UUID organizationId);
-    long countByOpportunity_OpportunityId(UUID opportunityId);
 }

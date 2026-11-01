@@ -6,7 +6,7 @@ O módulo transforma uma intenção em uma sequência verificável:
 
 `objetivo -> plano -> prática -> evidência -> candidatura -> oportunidade`
 
-Ele complementa o SkillSwap existente sem substituir comunidades, propostas, aulas, chat, reputação ou carteira.
+Ele complementa o SkillSwap existente sem substituir comunidades, propostas, aulas, chat e reputação.
 
 ## Jornada implementada
 

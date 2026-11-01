@@ -159,29 +159,16 @@ public class SettingsController {
                                     (Boolean) updates.get("librasAvatarEnabled") : authenticatedUser.isLibrasAvatarEnabled();
             String theme = updates.containsKey("preferredTheme") ?
                            (String) updates.get("preferredTheme") : authenticatedUser.getPreferredTheme();
-            String visualMarker = updates.containsKey("accessibilityVisualMarker")
-                    ? (String) updates.get("accessibilityVisualMarker")
-                    : authenticatedUser.getAccessibilityVisualMarker();
-            boolean visualMarkerPublic = updates.containsKey("accessibilityVisualMarkerPublic")
-                    ? Boolean.TRUE.equals(updates.get("accessibilityVisualMarkerPublic"))
-                    : authenticatedUser.isAccessibilityVisualMarkerPublic();
 
 
             // Validate theme if provided (example validation)
-            if (updates.containsKey("preferredTheme") && (theme == null || !List.of("default", "high-contrast", "high-contrast-dark", "high-contrast-light").contains(theme))) {
+            if (updates.containsKey("preferredTheme") && (theme == null || !List.of("default", "high-contrast-dark", "high-contrast-light").contains(theme))) {
                  logger.warn("Tentativa de definir tema de acessibilidade inválido: {} para usuário {}", theme, userId);
                  return ResponseEntity.badRequest().body(Map.of("error", "Tema inválido selecionado."));
             }
 
-            if (updates.containsKey("accessibilityVisualMarker")
-                    && (visualMarker == null || !List.of("BLUE_TRIANGLE", "ORANGE_SQUARE", "NEUTRAL_CIRCLE").contains(visualMarker))) {
-                logger.warn("Tentativa de definir marcador visual inválido para usuário {}", userId);
-                return ResponseEntity.badRequest().body(Map.of("error", "Marcador visual inválido selecionado."));
-            }
-
             // Call the specific service method for updating accessibility settings
-            userServiceDTO.updateAccessibilitySettingsDTO(userId, librasEnabled, theme, visualMarker,
-                    visualMarkerPublic);
+            userServiceDTO.updateAccessibilitySettingsDTO(userId, librasEnabled, theme);
 
             logger.info("Configurações de acessibilidade para o usuário '{}' (ID: {}) atualizadas.", authenticatedUser.getUsername(), userId);
             String successMessage = messageSource.getMessage("accessibility.update.success", null, locale); // Need this key in messages

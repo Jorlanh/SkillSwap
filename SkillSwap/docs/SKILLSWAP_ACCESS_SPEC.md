@@ -24,7 +24,7 @@ Pergunta de pesquisa: como uma plataforma acessível pode conectar aprendizagem,
 - painel institucional com indicadores agregados de capacitação e inclusão;
 - preferências de acessibilidade, leitura em voz alta, teclado, contraste e VLibras opcional;
 - FCM opcional para notificações;
-- economia de créditos e pagamentos com webhook assinado quando habilitados;
+- acessibilidade, aprendizagem entre pares e comunicação sem cobrança obrigatória;
 - plano persistido de evolução com objetivo, ritmo e limitações;
 - etapas práticas com estados de execução;
 - portfólio de evidências com link opcional e pedido de revisão;
@@ -33,7 +33,7 @@ Pergunta de pesquisa: como uma plataforma acessível pode conectar aprendizagem,
 
 ## Arquitetura escolhida
 
-O TCC e o MVP usam monólito modular Spring Boot. Os módulos têm limites explícitos: identidade, perfil, aprendizagem, recomendações, oportunidades, comunidades, chat, notificações, carteira, pagamentos, administração e observabilidade. React/Vite é o cliente; PostgreSQL/Flyway é a persistência; Firebase é a identidade. Microsserviços podem ser extraídos depois de medir carga e fronteiras, mas não são necessários para demonstrar valor.
+O TCC e o MVP usam monólito modular Spring Boot. Os módulos têm limites explícitos: identidade, perfil, aprendizagem, comunidades, chat, notificações, administração e observabilidade. React/Vite é o cliente; PostgreSQL/Flyway é a persistência; Firebase é a identidade. Microsserviços podem ser extraídos depois de medir carga e fronteiras, mas não são necessários para demonstrar valor.
 
 ## Recomendação explicável
 
