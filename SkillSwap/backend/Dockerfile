@@ -19,10 +19,10 @@ RUN mvn clean install -DskipTests -Powasp-skip
 # Estágio 2: Execução da Aplicação
 FROM eclipse-temurin:21-jre
 
-# Define o diretório de trabalho
+# Define o diretório de trabalho (isto coloca o contexto dentro de /app)
 WORKDIR /app
 
-# Copia apenas o .jar compilado do estágio de build
+# Copia o .jar compilado do estágio de build e garante o nome local app.jar
 COPY --from=build /app/target/skill-swap-*.jar app.jar
 
 # Expõe a porta da aplicação
@@ -35,5 +35,5 @@ RUN groupadd --system app && useradd --system -g app app
 # Muda para o usuário não-root
 USER app
 
-# Comando para iniciar a aplicação, agora executado como o usuário 'app'
-ENTRYPOINT ["java", "-jar", "/app.jar"]
+# Comando para iniciar a aplicação (executado a partir do WORKDIR /app)
+ENTRYPOINT ["java", "-jar", "app.jar"]
