@@ -20,8 +20,12 @@ FROM eclipse-temurin:21-jre
 
 COPY --from=build /app/target/skill-swap-*.jar /app.jar
 
+WORKDIR /app
+
 RUN groupadd --system app \
     && useradd --system --gid app app \
+    && mkdir -p /app/logs/archived \
+    && chown -R app:app /app/logs \
     && chown app:app /app.jar
 
 USER app
