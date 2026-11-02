@@ -23,7 +23,7 @@ FROM eclipse-temurin:21-jre
 WORKDIR /app
 
 # Copia apenas o .jar compilado do estágio de build
-COPY --from=build /app/target/skill-swap-0.0.1-SNAPSHOT.jar app.jar
+COPY --from=build /app/target/skill-swap-*.jar app.jar
 
 # Expõe a porta da aplicação
 EXPOSE 8080
@@ -36,4 +36,4 @@ RUN groupadd --system app && useradd --system -g app app
 USER app
 
 # Comando para iniciar a aplicação, agora executado como o usuário 'app'
-ENTRYPOINT ["java", "-jar", "app.jar"]
+ENTRYPOINT ["java", "-jar", "/app.jar"]
