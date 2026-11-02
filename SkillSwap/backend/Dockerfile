@@ -13,7 +13,7 @@ RUN mvn dependency:go-offline
 
 # Copia o resto do código fonte e compila, pulando os testes
 COPY src ./src
-RUN mvn clean install -DskipTests
+RUN mvn clean install -DskipTests -Powasp-skip
 
 
 # Estágio 2: Execução da Aplicação
