@@ -32,6 +32,12 @@ import { Textarea } from '@/components/ui/textarea';
 
 const tabs = ['Publicações', 'Cursos', 'Conquistas', 'Atividade', 'Comunidades'];
 
+const accessibilitySymbolDetails: Record<string, { label: string; className: string }> = {
+  'blue-triangle': { label: 'Marcador azul com triângulo', className: 'bg-sky-500 [clip-path:polygon(50%_0,100%_100%,0_100%)]' },
+  'orange-square': { label: 'Marcador laranja com quadrado', className: 'bg-orange-500 rounded-sm' },
+  'white-circle': { label: 'Marcador branco com círculo', className: 'bg-white border border-slate-400 rounded-full' },
+};
+
 const ProfilePage = () => {
   const { username: urlUsername } = useParams();
   const navigate = useNavigate();
@@ -379,7 +385,15 @@ const ProfilePage = () => {
             <div className="flex justify-between items-start gap-3 mb-2 flex-wrap">
               <div>
                 <h1 className="font-display font-bold text-2xl text-foreground flex items-center gap-2 truncate">
-                  {user?.name || user?.username} <VerifiedBadge user={user} />
+                  <span className="truncate">{user?.name || user?.username}</span>
+                  <VerifiedBadge user={user} />
+                  {user?.accessibilitySymbol && accessibilitySymbolDetails[user.accessibilitySymbol] && (
+                    <span
+                      aria-label={accessibilitySymbolDetails[user.accessibilitySymbol].label}
+                      title={accessibilitySymbolDetails[user.accessibilitySymbol].label}
+                      className={`inline-block h-4 w-4 shrink-0 ${accessibilitySymbolDetails[user.accessibilitySymbol].className}`}
+                    />
+                  )}
                 </h1>
                 <p className="text-skillswap-teal font-semibold">@{user?.username?.toLowerCase()}</p>
               </div>

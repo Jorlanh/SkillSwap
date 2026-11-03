@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.UUID;
 import java.util.Map;
 import br.com.teamss.skillswap.skill_swap.dto.UserDTO;
+import br.com.teamss.skillswap.skill_swap.dto.UserPublicProfileDTO;
 import br.com.teamss.skillswap.skill_swap.model.services.UserServiceDTO;
 import br.com.teamss.skillswap.skill_swap.model.services.UserService;
 import br.com.teamss.skillswap.skill_swap.model.services.FileUploadService;
@@ -38,14 +39,8 @@ public class ProfileController {
     }
 
     @GetMapping("/user/{username}")
-    public ResponseEntity<?> getProfileByUsername(@PathVariable String username) {
-        try {
-            User user = userRepository.findByUsername(username)
-                    .orElseThrow(() -> new RuntimeException("Usuário não encontrado."));
-            return ResponseEntity.ok(user);
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(Map.of("error", "Usuário não encontrado."));
-        }
+    public ResponseEntity<UserPublicProfileDTO> getProfileByUsername(@PathVariable String username) {
+        return ResponseEntity.ok(userServiceDTO.findPublicProfileByUsername(username));
     }
 
     @PutMapping("/me")

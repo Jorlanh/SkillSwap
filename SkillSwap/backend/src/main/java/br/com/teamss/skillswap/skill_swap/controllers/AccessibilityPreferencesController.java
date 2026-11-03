@@ -57,6 +57,7 @@ public class AccessibilityPreferencesController {
         preferences.setLibrasEnabled(request.librasEnabled());
         preferences.setKeyboardNavigationEnabled(request.keyboardNavigationEnabled());
         preferences.setVisualMarker(request.visualMarker());
+        preferences.setAccessibilitySymbol(request.accessibilitySymbol());
         preferences.setUpdatedAt(Instant.now());
 
         return ResponseEntity.ok(AccessibilityPreferencesResponse.from(preferencesRepository.save(preferences)));

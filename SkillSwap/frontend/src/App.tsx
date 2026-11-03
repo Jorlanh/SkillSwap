@@ -22,7 +22,6 @@ import AdminConsole from '@/pages/AdminConsole';
 import OpportunityOsPage from '@/pages/OpportunityOsPage';
 import { ChatbotELOS } from '@/components/ChatbotELOS';
 import AuthPage from '@/pages/AuthPage';
-import { requestNotificationPermission, onMessageListener } from './lib/messaging';
 import { auth } from './lib/firebase';
 import { onIdTokenChanged } from 'firebase/auth';
 
@@ -38,8 +37,6 @@ const App = () => {
   useEffect(() => onIdTokenChanged(auth, async (user) => {
     if (user) {
       setIsAuthenticated(true);
-      requestNotificationPermission();
-      onMessageListener();
     } else {
       setIsAuthenticated(false);
     }
@@ -71,7 +68,7 @@ const App = () => {
               <Route path="/comunidades" element={<CommunitiesPage />} />
               <Route path="/atividades" element={<ActivitiesPage />} />
               <Route path="/propostas" element={<ProposalsPage />} />
-              <Route path="/preferencias" element={<PreferencesPage />} />
+              <Route path="/preferencias" element={<ProtectedRoute><PreferencesPage /></ProtectedRoute>} />
               <Route path="/configuracoes" element={<SettingsPage />} />
               <Route path="/cursos" element={<CoursesPage />} />
               <Route path="/rankings" element={<RankingsPage />} />

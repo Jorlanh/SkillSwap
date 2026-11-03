@@ -1,3 +1,4 @@
+
 {
   "compilerOptions": {
     "target": "ES2022",
@@ -21,7 +22,6 @@
     "noFallthroughCasesInSwitch": true,
 
     /* Base Path Aliases */
-    "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"]
     }

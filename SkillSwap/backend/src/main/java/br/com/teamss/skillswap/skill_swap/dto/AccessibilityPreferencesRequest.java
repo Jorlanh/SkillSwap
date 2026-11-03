@@ -12,5 +12,6 @@ public record AccessibilityPreferencesRequest(
     boolean simplifiedLanguageEnabled,
     boolean librasEnabled,
     boolean keyboardNavigationEnabled,
-    @NotBlank @Pattern(regexp = "standard|focus|contrast") String visualMarker
+    @NotBlank @Pattern(regexp = "standard|focus|contrast") String visualMarker,
+    @Pattern(regexp = "blue-triangle|orange-square|white-circle") String accessibilitySymbol
 ) {}

@@ -84,6 +84,7 @@ export const HomeService = {
   repost: (postId: number) => api.post(`/home/posts/${postId}/repost`),
   comment: (postId: number, content: string) => api.post(`/home/posts/${postId}/comment`, null, { params: { content } }),
   getCommunities: (limit: number = 5) => api.get('/home/communities', { params: { limit } }),
+  createCommunity: (data: { name: string; description?: string }) => api.post('/home/communities', data),
   joinCommunity: (communityId: string) => api.post(`/home/communities/${communityId}/join`),
   getUnreadNotifications: () => api.get('/home/notifications'),
   markNotificationRead: (notificationId: number) => api.post(`/home/notifications/${notificationId}/read`),

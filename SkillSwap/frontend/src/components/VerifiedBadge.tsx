@@ -14,7 +14,7 @@ const VerifiedBadge = ({ user, className = '', size = 18 }: VerifiedBadgeProps) 
   if (!user) return null;
 
   // Regra de negócio com fallback para falso/zero
-  const isEligible = (user.isVerified || (user.completedSwaps ?? 0) >= 1000);
+  const isEligible = (user.isVerified || (user.completedSwaps ?? 0) >= 10);
 
   if (!isEligible) return null;
 

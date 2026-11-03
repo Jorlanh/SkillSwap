@@ -31,6 +31,13 @@ public class CommunityController {
         return ResponseEntity.ok().build();
     }
 
+    @PostMapping
+    public ResponseEntity<CommunitySummaryDTO> createCommunity(
+            @Valid @RequestBody CreateCommunityRequest request) {
+        UserDTO authenticatedUser = userServiceDTO.getAuthenticatedUser();
+        return ResponseEntity.ok(communityService.createCommunity(request, authenticatedUser.getUserId()));
+    }
+
     @GetMapping("/{communityId}/posts")
     public ResponseEntity<List<PostDTO>> getCommunityPosts(@PathVariable UUID communityId) {
         List<Post> posts = communityService.getCommunityPosts(communityId);

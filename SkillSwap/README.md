@@ -65,3 +65,15 @@ A SkillSwap não cobra dos usuários. As rotas de carteira, SwapCoins, premium e
 Após o cadastro, a pessoa pode escolher preferências de acessibilidade, como contraste intenso, tamanho do texto, canal de comunicação, legendas quando disponíveis, descrição de imagens, VLibras e operação por teclado. Essas escolhas não diagnosticam nem classificam deficiência.
 
 A conclusão de uma aula depende da confirmação do aluno e do professor. Depois das duas confirmações, o aluno pode gerar uma página acessível de certificado e salvá-la como PDF pelo navegador.
+
+## Fluxo do primeiro acesso e comunidades
+
+No primeiro acesso com uma conta Firebase, a API cria ou sincroniza o usuário local e o seu perfil no PostgreSQL. Em seguida, a pessoa escolhe um marcador visual de acessibilidade por cor e forma: azul com triângulo, laranja com quadrado ou branco com círculo. A escolha é voluntária, pode ser alterada depois e não representa diagnóstico ou classificação médica. O marcador salvo aparece no perfil.
+
+Qualquer pessoa autenticada pode criar uma comunidade informando nome e descrição. A comunidade é gravada no banco e quem a criou entra como primeiro membro. A tela de comunidades e a barra lateral consultam a API; quando não houver registros, a interface informa isso em vez de preencher exemplos.
+
+As permissões de câmera, microfone e localização são solicitadas pelo navegador somente quando a pessoa ativa cada opção. O navegador é quem controla a concessão e a revogação. Contatos não são solicitados porque não existe uma permissão geral segura para isso em navegadores.
+
+O arquivo `frontend/public/firebase-messaging-sw.js` é publicado na raiz do build. As notificações não são solicitadas automaticamente durante o login; quando forem habilitadas por uma ação explícita, o frontend verifica se o arquivo foi entregue como JavaScript antes de registrá-lo.
+
+A migração `V8__accessibility_profile_marker.sql` cria o campo do marcador visual. O Flyway executa essa migration quando o backend inicia com um PostgreSQL configurado e, depois, o Hibernate valida o modelo.

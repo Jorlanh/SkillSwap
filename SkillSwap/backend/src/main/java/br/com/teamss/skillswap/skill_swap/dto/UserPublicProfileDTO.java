@@ -1,12 +1,15 @@
 package br.com.teamss.skillswap.skill_swap.dto;
 
 import java.util.Set;
+import java.util.UUID;
 
-// DTO para o perfil PÚBLICO de um usuário, visto por outros. NÃO CONTÉM userId.
+// DTO seguro para o perfil PÚBLICO. Não inclui senha, tokens ou segredos.
 public record UserPublicProfileDTO(
+    UUID userId,
     String username,
     String name,
     boolean verifiedBadge, // NOVO CAMPO
     ProfileDTO profile,
-    Set<SkillDTO> skills
+    Set<SkillDTO> skills,
+    String accessibilitySymbol
 ) {}

@@ -8,6 +8,7 @@ import br.com.teamss.skillswap.skill_swap.model.entities.Comment;
 import br.com.teamss.skillswap.skill_swap.model.entities.Repost;
 import br.com.teamss.skillswap.skill_swap.model.entities.ShareLink;
 import br.com.teamss.skillswap.skill_swap.dto.CommentDTO;
+import br.com.teamss.skillswap.skill_swap.dto.CreateCommunityRequest;
 import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 import java.util.List;
@@ -15,6 +16,7 @@ import java.util.UUID;
 
 public interface CommunityService {
     List<CommunitySummaryDTO> getCommunities(int limit);
+    CommunitySummaryDTO createCommunity(CreateCommunityRequest request, UUID creatorId);
     Community joinCommunity(UUID communityId, UUID userId);
     List<Post> getCommunityPosts(UUID communityId);
     Post createCommunityPost(UUID communityId, UUID userId, String title, String content, 

@@ -50,6 +50,9 @@ public class AccessibilityPreferences {
     @Column(name = "visual_marker", nullable = false, length = 16)
     private String visualMarker = "standard";
 
+    @Column(name = "accessibility_symbol", length = 24)
+    private String accessibilitySymbol;
+
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt = Instant.now();
 }

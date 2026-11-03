@@ -2,6 +2,7 @@ package br.com.teamss.skillswap.skill_swap.model.services.impl;
 
 import br.com.teamss.skillswap.skill_swap.dto.CommentDTO;
 import br.com.teamss.skillswap.skill_swap.dto.CommunitySummaryDTO;
+import br.com.teamss.skillswap.skill_swap.dto.CreateCommunityRequest;
 import br.com.teamss.skillswap.skill_swap.model.entities.*;
 import br.com.teamss.skillswap.skill_swap.model.exception.InappropriateContentException;
 import br.com.teamss.skillswap.skill_swap.model.repositories.*;
@@ -119,6 +120,22 @@ public class CommunityServiceImpl implements CommunityService {
                         community.getDescription(),
                         community.getMembers().size()))
                 .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional
+    public CommunitySummaryDTO createCommunity(CreateCommunityRequest request, UUID creatorId) {
+        User creator = userRepository.findById(creatorId)
+                .orElseThrow(() -> new RuntimeException("Usuário não encontrado!"));
+
+        Community community = new Community();
+        community.setName(request.name().trim());
+        community.setDescription(request.description() == null ? null : request.description().trim());
+        Community saved = communityRepository.save(community);
+
+        // Quem cria a comunidade já entra como primeiro membro.
+        joinCommunityWithMemberRepository(saved.getCommunityId(), creator.getUserId());
+        return new CommunitySummaryDTO(saved.getCommunityId(), saved.getName(), saved.getDescription(), 1);
     }
 
     @Override

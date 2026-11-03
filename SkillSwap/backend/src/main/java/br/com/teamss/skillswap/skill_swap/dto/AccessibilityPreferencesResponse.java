@@ -11,14 +11,15 @@ public record AccessibilityPreferencesResponse(
     boolean simplifiedLanguageEnabled,
     boolean librasEnabled,
     boolean keyboardNavigationEnabled,
-    String visualMarker
+    String visualMarker,
+    String accessibilitySymbol
 ) {
     public static AccessibilityPreferencesResponse from(AccessibilityPreferences p) {
         return new AccessibilityPreferencesResponse(
             p.getContrastMode(), p.getFontScale(), p.getPreferredChannel(),
             p.isCaptionsEnabled(), p.isImageDescriptionsEnabled(),
             p.isSimplifiedLanguageEnabled(), p.isLibrasEnabled(),
-            p.isKeyboardNavigationEnabled(), p.getVisualMarker()
+            p.isKeyboardNavigationEnabled(), p.getVisualMarker(), p.getAccessibilitySymbol()
         );
     }
 }

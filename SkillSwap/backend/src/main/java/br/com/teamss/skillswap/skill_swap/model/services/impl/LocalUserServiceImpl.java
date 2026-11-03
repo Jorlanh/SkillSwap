@@ -1,6 +1,7 @@
 package br.com.teamss.skillswap.skill_swap.model.services.impl;
 
 import br.com.teamss.skillswap.skill_swap.model.entities.Role;
+import br.com.teamss.skillswap.skill_swap.model.entities.Profile;
 import br.com.teamss.skillswap.skill_swap.model.entities.User;
 import br.com.teamss.skillswap.skill_swap.model.repositories.RoleRepository;
 import br.com.teamss.skillswap.skill_swap.model.repositories.UserRepository;
@@ -45,6 +46,12 @@ public class LocalUserServiceImpl implements LocalUserService {
 
         User user = userRepository.findByEmail(email).orElseGet(() -> createUserFromJwt(jwt, email));
         boolean changed = ensureRole(user, "USER");
+        if (user.getProfile() == null) {
+            Profile profile = new Profile();
+            profile.setUser(user);
+            user.setProfile(profile);
+            changed = true;
+        }
         if (bootstrapAdminEmail != null && !bootstrapAdminEmail.isBlank()
             && bootstrapAdminEmail.equalsIgnoreCase(email)) {
             changed |= ensureRole(user, "ADMIN");
@@ -84,6 +91,11 @@ public class LocalUserServiceImpl implements LocalUserService {
         newUser.setVerified(Boolean.TRUE.equals(jwt.getClaimAsBoolean("email_verified")));
         newUser.setVerifiedAt(newUser.getVerified() ? Instant.now() : null);
         newUser.setCreatedAt(Instant.now());
+        // Todo usuário autenticado pelo Firebase precisa ter um perfil local
+        // para que a primeira chamada à API já possa abrir o perfil sem erro.
+        Profile profile = new Profile();
+        profile.setUser(newUser);
+        newUser.setProfile(profile);
         ensureRole(newUser, "USER");
         return userRepository.save(newUser);
     }

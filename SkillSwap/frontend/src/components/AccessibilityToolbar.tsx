@@ -13,6 +13,12 @@ export const AccessibilityToolbar = () => {
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = 'pt-BR';
     utterance.rate = 0.92;
+    utterance.pitch = 1.02;
+    utterance.volume = 1;
+    const voices = window.speechSynthesis.getVoices();
+    utterance.voice = voices.find((voice) => voice.lang.toLowerCase() === 'pt-br')
+      ?? voices.find((voice) => voice.lang.toLowerCase().startsWith('pt'))
+      ?? null;
     utterance.onend = () => setSpeaking(false);
     setSpeaking(true);
     window.speechSynthesis.speak(utterance);

@@ -43,7 +43,7 @@ public class UserController {
     }
 
     @GetMapping("/me")
-    @Transactional(readOnly = true)
+    @Transactional
     public ResponseEntity<UserPrivateProfileDTO> getMyProfile() {
         UserDTO authUser = userServiceDTO.getAuthenticatedUser();
         User user = userRepository.findWithProfileSkillsAndRolesByUserId(authUser.getUserId())

@@ -5,10 +5,13 @@ import br.com.teamss.skillswap.skill_swap.model.entities.Profile;
 import br.com.teamss.skillswap.skill_swap.model.entities.Role;
 import br.com.teamss.skillswap.skill_swap.model.entities.Skill; 
 import br.com.teamss.skillswap.skill_swap.model.entities.User;
+import br.com.teamss.skillswap.skill_swap.model.repositories.AccessibilityPreferencesRepository;
 import br.com.teamss.skillswap.skill_swap.model.repositories.UserRepository;
 import br.com.teamss.skillswap.skill_swap.model.services.UserService; 
 import br.com.teamss.skillswap.skill_swap.model.services.UserServiceDTO;
+import br.com.teamss.skillswap.skill_swap.model.services.LocalUserService;
 import jakarta.persistence.EntityNotFoundException;
+import org.hibernate.Hibernate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.Authentication; 
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -29,11 +32,20 @@ public class UserServiceDTOImpl implements UserServiceDTO {
 
     private final UserRepository userRepository;
     private final UserService userService;
+    private final LocalUserService localUserService;
+    private final AccessibilityPreferencesRepository accessibilityPreferencesRepository;
 
     @Autowired 
-    public UserServiceDTOImpl(UserRepository userRepository, UserService userService) {
+    public UserServiceDTOImpl(
+        UserRepository userRepository,
+        UserService userService,
+        LocalUserService localUserService,
+        AccessibilityPreferencesRepository accessibilityPreferencesRepository
+    ) {
         this.userRepository = userRepository;
         this.userService = userService; 
+        this.localUserService = localUserService;
+        this.accessibilityPreferencesRepository = accessibilityPreferencesRepository;
     }
 
     @Override
@@ -42,6 +54,8 @@ public class UserServiceDTOImpl implements UserServiceDTO {
         if (user == null) {
             return null; 
         }
+
+        user = loadUserGraph(user);
 
         ProfileDTO profileDTO = null;
         if (user.getProfile() != null) {
@@ -162,7 +176,7 @@ public class UserServiceDTOImpl implements UserServiceDTO {
     }
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional
     public UserDTO getAuthenticatedUser() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null || !authentication.isAuthenticated() || authentication.getPrincipal() instanceof String && "anonymousUser".equals(authentication.getPrincipal())) {
@@ -175,17 +189,10 @@ public class UserServiceDTOImpl implements UserServiceDTO {
         // SE O TOKEN FOR DO AUTH0 (JWT)
         if (principal instanceof Jwt) {
             Jwt jwt = (Jwt) principal;
-            String email = jwt.getClaimAsString("email");
-            
-            if (email != null) {
-                user = userRepository.findByEmail(email)
-                    .orElseThrow(() -> new EntityNotFoundException("Usuário autenticado não encontrado com o e-mail: " + email));
-            } else {
-                // Fallback de segurança caso o email não seja fornecido
-                String subject = jwt.getSubject();
-                user = userRepository.findByUsername(subject)
-                    .orElseThrow(() -> new EntityNotFoundException("Usuário autenticado não encontrado no banco de dados."));
-            }
+            // O primeiro acesso cria e registra o usuário local e seu perfil.
+            // O Firebase continua sendo a fonte da autenticação; o PostgreSQL
+            // guarda apenas os dados operacionais necessários à plataforma.
+            user = localUserService.findOrCreateUser(jwt);
         } 
         // SE FOR O SISTEMA ANTIGO DE SESSÃO LOCAL (UserDetails)
         else if (principal instanceof UserDetails) {
@@ -207,6 +214,7 @@ public class UserServiceDTOImpl implements UserServiceDTO {
     @Transactional(readOnly = true)
     public UserPublicProfileDTO toUserPublicProfileDTO(User user) {
         if (user == null) return null;
+        user = loadUserGraph(user);
         Profile profile = user.getProfile();
         ProfileDTO profileDTO = null;
         if (profile != null) {
@@ -222,13 +230,21 @@ public class UserServiceDTOImpl implements UserServiceDTO {
             .map(skill -> new SkillDTO(skill.getSkillId(), skill.getName(), skill.getDescription(), skill.getCategory(), skill.getLevel()))
             .collect(Collectors.toSet()) : Collections.emptySet();
 
-        return new UserPublicProfileDTO(user.getUsername(), user.getName(), user.isVerifiedBadge(), profileDTO, skills);
+        String accessibilitySymbol = accessibilityPreferencesRepository.findById(user.getUserId())
+            .map(preferences -> preferences.getAccessibilitySymbol())
+            .orElse(null);
+
+        return new UserPublicProfileDTO(
+            user.getUserId(), user.getUsername(), user.getName(), user.isVerifiedBadge(), profileDTO, skills,
+            accessibilitySymbol
+        );
     }
 
     @Override
     @Transactional(readOnly = true)
     public UserPrivateProfileDTO toUserPrivateProfileDTO(User user) {
         if (user == null) return null;
+        user = loadUserGraph(user);
         Profile profile = user.getProfile();
         ProfileDTO profileDTO = null;
         if (profile != null) {
@@ -246,12 +262,17 @@ public class UserServiceDTOImpl implements UserServiceDTO {
 
         Set<String> roles = (user.getRoles() != null) ? user.getRoles().stream().map(Role::getName).collect(Collectors.toSet()) : Collections.emptySet();
 
+        String accessibilitySymbol = accessibilityPreferencesRepository.findById(user.getUserId())
+            .map(preferences -> preferences.getAccessibilitySymbol())
+            .orElse(null);
+
         return new UserPrivateProfileDTO(
             user.getUserId(), user.getUsername(), user.getEmail(), user.getName(),
             user.isVerifiedBadge(), profileDTO, skills, roles,
             // --- START: Accessibility Settings ---
             user.isLibrasAvatarEnabled(),
-            user.getPreferredTheme()
+            user.getPreferredTheme(),
+            accessibilitySymbol
             // --- END: Accessibility Settings ---
         );
     }
@@ -269,5 +290,18 @@ public class UserServiceDTOImpl implements UserServiceDTO {
     public UserDTO updateAccessibilitySettingsDTO(UUID userId, boolean librasAvatarEnabled, String preferredTheme) {
         User updatedUser = userService.updateAccessibilitySettings(userId, librasAvatarEnabled, preferredTheme);
         return toUserDTO(updatedUser);
+    }
+
+    /**
+     * O usuário recebido por um controller pode estar detached. Recarregamos
+     * os relacionamentos usados pelos DTOs em uma única consulta para evitar
+     * LazyInitializationException durante o login e a abertura do perfil.
+     */
+    private User loadUserGraph(User user) {
+        User loaded = userRepository.findWithProfileSkillsAndRolesByUserId(user.getUserId()).orElse(user);
+        Hibernate.initialize(loaded.getProfile());
+        Hibernate.initialize(loaded.getSkills());
+        Hibernate.initialize(loaded.getRoles());
+        return loaded;
     }
 }

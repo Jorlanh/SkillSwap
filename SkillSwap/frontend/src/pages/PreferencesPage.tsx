@@ -16,6 +16,7 @@ type AccessibilityPreferences = {
   librasEnabled: boolean;
   keyboardNavigationEnabled: boolean;
   visualMarker: 'standard' | 'focus' | 'contrast';
+  accessibilitySymbol: 'blue-triangle' | 'orange-square' | 'white-circle' | null;
 };
 
 const defaults: AccessibilityPreferences = {
@@ -28,6 +29,7 @@ const defaults: AccessibilityPreferences = {
   librasEnabled: false,
   keyboardNavigationEnabled: true,
   visualMarker: 'standard',
+  accessibilitySymbol: null,
 };
 
 const PreferencesPage = () => {
@@ -73,6 +75,10 @@ const PreferencesPage = () => {
   };
 
   const save = async () => {
+    if (setup && !preferences.accessibilitySymbol) {
+      toast.error('Escolha uma opção para concluir a triagem de acessibilidade.');
+      return;
+    }
     setSaving(true);
     try {
       const response = await SettingsService.updateAccessibilityPreferences(preferences);
@@ -101,6 +107,37 @@ const PreferencesPage = () => {
               : 'Estas escolhas ajustam a interface e não servem para diagnosticar ou classificar ninguém.'}
           </p>
         </header>
+
+        <section aria-labelledby="accessibility-symbol-title" className="space-y-4 rounded-xl border border-skillswap-teal/30 bg-skillswap-light-blue/40 p-4">
+          <div>
+            <h2 id="accessibility-symbol-title" className="font-bold text-xl text-foreground">Como você prefere usar a plataforma?</h2>
+            <p className="text-sm text-muted-foreground mt-2 leading-6">
+              Esta escolha é feita por você para orientar o atendimento e a apresentação do seu perfil. Ela não diagnostica deficiência, não substitui uma avaliação profissional e pode ser alterada depois.
+            </p>
+          </div>
+          <div className="grid gap-3" role="radiogroup" aria-labelledby="accessibility-symbol-title">
+            {([
+              ['blue-triangle', 'Azul com triângulo', 'Quero indicar uma necessidade de acessibilidade e receber uma experiência mais cuidadosa.'],
+              ['orange-square', 'Laranja com quadrado', 'Quero indicar que preciso de apoio prático em algum recurso da plataforma.'],
+              ['white-circle', 'Branco com círculo', 'Não quero indicar uma necessidade específica neste momento.'],
+            ] as const).map(([value, label, description]) => (
+              <button
+                type="button"
+                key={value}
+                role="radio"
+                aria-checked={preferences.accessibilitySymbol === value}
+                onClick={() => update('accessibilitySymbol', value)}
+                className={`flex items-start gap-3 rounded-lg border p-3 text-left transition-colors ${preferences.accessibilitySymbol === value ? 'border-skillswap-teal ring-2 ring-skillswap-teal bg-background' : 'border-border bg-background/70 hover:bg-background'}`}
+              >
+                <span aria-hidden="true" className={`mt-0.5 h-8 w-8 shrink-0 ${value === 'blue-triangle' ? 'bg-sky-500 [clip-path:polygon(50%_0,100%_100%,0_100%)]' : value === 'orange-square' ? 'bg-orange-500 rounded-sm' : 'bg-white border border-slate-400 rounded-full'}`} />
+                <span>
+                  <span className="font-semibold block text-foreground">{label}</span>
+                  <span className="text-sm text-muted-foreground">{description}</span>
+                </span>
+              </button>
+            ))}
+          </div>
+        </section>
 
         <section aria-labelledby="visual-title" className="space-y-4">
           <h2 id="visual-title" className="font-bold text-xl flex items-center gap-2"><Eye size={20} /> Visual</h2>

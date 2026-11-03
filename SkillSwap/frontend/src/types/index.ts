@@ -48,6 +48,7 @@ export interface Community {
   name: string;
   members: number;
   avatars: string[];
+  description?: string;
 }
 
 export interface Notification {

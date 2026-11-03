@@ -5,6 +5,7 @@ import br.com.teamss.skillswap.skill_swap.model.entities.Post;
 import br.com.teamss.skillswap.skill_swap.model.entities.ShareLink;
 import br.com.teamss.skillswap.skill_swap.model.repositories.ShareLinkRepository;
 import br.com.teamss.skillswap.skill_swap.model.services.*;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -94,6 +95,13 @@ public class HomeController {
         UserDTO authenticatedUser = userServiceDTO.getAuthenticatedUser();
         communityService.joinCommunity(communityId, authenticatedUser.getUserId());
         return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/communities")
+    public ResponseEntity<CommunitySummaryDTO> createCommunity(
+            @Valid @RequestBody CreateCommunityRequest request) {
+        UserDTO authenticatedUser = userServiceDTO.getAuthenticatedUser();
+        return ResponseEntity.ok(communityService.createCommunity(request, authenticatedUser.getUserId()));
     }
     
     @GetMapping("/posts")

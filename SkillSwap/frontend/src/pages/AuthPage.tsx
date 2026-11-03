@@ -6,14 +6,13 @@ import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 
 import { auth, googleProvider, githubProvider } from '@/lib/firebase';
-import { requestNotificationPermission } from '@/lib/messaging'; 
 import { 
   signInWithEmailAndPassword, 
   createUserWithEmailAndPassword, 
   signInWithPopup,
   updateProfile
 } from 'firebase/auth';
-import { UserService } from '@/services/api'; 
+import { SettingsService, UserService } from '@/services/api';
 
 interface AuthPageProps {
   isModal?: boolean;
@@ -35,11 +34,17 @@ const AuthPage = ({ isModal, onClose }: AuthPageProps) => {
   const handleSuccess = async (user: any) => {
     try {
       await user.getIdToken(true);
-      const fcmToken = await requestNotificationPermission();
-      if (fcmToken) await UserService.updateFcmToken(fcmToken);
-
       const profile = await UserService.getMe();
       const isAdmin = profile.data.roles?.some((role: string) => role.toUpperCase() === 'ADMIN');
+      let needsAccessibilitySetup = false;
+      try {
+        const preferences = await SettingsService.getAccessibilityPreferences();
+        needsAccessibilitySetup = !preferences.data?.accessibilitySymbol;
+      } catch {
+        // A primeira tela de preferências também consegue criar o registro,
+        // então uma falha transitória não impede o login.
+        needsAccessibilitySetup = !isLogin;
+      }
       if (isAdmin) {
         const enterAdmin = window.confirm('Sua conta possui acesso administrativo.\n\nOK: entrar como administrador\nCancelar: continuar como usuário');
         localStorage.setItem('activeMode', enterAdmin ? 'admin' : 'user');
@@ -53,7 +58,7 @@ const AuthPage = ({ isModal, onClose }: AuthPageProps) => {
         onClose();
         window.location.reload(); // Atualiza o estado global de auth
       } else {
-        navigate(!isLogin ? '/preferencias?setup=1' : (localStorage.getItem('activeMode') === 'admin' ? '/admin' : '/'));
+        navigate(needsAccessibilitySetup ? '/preferencias?setup=1' : (localStorage.getItem('activeMode') === 'admin' ? '/admin' : '/'));
       }
     } catch (error) {
       console.error("Erro no pós-login:", error);
