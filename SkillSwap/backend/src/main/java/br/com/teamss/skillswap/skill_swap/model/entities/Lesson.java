@@ -15,7 +15,7 @@ import lombok.Setter;
 @AllArgsConstructor
 public class Lesson {
     @Id
-    @GeneratedValue(strategy = GenerationType.AUTO)
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "lesson_id")
     private Long lessonId;
 
