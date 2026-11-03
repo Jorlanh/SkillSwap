@@ -17,6 +17,8 @@ import java.util.UUID;
 public interface CommunityService {
     List<CommunitySummaryDTO> getCommunities(int limit);
     CommunitySummaryDTO createCommunity(CreateCommunityRequest request, UUID creatorId);
+    CommunitySummaryDTO getCommunity(UUID communityId);
+    void updateCommunityImage(UUID communityId, UUID userId, MultipartFile image) throws IOException;
     Community joinCommunity(UUID communityId, UUID userId);
     List<Post> getCommunityPosts(UUID communityId);
     Post createCommunityPost(UUID communityId, UUID userId, String title, String content, 

@@ -120,6 +120,16 @@ public class ProfileController {
         }
     }
 
+    @DeleteMapping("/me/avatar")
+    public ResponseEntity<?> removeMyAvatar() {
+        UserDTO authenticatedUser = userServiceDTO.getAuthenticatedUser();
+        profileService.findByUserId(authenticatedUser.getUserId()).ifPresent(profile -> {
+            profile.setImageUrl(null);
+            profileService.update(profile.getProfileId(), profile);
+        });
+        return ResponseEntity.ok().body(Map.of("message", "Foto de perfil removida."));
+    }
+
     @GetMapping("/me/feed")
     public ResponseEntity<List<Post>> getMyFeed() {
         UserDTO authenticatedUser = userServiceDTO.getAuthenticatedUser();

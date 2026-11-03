@@ -20,6 +20,8 @@ import RankingsPage from '@/pages/RankingsPage';
 import NotFound from './pages/NotFound';
 import AdminConsole from '@/pages/AdminConsole';
 import OpportunityOsPage from '@/pages/OpportunityOsPage';
+import CommunityDetailPage from '@/pages/CommunityDetailPage';
+import InstitutionalPage from '@/pages/InstitutionalPage';
 import { ChatbotELOS } from '@/components/ChatbotELOS';
 import AuthPage from '@/pages/AuthPage';
 import { auth } from './lib/firebase';
@@ -66,6 +68,8 @@ const App = () => {
               <Route path="/perfil/:username?" element={<ProfilePage />} />
               <Route path="/busca" element={<SearchPage />} />
               <Route path="/comunidades" element={<CommunitiesPage />} />
+              <Route path="/comunidades/:communityId" element={<CommunityDetailPage />} />
+              <Route path="/institucional/:section" element={<InstitutionalPage />} />
               <Route path="/atividades" element={<ActivitiesPage />} />
               <Route path="/propostas" element={<ProposalsPage />} />
               <Route path="/preferencias" element={<ProtectedRoute><PreferencesPage /></ProtectedRoute>} />

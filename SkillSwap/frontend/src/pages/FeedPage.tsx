@@ -5,6 +5,7 @@ import RightSidebar from '@/components/RightSidebar';
 import { BrainCircuit } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useOutletContext } from 'react-router-dom';
+import StoriesBar from '@/components/StoriesBar';
 
 const FeedPage = () => {
   const [posts, setPosts] = useState<any[]>([]);
@@ -35,6 +36,7 @@ const FeedPage = () => {
     // AJUSTE: max-w-4xl para centralizar melhor e não espalhar tanto para a direita
     <div className="flex gap-6 max-w-4xl mx-auto p-4 justify-center">
       <div className="flex-1 min-w-0 max-w-2xl"> 
+        <StoriesBar />
         <div className="flex items-center justify-between mb-4">
           <h2 className="font-display font-bold text-xl text-foreground">Em alta</h2>
           <span className="text-[10px] bg-skillswap-teal/10 text-skillswap-teal px-2 py-1 rounded flex items-center gap-1 font-bold">
@@ -52,7 +54,7 @@ const FeedPage = () => {
           ) : posts.length > 0 ? (
             posts.map((post) => (
               <PostCard 
-                key={post.postId || post.id || Math.random()} 
+                key={post.postId || post.id || `${post.createdAt || ''}-${post.content || ''}`}
                 post={{
                   ...post,
                   author: post.user || post.author || { name: "Usuário", avatar: "" }

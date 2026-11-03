@@ -25,6 +25,7 @@ public class PostServiceImpl implements PostService {
 
     private final PostRepository postRepository;
     private final UserRepository userRepository;
+    private final ProfileRepository profileRepository;
     private final NotificationService notificationService;
     private final LikeRepository likeRepository;
     private final RepostRepository repostRepository;
@@ -35,12 +36,14 @@ public class PostServiceImpl implements PostService {
 
     // Injeção via construtor (Recomendado)
     public PostServiceImpl(PostRepository postRepository, UserRepository userRepository,
+                           ProfileRepository profileRepository,
                            NotificationService notificationService, LikeRepository likeRepository,
                            RepostRepository repostRepository, ShareLinkRepository shareLinkRepository,
                            CommentRepository commentRepository, FileUploadService fileUploadService,
                            ContentModerationService moderationService) {
         this.postRepository = postRepository;
         this.userRepository = userRepository;
+        this.profileRepository = profileRepository;
         this.notificationService = notificationService;
         this.likeRepository = likeRepository;
         this.repostRepository = repostRepository;
@@ -61,13 +64,13 @@ public class PostServiceImpl implements PostService {
         int maxPost = 1000 + (user.getProfile() == null ? 0 : user.getProfile().getExtraPostChars());
         if (content == null || content.isBlank()) throw new IllegalArgumentException("O post precisa ter conteudo.");
         if (content.length() > maxPost) {
-            throw new IllegalArgumentException("O post ultrapassa o limite de " + maxPost + " caracteres. Compre um aumento de limite em Premium.");
+            throw new IllegalArgumentException("O post ultrapassa o limite gratuito de " + maxPost + " caracteres.");
         }
         Post post = new Post();
         post.setUser(user);
         post.setTitle(title);
         post.setContent(content);
-        post.setProfile(user.getProfile());
+        post.setProfile(ensureProfile(user));
         post.setCreatedAt(Instant.now());
 
         try {
@@ -89,8 +92,24 @@ public class PostServiceImpl implements PostService {
     public Post save(Post post, UUID userId) {
         User user = userRepository.findById(userId).orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
         post.setUser(user);
+        if (post.getProfile() == null) post.setProfile(ensureProfile(user));
+        if (post.getTitle() == null) post.setTitle("");
+        if (post.getContent() == null || post.getContent().isBlank()) {
+            throw new IllegalArgumentException("O post precisa ter conteúdo.");
+        }
         if (post.getCreatedAt() == null) post.setCreatedAt(Instant.now());
         return postRepository.save(post);
+    }
+
+    private Profile ensureProfile(User user) {
+        if (user.getProfile() != null) return user.getProfile();
+        Profile profile = profileRepository.findByUser_UserId(user.getUserId()).orElseGet(() -> {
+            Profile created = new Profile();
+            created.setUser(user);
+            return profileRepository.save(created);
+        });
+        user.setProfile(profile);
+        return profile;
     }
 
     @Override
@@ -155,7 +174,7 @@ public class PostServiceImpl implements PostService {
         repostPost.setUser(user);
         repostPost.setTitle("Repost: " + originalPost.getTitle());
         repostPost.setContent(originalPost.getContent());
-        repostPost.setProfile(user.getProfile());
+        repostPost.setProfile(ensureProfile(user));
         repostPost.setCreatedAt(Instant.now());
         postRepository.save(repostPost);
 
@@ -198,6 +217,9 @@ public class PostServiceImpl implements PostService {
         return posts.stream().map(post -> {
             PostResponseDTO dto = new PostResponseDTO();
             dto.setPostId(post.getPostId());
+            if (post.getUser() != null) {
+                dto.setUserId(post.getUser().getUserId());
+            }
             dto.setTitle(post.getTitle());
             dto.setContent(post.getContent());
             dto.setUser(new UserSummaryDTO(post.getUser().getUsername(), post.getUser().getName()));

@@ -3,6 +3,7 @@ package br.com.teamss.skillswap.skill_swap.dto;
 import java.util.Set;
 import java.util.UUID;
 import java.util.HashSet;
+import java.time.Instant;
 
 /**
  * DTO para o perfil PRIVADO de um usuário, visto apenas por ele mesmo. CONTÉM userId e informações sensíveis.
@@ -12,6 +13,7 @@ public record UserPrivateProfileDTO(
     String username,
     String email, // Incluído info sensível
     String name,
+    Instant createdAt,
     boolean verifiedBadge,
     ProfileDTO profile,
     Set<SkillDTO> skills,

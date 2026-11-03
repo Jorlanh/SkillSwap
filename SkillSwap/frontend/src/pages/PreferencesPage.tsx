@@ -5,6 +5,8 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { SettingsService } from '@/services/api';
 import { toast } from 'sonner';
+import { auth } from '@/lib/firebase';
+import { onIdTokenChanged } from 'firebase/auth';
 
 type AccessibilityPreferences = {
   contrastMode: 'default' | 'high-contrast';
@@ -47,25 +49,39 @@ const PreferencesPage = () => {
   };
 
   useEffect(() => {
-    SettingsService.getAccessibilityPreferences()
-      .then((response) => {
+    let active = true;
+    const loadLocal = () => {
+      const stored = localStorage.getItem('skillswap-accessibility-preferences');
+      if (stored) {
+        try {
+          const next = { ...defaults, ...JSON.parse(stored) } as AccessibilityPreferences;
+          if (active) setPreferences(next);
+          applyLocally(next);
+          return;
+        } catch { /* usa os valores padrão abaixo */ }
+      }
+      if (active) setPreferences(defaults);
+      applyLocally(defaults);
+    };
+    const load = async (authenticated: boolean) => {
+      if (!authenticated) {
+        loadLocal();
+        if (active) setLoading(false);
+        return;
+      }
+      try {
+        const response = await SettingsService.getAccessibilityPreferences();
         const next = { ...defaults, ...response.data } as AccessibilityPreferences;
-        setPreferences(next);
+        if (active) setPreferences(next);
         applyLocally(next);
-      })
-      .catch(() => {
-        const stored = localStorage.getItem('skillswap-accessibility-preferences');
-        if (stored) {
-          try {
-            const next = { ...defaults, ...JSON.parse(stored) } as AccessibilityPreferences;
-            setPreferences(next);
-            applyLocally(next);
-          } catch {
-            applyLocally(defaults);
-          }
-        } else applyLocally(defaults);
-      })
-      .finally(() => setLoading(false));
+      } catch {
+        loadLocal();
+      } finally {
+        if (active) setLoading(false);
+      }
+    };
+    const unsubscribe = onIdTokenChanged(auth, (firebaseUser) => { void load(Boolean(firebaseUser)); });
+    return () => { active = false; unsubscribe(); };
   }, []);
 
   const update = <K extends keyof AccessibilityPreferences>(key: K, value: AccessibilityPreferences[K]) => {
@@ -75,6 +91,10 @@ const PreferencesPage = () => {
   };
 
   const save = async () => {
+    if (!auth.currentUser) {
+      toast.error('Entre na sua conta para salvar as preferências no perfil.');
+      return;
+    }
     if (setup && !preferences.accessibilitySymbol) {
       toast.error('Escolha uma opção para concluir a triagem de acessibilidade.');
       return;

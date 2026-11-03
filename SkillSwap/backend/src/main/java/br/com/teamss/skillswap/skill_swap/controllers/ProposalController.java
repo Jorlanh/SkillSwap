@@ -4,6 +4,7 @@ import br.com.teamss.skillswap.skill_swap.dto.ProposalRequestDTO;
 import br.com.teamss.skillswap.skill_swap.dto.ProposalResponseDTO;
 import br.com.teamss.skillswap.skill_swap.model.entities.Proposal;
 import br.com.teamss.skillswap.skill_swap.model.services.ProposalService;
+import br.com.teamss.skillswap.skill_swap.model.services.UserServiceDTO;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -19,6 +20,9 @@ public class ProposalController {
     @Autowired
     private ProposalService proposalService;
 
+    @Autowired
+    private UserServiceDTO userServiceDTO;
+
     @PostMapping("/send")
     public ResponseEntity<Proposal> sendProposal(@Valid @RequestBody ProposalRequestDTO proposalRequest) {
         Proposal savedProposal = proposalService.sendProposal(proposalRequest);
@@ -29,6 +33,12 @@ public class ProposalController {
     public ResponseEntity<List<ProposalResponseDTO>> getUserProposals(@PathVariable UUID userId) {
         List<ProposalResponseDTO> proposals = proposalService.getUserProposals(userId);
         return ResponseEntity.ok(proposals);
+    }
+
+    @GetMapping("/user/me")
+    public ResponseEntity<List<ProposalResponseDTO>> getMyProposals() {
+        UUID userId = userServiceDTO.getAuthenticatedUser().getUserId();
+        return ResponseEntity.ok(proposalService.getUserProposals(userId));
     }
 
     @PostMapping("/accept/{proposalId}")

@@ -11,9 +11,18 @@ const api = axios.create({
 
 // Interceptor para injetar o Token JWT em cada requisição
 api.interceptors.request.use(async (config) => {
-  const token = auth.currentUser ? await auth.currentUser.getIdToken() : null;
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
+  try {
+    // Aguarda o Firebase terminar de restaurar a sessão antes de decidir se
+    // esta chamada precisa de autenticação.
+    const firebaseAuth = auth as typeof auth & { authStateReady?: () => Promise<void> };
+    if (firebaseAuth.authStateReady) await firebaseAuth.authStateReady();
+    const token = auth.currentUser ? await auth.currentUser.getIdToken() : null;
+    if (token) {
+      config.headers = config.headers ?? {};
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+  } catch {
+    // Chamadas públicas continuam funcionando mesmo quando não há sessão.
   }
   return config;
 });
@@ -117,13 +126,24 @@ export const SearchService = {
 
 export const CommunityService = {
   getAll: () => api.get('/communities'), // RESTAURADO para resolver o erro no ActivitiesPage
+  getById: (communityId: string) => api.get(`/communities/${communityId}`),
   join: (communityId: string) => api.post(`/communities/${communityId}/join`),
+  updateAvatar: (communityId: string, file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return api.post(`/communities/${communityId}/avatar`, formData);
+  },
   getPosts: (communityId: string) => api.get(`/communities/${communityId}/posts`),
   createPost: (communityId: string, formData: FormData) => api.post(`/communities/${communityId}/posts`, formData),
   likePost: (communityId: string, postId: number) => api.post(`/communities/${communityId}/posts/${postId}/like`),
   commentPost: (communityId: string, postId: number, commentData: any) => api.post(`/communities/${communityId}/posts/${postId}/comment`, commentData),
   repostPost: (communityId: string, postId: number) => api.post(`/communities/${communityId}/posts/${postId}/repost`),
   sharePost: (communityId: string, postId: number) => api.post(`/communities/${communityId}/posts/${postId}/share`),
+};
+
+export const StoryService = {
+  getAll: () => api.get('/stories'),
+  create: (formData: FormData) => api.post('/stories', formData),
 };
 
 // ==========================================
@@ -134,6 +154,7 @@ export const ProfileService = {
   update: (data: any) => api.put('/profiles/me', data),
   togglePrivacy: (isPrivate: boolean) => api.patch('/profiles/me/privacy', null, { params: { isPrivate } }),
   updateAvatar: (formData: FormData) => api.post('/profiles/me/avatar', formData),
+  removeAvatar: () => api.delete('/profiles/me/avatar'),
   getMyFeed: () => api.get('/profiles/me/feed'),
   createMyPost: (formData: FormData) => api.post('/profiles/me/posts', formData),
   deleteMyPost: (postId: number) => api.delete(`/profiles/me/posts/${postId}`),

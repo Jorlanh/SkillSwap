@@ -49,6 +49,8 @@ export interface Community {
   members: number;
   avatars: string[];
   description?: string;
+  imageUrl?: string;
+  ownerId?: string;
 }
 
 export interface Notification {

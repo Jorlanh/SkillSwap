@@ -3,6 +3,7 @@ import { Switch } from '@/components/ui/switch';
 import { ChevronRight, Clock, Camera, Mic, MapPin, Users, Shield, Key, Lock } from 'lucide-react';
 import { AccessLogService } from '@/services/api';
 import { auth } from '@/lib/firebase';
+import { onIdTokenChanged } from 'firebase/auth';
 import { toast } from 'sonner';
 
 type SettingsTab = 'historico' | 'permissoes' | 'seguranca';
@@ -18,10 +19,18 @@ const SettingsPage = () => {
   const [permissions, setPermissions] = useState<PermissionMap>(initialPermissions);
 
   useEffect(() => {
-    if (!auth.currentUser) return;
-    AccessLogService.getMyAccessHistory()
-      .then(({ data }) => setAccessLogs(Array.isArray(data) ? data : []))
-      .catch(() => setAccessLogError(true));
+    let active = true;
+    const unsubscribe = onIdTokenChanged(auth, (firebaseUser) => {
+      if (!firebaseUser) {
+        setAccessLogs([]);
+        return;
+      }
+      setAccessLogError(false);
+      AccessLogService.getMyAccessHistory()
+        .then(({ data }) => { if (active) setAccessLogs(Array.isArray(data) ? data : []); })
+        .catch(() => { if (active) setAccessLogError(true); });
+    });
+    return () => { active = false; unsubscribe(); };
   }, []);
 
   useEffect(() => {

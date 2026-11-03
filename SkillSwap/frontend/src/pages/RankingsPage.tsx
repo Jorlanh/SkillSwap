@@ -53,14 +53,14 @@ const RankingsPage = () => {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="Ranking Geral">Ranking Geral</SelectItem>
-            {skills.map((skill: any) => {
+            {skills.map((skill: any, index: number) => {
               // MANOBRA DE SEGURANÇA: O valor não pode ser string vazia ("")
               // Se o id não existir, usamos um fallback temporário para evitar crash no Radix
-              const skillValue = skill?.id ? skill.id.toString() : `temp-${Math.random()}`;
+              const skillValue = (skill?.id ?? skill?.skillId ?? skill?.name ?? `skill-${index}`).toString();
               
               return (
                 <SelectItem 
-                  key={skill?.id || Math.random()} 
+                  key={skill?.id ?? skill?.skillId ?? skill?.name ?? `skill-${index}`}
                   value={skillValue}
                 >
                   {skill?.name || "Habilidade sem nome"}

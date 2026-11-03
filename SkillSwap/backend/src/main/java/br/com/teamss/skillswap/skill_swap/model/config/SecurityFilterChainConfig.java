@@ -99,6 +99,7 @@ public class SecurityFilterChainConfig {
                 // A Stripe assina cada webhook; nenhuma outra rota de pagamento é pública.
                 .requestMatchers("/api/wallet/**", "/api/premium/**", "/api/payments/**").denyAll()
                 .requestMatchers(HttpMethod.GET, "/api/home/**", "/api/skills/**", "/api/rankings/**", "/api/search/**").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/stories/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/roles/**", "/api/profiles/user/{username}").permitAll()
                 // O handshake WebSocket não carrega o JWT na URL. A autenticação
                 // acontece como primeira mensagem, dentro dos handlers, e o

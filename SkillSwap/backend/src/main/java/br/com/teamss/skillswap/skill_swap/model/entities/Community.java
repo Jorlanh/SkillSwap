@@ -28,6 +28,13 @@ public class Community {
     @Column(length = 1000)
     private String description;
 
+    @Column(name = "image_url", length = 1024)
+    private String imageUrl;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "owner_id")
+    private User owner;
+
     @ManyToMany
     @JoinTable(
         name = "tb_community_members",
@@ -35,4 +42,9 @@ public class Community {
         inverseJoinColumns = @JoinColumn(name = "user_id")
     )
     private List<User> members = new ArrayList<>();
+
+    public String getImageUrl() { return imageUrl; }
+    public void setImageUrl(String imageUrl) { this.imageUrl = imageUrl; }
+    public User getOwner() { return owner; }
+    public void setOwner(User owner) { this.owner = owner; }
 }

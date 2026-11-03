@@ -1,6 +1,8 @@
 package br.com.teamss.skillswap.skill_swap.controllers;
 
 import br.com.teamss.skillswap.skill_swap.dto.UserDTO;
+import br.com.teamss.skillswap.skill_swap.dto.PostResponseDTO;
+import br.com.teamss.skillswap.skill_swap.dto.UserSummaryDTO;
 import br.com.teamss.skillswap.skill_swap.model.entities.Post;
 import br.com.teamss.skillswap.skill_swap.model.services.PostService;
 import br.com.teamss.skillswap.skill_swap.model.services.UserServiceDTO;
@@ -25,12 +27,12 @@ public class PostController {
     }
 
     @GetMapping
-    public ResponseEntity<List<Post>> getAllPosts() {
-        return ResponseEntity.ok(postService.findAll());
+    public ResponseEntity<List<PostResponseDTO>> getAllPosts() {
+        return ResponseEntity.ok(postService.findAll().stream().map(this::toResponse).toList());
     }
 
     @PostMapping
-    public ResponseEntity<?> createPost(@RequestParam("content") String content, 
+    public ResponseEntity<?> createPost(@RequestParam("content") String content,
                                         @RequestParam(value = "image", required = false) MultipartFile image) {
         UserDTO authenticatedUser = userServiceDTO.getAuthenticatedUser();
         
@@ -43,10 +45,35 @@ public class PostController {
                 newPost.setImageUrl(imageUrl);
             }
             // Salvamento real no Banco de Dados
-            Post savedPost = postService.save(newPost, authenticatedUser.getUserId()); 
-            return ResponseEntity.ok(savedPost);
+            Post savedPost = postService.save(newPost, authenticatedUser.getUserId());
+            return ResponseEntity.ok(toResponse(savedPost));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body("Falha ao salvar postagem: " + e.getMessage());
         }
+    }
+
+    private PostResponseDTO toResponse(Post post) {
+        PostResponseDTO response = new PostResponseDTO();
+        response.setPostId(post.getPostId());
+        if (post.getUser() != null) {
+            response.setUserId(post.getUser().getUserId());
+        }
+        response.setTitle(post.getTitle());
+        response.setContent(post.getContent());
+        response.setImageUrl(post.getImageUrl());
+        response.setVideoUrl(post.getVideoUrl());
+        response.setCreatedAt(post.getCreatedAt());
+        response.setLikesCount(post.getLikesCount());
+        response.setCommentsCount(post.getCommentsCount());
+        response.setRepostsCount(post.getRepostsCount());
+        response.setSharesCount(post.getSharesCount());
+        response.setViewsCount(post.getViewsCount());
+        if (post.getUser() != null) {
+            UserSummaryDTO summary = new UserSummaryDTO(post.getUser().getUsername(), post.getUser().getName());
+            summary.setVerifiedBadge(post.getUser().isVerifiedBadge());
+            response.setUser(summary);
+        }
+        if (post.getCommunity() != null) response.setCommunity(post.getCommunity().getName());
+        return response;
     }
 }

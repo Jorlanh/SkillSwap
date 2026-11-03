@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { HomeService } from '@/services/api';
-import { useOutletContext } from 'react-router-dom';
+import { Link, useOutletContext } from 'react-router-dom';
 
 type ApiCommunity = {
   communityId?: string;
@@ -10,6 +10,7 @@ type ApiCommunity = {
   name?: string;
   members?: unknown[] | number;
   memberCount?: number;
+  imageUrl?: string;
 };
 
 const communityId = (community: ApiCommunity) => String(community.communityId ?? community.id ?? '');
@@ -50,9 +51,10 @@ const RightSidebar = () => {
           {communities.map((c) => (
             <div key={communityId(c)} className="flex items-center gap-2 min-w-0">
               <Avatar className="h-8 w-8">
+                {c.imageUrl && <img src={c.imageUrl} alt="" className="h-full w-full rounded-full object-cover" />}
                 <AvatarFallback>{c.name?.slice(0, 1).toUpperCase() || 'C'}</AvatarFallback>
               </Avatar>
-              <span className="text-sm text-foreground flex-1 truncate" title={c.name}>{c.name}</span>
+              <Link to={`/comunidades/${communityId(c)}`} className="text-sm text-foreground flex-1 truncate hover:text-skillswap-teal" title={c.name}>{c.name}</Link>
               <Button size="sm" disabled={joined.includes(communityId(c))} onClick={() => join(communityId(c))} className="bg-skillswap-teal text-primary-foreground text-xs h-6 px-2 hover:opacity-90 shrink-0">
                 {joined.includes(communityId(c)) ? 'Membro' : 'Juntar-se'}
               </Button>
@@ -77,18 +79,18 @@ const RightSidebar = () => {
       <div>
         <h3 className="font-display font-semibold text-foreground mb-3">Recursos</h3>
         <div className="space-y-1">
-          {['Sobre o SkillSwap', 'Anuncie aqui', 'Ajuda', 'Notícias', 'Blog'].map((r) => (
-            <button key={r} className="block text-sm text-muted-foreground hover:text-foreground transition-colors">
-              {r}
-            </button>
-          ))}
+          <Link to="/institucional/sobre" className="block text-sm text-muted-foreground hover:text-foreground transition-colors">Sobre o SkillSwap</Link>
+          <a href="mailto:suporte.skillswap@gmail.com" className="block text-sm text-muted-foreground hover:text-foreground transition-colors">Anuncie aqui</a>
+          <Link to="/institucional/ajuda" className="block text-sm text-muted-foreground hover:text-foreground transition-colors">Ajuda</Link>
+          <Link to="/institucional/noticias" className="block text-sm text-muted-foreground hover:text-foreground transition-colors">Notícias</Link>
+          <Link to="/institucional/blog" className="block text-sm text-muted-foreground hover:text-foreground transition-colors">Blog</Link>
         </div>
       </div>
 
       <div className="text-xs text-muted-foreground space-y-1">
-        <p>Regras do SkillSwap | Políticas de Privacidade</p>
-        <p>Contrato de Usuário | Termos de Serviço</p>
-        <p>SkillSwap, Inc. © 2025</p>
+        <p><Link to="/institucional/regras" className="hover:text-foreground">Regras do SkillSwap</Link> | <Link to="/institucional/privacidade" className="hover:text-foreground">Políticas de Privacidade</Link></p>
+        <p><Link to="/institucional/contrato" className="hover:text-foreground">Contrato de Usuário</Link> | <Link to="/institucional/termos" className="hover:text-foreground">Termos de Serviço</Link></p>
+        <p>SkillSwap</p>
       </div>
     </aside>
   );

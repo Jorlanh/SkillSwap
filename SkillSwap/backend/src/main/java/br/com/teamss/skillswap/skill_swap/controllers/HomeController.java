@@ -44,8 +44,8 @@ public class HomeController {
      * Mapeia /api/home/trending para retornar os posts em alta.
      */
     @GetMapping("/trending")
-    public ResponseEntity<List<Post>> getTrending(@RequestParam(defaultValue = "DAY") String period) {
-        return ResponseEntity.ok(trendingService.getTrendingPosts(period, 10));
+    public ResponseEntity<List<PostResponseDTO>> getTrending(@RequestParam(defaultValue = "DAY") String period) {
+        return ResponseEntity.ok(trendingService.getTrendingPosts(period, 10).stream().map(this::toResponse).toList());
     }
 
     @PostMapping("/notifications/{notificationId}/read")
@@ -56,32 +56,32 @@ public class HomeController {
     }
 
     @PostMapping("/posts")
-    public ResponseEntity<Post> createPost(
-            @RequestParam String title,
+    public ResponseEntity<PostResponseDTO> createPost(
+            @RequestParam(defaultValue = "") String title,
             @RequestParam String content,
             @RequestParam(required = false) MultipartFile image,
             @RequestParam(required = false) MultipartFile video) throws IOException {
         UserDTO authenticatedUser = userServiceDTO.getAuthenticatedUser();
         Post post = postService.createPost(authenticatedUser.getUserId(), title, content, image, video);
-        return ResponseEntity.ok(post);
+        return ResponseEntity.ok(toResponse(post));
     }
 
     @PostMapping("/posts/{postId}/like")
-    public ResponseEntity<Post> likePost(@PathVariable Long postId) {
+    public ResponseEntity<PostResponseDTO> likePost(@PathVariable Long postId) {
         UserDTO authenticatedUser = userServiceDTO.getAuthenticatedUser();
-        return ResponseEntity.ok(postService.likePost(postId, authenticatedUser.getUserId()));
+        return ResponseEntity.ok(toResponse(postService.likePost(postId, authenticatedUser.getUserId())));
     }
 
     @PostMapping("/posts/{postId}/repost")
-    public ResponseEntity<Post> repost(@PathVariable Long postId) {
+    public ResponseEntity<PostResponseDTO> repost(@PathVariable Long postId) {
         UserDTO authenticatedUser = userServiceDTO.getAuthenticatedUser();
-        return ResponseEntity.ok(postService.repost(postId, authenticatedUser.getUserId()));
+        return ResponseEntity.ok(toResponse(postService.repost(postId, authenticatedUser.getUserId())));
     }
 
     @PostMapping("/posts/{postId}/comment")
-    public ResponseEntity<Post> commentOnPost(@PathVariable Long postId, @RequestParam String content) {
+    public ResponseEntity<PostResponseDTO> commentOnPost(@PathVariable Long postId, @RequestParam String content) {
         UserDTO authenticatedUser = userServiceDTO.getAuthenticatedUser();
-        return ResponseEntity.ok(postService.commentOnPost(postId, authenticatedUser.getUserId(), content));
+        return ResponseEntity.ok(toResponse(postService.commentOnPost(postId, authenticatedUser.getUserId(), content)));
     }
 
     @GetMapping("/notifications")
@@ -138,8 +138,8 @@ public class HomeController {
     }
 
     @GetMapping("/trending-posts")
-    public ResponseEntity<List<Post>> getTrendingPosts(@RequestParam(defaultValue = "DAY") String period) {
-        return ResponseEntity.ok(trendingService.getTrendingPosts(period, 10));
+    public ResponseEntity<List<PostResponseDTO>> getTrendingPosts(@RequestParam(defaultValue = "DAY") String period) {
+        return ResponseEntity.ok(trendingService.getTrendingPosts(period, 10).stream().map(this::toResponse).toList());
     }
 
     @GetMapping("/posts/{postId}/likes")
@@ -150,5 +150,30 @@ public class HomeController {
     @GetMapping("/posts/{postId}/comments")
     public ResponseEntity<List<CommentDTO>> getCommentsByPost(@PathVariable Long postId) {
         return ResponseEntity.ok(commentService.getCommentsByPost(postId));
+    }
+
+    private PostResponseDTO toResponse(Post post) {
+        PostResponseDTO response = new PostResponseDTO();
+        response.setPostId(post.getPostId());
+        if (post.getUser() != null) {
+            response.setUserId(post.getUser().getUserId());
+        }
+        response.setTitle(post.getTitle());
+        response.setContent(post.getContent());
+        response.setImageUrl(post.getImageUrl());
+        response.setVideoUrl(post.getVideoUrl());
+        response.setCreatedAt(post.getCreatedAt());
+        response.setLikesCount(post.getLikesCount());
+        response.setCommentsCount(post.getCommentsCount());
+        response.setRepostsCount(post.getRepostsCount());
+        response.setSharesCount(post.getSharesCount());
+        response.setViewsCount(post.getViewsCount());
+        if (post.getUser() != null) {
+            UserSummaryDTO summary = new UserSummaryDTO(post.getUser().getUsername(), post.getUser().getName());
+            summary.setVerifiedBadge(post.getUser().isVerifiedBadge());
+            response.setUser(summary);
+        }
+        if (post.getCommunity() != null) response.setCommunity(post.getCommunity().getName());
+        return response;
     }
 }

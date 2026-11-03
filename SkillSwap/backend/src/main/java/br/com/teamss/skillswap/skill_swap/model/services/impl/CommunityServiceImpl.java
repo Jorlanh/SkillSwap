@@ -66,11 +66,17 @@ public class CommunityServiceImpl implements CommunityService {
                 .orElseThrow(() -> new RuntimeException("Usuário não encontrado!"));
         Community community = communityRepository.findById(communityId)
                 .orElseThrow(() -> new RuntimeException("Comunidade não encontrada!"));
-        Profile profile = profileRepository.findByUser_UserId(userId)
-                .orElseThrow(() -> new RuntimeException("Perfil não encontrado para usuário com ID: " + userId));
+        Profile profile = profileRepository.findByUser_UserId(userId).orElseGet(() -> {
+            Profile created = new Profile();
+            created.setUser(user);
+            return profileRepository.save(created);
+        });
+        user.setProfile(profile);
 
-        String imageUrl = fileUploadService.uploadFile(image);
-        String videoUrl = fileUploadService.uploadFile(video);
+        String imageUrl = null;
+        String videoUrl = null;
+        if (image != null && !image.isEmpty()) imageUrl = fileUploadService.uploadFile(image);
+        if (video != null && !video.isEmpty()) videoUrl = fileUploadService.uploadFile(video);
 
         Post post = new Post();
         post.setUser(user);
@@ -118,7 +124,9 @@ public class CommunityServiceImpl implements CommunityService {
                         community.getCommunityId(),
                         community.getName(),
                         community.getDescription(),
-                        community.getMembers().size()))
+                        community.getMembers().size(),
+                        community.getImageUrl(),
+                        community.getOwner() == null ? null : community.getOwner().getUserId()))
                 .collect(Collectors.toList());
     }
 
@@ -131,11 +139,35 @@ public class CommunityServiceImpl implements CommunityService {
         Community community = new Community();
         community.setName(request.name().trim());
         community.setDescription(request.description() == null ? null : request.description().trim());
+        community.setOwner(creator);
         Community saved = communityRepository.save(community);
 
         // Quem cria a comunidade já entra como primeiro membro.
         joinCommunityWithMemberRepository(saved.getCommunityId(), creator.getUserId());
-        return new CommunitySummaryDTO(saved.getCommunityId(), saved.getName(), saved.getDescription(), 1);
+        return new CommunitySummaryDTO(saved.getCommunityId(), saved.getName(), saved.getDescription(), 1,
+                saved.getImageUrl(), creator.getUserId());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public CommunitySummaryDTO getCommunity(UUID communityId) {
+        Community community = communityRepository.findById(communityId)
+            .orElseThrow(() -> new RuntimeException("Comunidade não encontrada!"));
+        return new CommunitySummaryDTO(community.getCommunityId(), community.getName(), community.getDescription(),
+            community.getMembers().size(), community.getImageUrl(), community.getOwner() == null ? null : community.getOwner().getUserId());
+    }
+
+    @Override
+    @Transactional
+    public void updateCommunityImage(UUID communityId, UUID userId, MultipartFile image) throws IOException {
+        Community community = communityRepository.findById(communityId)
+            .orElseThrow(() -> new RuntimeException("Comunidade não encontrada!"));
+        if (community.getOwner() == null || !community.getOwner().getUserId().equals(userId)) {
+            throw new org.springframework.security.access.AccessDeniedException("Somente quem criou a comunidade pode alterar a foto.");
+        }
+        if (image == null || image.isEmpty()) throw new IllegalArgumentException("Escolha uma imagem.");
+        community.setImageUrl(fileUploadService.uploadFile(image));
+        communityRepository.save(community);
     }
 
     @Override
@@ -152,7 +184,10 @@ public class CommunityServiceImpl implements CommunityService {
                 .orElseThrow(() -> new RuntimeException("Usuário não encontrado com ID: " + userId));
 
         if (communityMemberRepository.existsById_CommunityIdAndId_UserId(communityId, userId)) {
-            throw new IllegalStateException("Usuário já é membro da comunidade com ID: " + communityId);
+            CommunityMemberId existingId = new CommunityMemberId();
+            existingId.setCommunityId(communityId);
+            existingId.setUserId(userId);
+            return communityMemberRepository.findById(existingId).orElseThrow();
         }
 
         CommunityMember communityMember = new CommunityMember();

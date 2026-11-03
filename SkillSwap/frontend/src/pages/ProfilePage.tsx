@@ -11,6 +11,8 @@ import VerifiedBadge from '@/components/VerifiedBadge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent } from '@/components/ui/card';
 import { toast } from 'sonner';
+import { auth } from '@/lib/firebase';
+import { onIdTokenChanged } from 'firebase/auth';
 
 import {
   Dialog,
@@ -90,13 +92,27 @@ const ProfilePage = () => {
   const loadProfileData = async () => {
     setIsLoading(true);
     try {
-      const { data: meData } = await UserService.getMe();
-      let targetUser;
+      let meData: any = null;
+      if (auth.currentUser) {
+        try {
+          meData = (await UserService.getMe()).data;
+        } catch {
+          meData = null;
+        }
+      }
+      let targetUser: any;
 
-      if (!urlUsername || urlUsername === meData.username) {
+      if (!urlUsername) {
+        if (!meData) {
+          navigate('/login');
+          return;
+        }
         targetUser = meData;
         setIsOwnProfile(true);
-        if (!urlUsername) navigate(`/perfil/${meData.username}`, { replace: true });
+        navigate(`/perfil/${meData.username}`, { replace: true });
+      } else if (meData && urlUsername === meData.username) {
+        targetUser = meData;
+        setIsOwnProfile(true);
       } else {
         setIsOwnProfile(false);
         const { data: publicProfile } = await ProfileService.get(urlUsername);
@@ -113,8 +129,10 @@ const ProfilePage = () => {
       setSkillsList(targetUser.skills?.map((s: any) => s.name) || []);
       
       // Verifica Followers
-      if (meData.following && Array.isArray(meData.following)) {
+      if (meData?.following && Array.isArray(meData.following)) {
         setIsFollowing(meData.following.some((f: any) => f.id === targetUser.id));
+      } else {
+        setIsFollowing(false);
       }
 
       const tId = targetUser.userId || targetUser.id;
@@ -137,7 +155,10 @@ const ProfilePage = () => {
     }
   };
 
-  useEffect(() => { loadProfileData(); }, [urlUsername]);
+  useEffect(() => {
+    const unsubscribe = onIdTokenChanged(auth, () => { void loadProfileData(); });
+    return unsubscribe;
+  }, [urlUsername]);
 
   const handleSaveProfile = async () => {
     try {
@@ -203,10 +224,11 @@ const ProfilePage = () => {
 
   const handleRemoveAvatar = async () => {
      try {
-         toast.info("Removendo foto...");
-         toast.warning("Rota de remoção de avatar ainda pendente no backend.");
+         await ProfileService.removeAvatar();
+         toast.success("Foto removida.");
+         loadProfileData();
      } catch (error) {
-         toast.error("Erro ao remover foto.");
+         toast.error("Não foi possível remover a foto agora.");
      }
   };
 
@@ -235,12 +257,19 @@ const ProfilePage = () => {
     if (!proposalMessage.trim()) return;
     try {
       const targetId = user.userId || user.id;
-      // DTO Atualizado para prevenir Erros 400 no Backend
+      const me = (await UserService.getMe()).data;
+      const offeredSkillId = me?.skills?.[0]?.skillId ?? me?.skills?.[0]?.id;
+      const requestedSkillId = user?.skills?.[0]?.skillId ?? user?.skills?.[0]?.id;
+      if (!offeredSkillId || !requestedSkillId) {
+        toast.error('Cadastre uma habilidade sua e uma habilidade no perfil da pessoa antes de enviar a proposta.');
+        return;
+      }
       await ProposalService.create({
+        senderId: me.userId || me.id,
         receiverId: targetId,
         message: proposalMessage,
-        skillOfferedId: null, 
-        skillWantedId: null
+        offeredSkillId,
+        requestedSkillId,
       } as any);
       
       toast.success("Proposta enviada! Acompanhe em Solicitações.");
@@ -341,7 +370,7 @@ const ProfilePage = () => {
   if (isLoading) return <ProfileSkeleton />;
 
   return (
-    <div className="flex gap-6 max-w-[1200px] mx-auto p-4">
+    <div className="flex w-full gap-6 max-w-[1200px] mx-auto p-4">
       {/* CORREÇÃO VISUAL DA LARGURA: Expansão do max-w para dar espaço ao Card de Reputação */}
       <div className="flex-1 min-w-0">
         
@@ -384,8 +413,8 @@ const ProfilePage = () => {
           <div className="flex-1 w-full min-w-0">
             <div className="flex justify-between items-start gap-3 mb-2 flex-wrap">
               <div>
-                <h1 className="font-display font-bold text-2xl text-foreground flex items-center gap-2 truncate">
-                  <span className="truncate">{user?.name || user?.username}</span>
+                <h1 className="font-display font-bold text-2xl text-foreground flex flex-wrap items-center gap-2 break-words">
+                  <span className="break-words">{user?.name || user?.username}</span>
                   <VerifiedBadge user={user} />
                   {user?.accessibilitySymbol && accessibilitySymbolDetails[user.accessibilitySymbol] && (
                     <span
@@ -398,7 +427,7 @@ const ProfilePage = () => {
                 <p className="text-skillswap-teal font-semibold">@{user?.username?.toLowerCase()}</p>
               </div>
               
-              <div className="flex gap-2 shrink-0">
+              <div className="flex w-full sm:w-auto flex-wrap gap-2 shrink-0">
                 {!isOwnProfile ? (
                   <>
                     <Button onClick={() => setIsProposalOpen(true)} className="bg-skillswap-teal hover:bg-teal-700 text-white font-bold rounded-full px-6">
@@ -425,10 +454,10 @@ const ProfilePage = () => {
             </p>
             
             <div className="flex flex-wrap items-center gap-4 text-[10px] font-bold text-muted-foreground mb-4 uppercase">
-              <span className="flex items-center gap-1 bg-muted px-2 py-1 rounded-md"><MapPin size={12} /> {user?.profile?.location || user?.location || "Sem localização"}</span>
-              <span className="flex items-center gap-1 bg-muted px-2 py-1 rounded-md">
-                <Calendar size={12} /> Entrou em {user?.createdAt ? new Date(user.createdAt).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '--/--/----'}
-              </span>
+              {(user?.profile?.location || user?.location) && <span className="flex items-center gap-1 bg-muted px-2 py-1 rounded-md"><MapPin size={12} /> {user.profile?.location || user.location}</span>}
+              {user?.createdAt && <span className="flex items-center gap-1 bg-muted px-2 py-1 rounded-md">
+                <Calendar size={12} /> Entrou em {new Date(user.createdAt).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+              </span>}
             </div>
 
             <div className="flex gap-6 pt-4 border-t border-border/50">
@@ -438,7 +467,7 @@ const ProfilePage = () => {
           </div>
 
           {/* COLUNA DIREITA: CSS DO CARD DE REPUTAÇÃO CORRIGIDO PARA W-72 (LARGO) E FLEX-WRAP */}
-          <div className="hidden md:block w-72 shrink-0 space-y-6">
+          <div className="w-full md:w-72 shrink-0 space-y-6">
             <div className="bg-card border border-border p-5 rounded-xl shadow-sm">
               <div className="flex justify-between items-center mb-4">
                 <h3 className="text-[10px] font-bold text-muted-foreground uppercase tracking-tighter">Reputação Real</h3>
@@ -460,7 +489,7 @@ const ProfilePage = () => {
               <h3 className="text-[10px] font-bold text-muted-foreground uppercase mb-3 flex items-center gap-1"><Award size={12}/> Habilidades</h3>
               <div className="flex flex-wrap gap-2">
                 {user?.skills?.length > 0 ? user.skills.map((s: any) => (
-                  <SkillBadge key={s.id || Math.random()} skill={s.name} />
+                  <SkillBadge key={s.id || s.skillId || s.name} skill={s.name} />
                 )) : <span className="text-[10px] text-muted-foreground">Nenhuma definida.</span>}
               </div>
             </div>
@@ -496,7 +525,7 @@ const ProfilePage = () => {
                   </div>
                 </div>
               )}
-              {userPosts.map((post) => <PostCard key={post.id || Math.random()} post={post} />)}
+              {userPosts.map((post) => <PostCard key={post.postId || post.id || `${post.createdAt || ''}-${post.content || ''}`} post={post} />)}
             </div>
           )}
 
@@ -510,7 +539,7 @@ const ProfilePage = () => {
               )}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {user?.skills?.map((s: any) => (
-                  <Card key={s.id || Math.random()} className="group relative border-border bg-card/50">
+                  <Card key={s.skillId || s.id || s.name} className="group relative border-border bg-card/50">
                     <CardContent className="p-4 flex justify-between items-center">
                       <div className="flex items-center gap-3">
                         <div className="p-2 bg-skillswap-teal/10 rounded-lg text-skillswap-teal"><BookOpen size={20}/></div>
@@ -527,7 +556,7 @@ const ProfilePage = () => {
           {activeTab === 'Conquistas' && (
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
               {achievements.length > 0 ? achievements.map((ach) => (
-                <Card key={ach.id || Math.random()} className="overflow-hidden group hover:border-skillswap-teal transition-all bg-card/50 border-border">
+                <Card key={ach.id || ach.achievement?.name || ach.achievement?.description} className="overflow-hidden group hover:border-skillswap-teal transition-all bg-card/50 border-border">
                   <CardContent className="p-6 flex flex-col items-center text-center">
                     <div className="w-16 h-16 rounded-full bg-skillswap-teal/10 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
                       {ach.imageUrl ? (

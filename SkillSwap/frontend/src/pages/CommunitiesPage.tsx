@@ -16,6 +16,8 @@ type ApiCommunity = {
   members?: unknown[] | number;
   memberCount?: number;
   description?: string;
+  imageUrl?: string;
+  ownerId?: string;
 };
 
 const toCommunity = (community: ApiCommunity): Community => ({
@@ -24,6 +26,8 @@ const toCommunity = (community: ApiCommunity): Community => ({
   members: Array.isArray(community.members) ? community.members.length : community.memberCount ?? Number(community.members ?? 0),
   avatars: [],
   description: community.description,
+  imageUrl: community.imageUrl,
+  ownerId: community.ownerId,
 });
 
 const CommunitiesPage = () => {

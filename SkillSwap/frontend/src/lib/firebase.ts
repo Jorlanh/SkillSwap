@@ -1,10 +1,10 @@
 import { initializeApp } from "firebase/app";
-
-import {
-  getAuth,
-  GoogleAuthProvider,
-  FacebookAuthProvider,
-  GithubAuthProvider
+import { 
+  getAuth, 
+  GoogleAuthProvider, 
+  FacebookAuthProvider, 
+  OAuthProvider, 
+  GithubAuthProvider 
 } from "firebase/auth";
 
 const firebaseConfig = {
@@ -18,15 +18,13 @@ const firebaseConfig = {
 
 export const app = initializeApp(firebaseConfig);
 
-// Inicializa o Firebase Auth
+// Inicializa o Auth
 export const auth = getAuth(app);
 
-// Configura os provedores sociais
+// Configura os Provedores Sociais
 export const googleProvider = new GoogleAuthProvider();
 export const githubProvider = new GithubAuthProvider();
 export const facebookProvider = new FacebookAuthProvider();
 
-// Força a seleção de conta no Google
-googleProvider.setCustomParameters({
-  prompt: "select_account"
-});
+// Configuração opcional: Forçar seleção de conta no Google
+googleProvider.setCustomParameters({ prompt: 'select_account' });

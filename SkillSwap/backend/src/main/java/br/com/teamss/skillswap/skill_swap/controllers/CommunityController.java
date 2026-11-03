@@ -31,11 +31,24 @@ public class CommunityController {
         return ResponseEntity.ok().build();
     }
 
+    @GetMapping("/{communityId}")
+    public ResponseEntity<CommunitySummaryDTO> getCommunity(@PathVariable UUID communityId) {
+        return ResponseEntity.ok(communityService.getCommunity(communityId));
+    }
+
     @PostMapping
     public ResponseEntity<CommunitySummaryDTO> createCommunity(
             @Valid @RequestBody CreateCommunityRequest request) {
         UserDTO authenticatedUser = userServiceDTO.getAuthenticatedUser();
         return ResponseEntity.ok(communityService.createCommunity(request, authenticatedUser.getUserId()));
+    }
+
+    @PostMapping("/{communityId}/avatar")
+    public ResponseEntity<Void> updateCommunityImage(@PathVariable UUID communityId,
+                                                       @RequestParam("file") MultipartFile file) throws IOException {
+        UserDTO authenticatedUser = userServiceDTO.getAuthenticatedUser();
+        communityService.updateCommunityImage(communityId, authenticatedUser.getUserId(), file);
+        return ResponseEntity.ok().build();
     }
 
     @GetMapping("/{communityId}/posts")
@@ -111,6 +124,7 @@ public class CommunityController {
         dto.setContent(post.getContent());
         dto.setTitle(post.getTitle());
         if (post.getUser() != null) {
+            dto.setUserId(post.getUser().getUserId());
             dto.setUsername(post.getUser().getUsername());
         }
         if (post.getCommunity() != null) {

@@ -235,7 +235,7 @@ public class UserServiceDTOImpl implements UserServiceDTO {
             .orElse(null);
 
         return new UserPublicProfileDTO(
-            user.getUserId(), user.getUsername(), user.getName(), user.isVerifiedBadge(), profileDTO, skills,
+            user.getUserId(), user.getUsername(), user.getName(), user.getCreatedAt(), user.isVerifiedBadge(), profileDTO, skills,
             accessibilitySymbol
         );
     }
@@ -268,6 +268,7 @@ public class UserServiceDTOImpl implements UserServiceDTO {
 
         return new UserPrivateProfileDTO(
             user.getUserId(), user.getUsername(), user.getEmail(), user.getName(),
+            user.getCreatedAt(),
             user.isVerifiedBadge(), profileDTO, skills, roles,
             // --- START: Accessibility Settings ---
             user.isLibrasAvatarEnabled(),

@@ -4,7 +4,9 @@ import { MessageSquare, Repeat2, ArrowUp, Share, Send, Heart, Trash2, Reply } fr
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useOutletContext, useNavigate } from 'react-router-dom';
-import { PostService, UserService } from '@/services/api';
+import { HomeService, ProfileService, UserService } from '@/services/api';
+import { auth } from '@/lib/firebase';
+import { onIdTokenChanged } from 'firebase/auth';
 import { toast } from 'sonner';
 
 interface PostCardProps {
@@ -27,9 +29,20 @@ const PostCard = ({ post }: PostCardProps) => {
   const [loggedUser, setLoggedUser] = useState<any>({});
 
   useEffect(() => {
-    UserService.getMe()
-      .then(({ data }) => setLoggedUser(data || {}))
-      .catch(() => setLoggedUser({}));
+    let active = true;
+    const unsubscribe = onIdTokenChanged(auth, async (firebaseUser) => {
+      if (!firebaseUser) {
+        if (active) setLoggedUser({});
+        return;
+      }
+      try {
+        const { data } = await UserService.getMe();
+        if (active) setLoggedUser(data || {});
+      } catch {
+        if (active) setLoggedUser({});
+      }
+    });
+    return () => { active = false; unsubscribe(); };
   }, []);
 
   // ESTADOS DO POST
@@ -37,7 +50,6 @@ const PostCard = ({ post }: PostCardProps) => {
   const [likesCount, setLikesCount] = useState(post.likesCount || 0);
   const [isReposted, setIsReposted] = useState(false);
   const [repostsCount, setRepostsCount] = useState(post.repostsCount || 0);
-  const [isJoined, setIsJoined] = useState(false);
 
   // ESTADOS DOS COMENTÁRIOS
   const [showComments, setShowComments] = useState(false);
@@ -46,6 +58,7 @@ const PostCard = ({ post }: PostCardProps) => {
   const [commentsCount, setCommentsCount] = useState(post.commentsCount || 0);
 
   const author = post.user || post.author || { username: 'Usuário', avatarUrl: '' };
+  const postId = post.postId ?? post.id;
 
   // --- AÇÕES DO POST ---
 
@@ -59,7 +72,7 @@ const PostCard = ({ post }: PostCardProps) => {
       setLikesCount((prev: number) => isLiked ? prev - 1 : prev + 1);
 
       try {
-        await PostService.like(post.id);
+        await HomeService.likePost(postId);
         if (!originalLiked) toast.success("Post curtido!");
       } catch (error) {
         setIsLiked(originalLiked);
@@ -70,19 +83,22 @@ const PostCard = ({ post }: PostCardProps) => {
   };
 
   const handleRepost = () => {
-    requireAuth(() => {
-      const newStatus = !isReposted;
-      setIsReposted(newStatus);
-      // Tipagem (prev: number) adicionada
-      setRepostsCount((prev: number) => newStatus ? prev + 1 : prev - 1);
-      toast.success(newStatus ? "Repostado com sucesso!" : "Repost removido");
+    requireAuth(async () => {
+      try {
+        await HomeService.repost(postId);
+        setIsReposted(true);
+        setRepostsCount((prev: number) => prev + 1);
+        toast.success("Repostado com sucesso!");
+      } catch {
+        toast.error("Não foi possível repostar agora.");
+      }
     });
   };
 
   const handleDeletePost = async () => {
     if (!window.confirm("Deseja apagar esta publicação permanentemente?")) return;
     try {
-      await PostService.delete(post.id);
+      await ProfileService.deleteMyPost(postId);
       toast.success("Post removido.");
       // O ideal aqui é que o componente pai recarregue a lista (loadPosts)
     } catch (error) {
@@ -91,9 +107,17 @@ const PostCard = ({ post }: PostCardProps) => {
   };
 
   const handleShare = () => {
-    const url = `${window.location.origin}/perfil/${author.username}`;
-    navigator.clipboard.writeText(url);
-    toast.success("Link do perfil copiado!");
+    requireAuth(async () => {
+      try {
+        const { data } = await HomeService.generateShareLink(postId);
+        const url = typeof data === 'string' ? data : data?.shareUrl;
+        if (!url) throw new Error('link ausente');
+        await navigator.clipboard.writeText(url);
+        toast.success("Link da publicação copiado!");
+      } catch {
+        toast.error("Não foi possível compartilhar agora.");
+      }
+    });
   };
 
   const submitComment = async (e: React.FormEvent) => {
@@ -102,8 +126,11 @@ const PostCard = ({ post }: PostCardProps) => {
 
     requireAuth(async () => {
       try {
-        const { data: savedComment } = await PostService.comment(post.id, newComment);
-        setCommentsList([savedComment, ...commentsList]);
+        await HomeService.comment(postId, newComment);
+        setCommentsList([
+          { id: `local-${Date.now()}`, content: newComment, user: loggedUser },
+          ...commentsList,
+        ]);
         // Tipagem (prev: number) adicionada
         setCommentsCount((prev: number) => prev + 1);
         setNewComment("");
@@ -143,12 +170,6 @@ const PostCard = ({ post }: PostCardProps) => {
         </div>
 
         <div className="flex items-center gap-2">
-            {!isJoined && author.username !== loggedUser.username && (
-            <Button variant="outline" size="sm" className="bg-skillswap-teal text-white border-none h-7 text-[10px] uppercase font-bold" onClick={() => setIsJoined(true)}>
-                Juntar-se
-            </Button>
-            )}
-            
             {author.username === loggedUser.username && (
                 <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-red-500" onClick={handleDeletePost}>
                     <Trash2 size={16} />
@@ -212,7 +233,7 @@ const PostCard = ({ post }: PostCardProps) => {
 
           <div className="space-y-4">
             {commentsList.map((comment: any) => (
-              <div key={comment.id} className="flex gap-3 group">
+              <div key={comment.commentId ?? comment.id} className="flex gap-3 group">
                 <Avatar className="h-7 w-7 shrink-0 cursor-pointer" onClick={() => navigate(`/perfil/${comment.user?.username}`)}>
                   <AvatarImage src={comment.user?.avatarUrl || comment.user?.imageUrl || comment.user?.avatar} />
                   <AvatarFallback className="text-[10px]">{comment.user?.username?.[0]?.toUpperCase()}</AvatarFallback>

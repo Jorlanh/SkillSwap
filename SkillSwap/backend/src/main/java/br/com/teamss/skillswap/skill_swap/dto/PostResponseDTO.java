@@ -1,6 +1,7 @@
 package br.com.teamss.skillswap.skill_swap.dto;
 
 import java.time.Instant;
+import java.util.UUID;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 /**
@@ -10,6 +11,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 public class PostResponseDTO {
 
     private Long postId;
+    private UUID userId;
     private String content;
     private String title;
     
@@ -36,6 +38,8 @@ public class PostResponseDTO {
     // Getters e Setters
     public Long getPostId() { return postId; }
     public void setPostId(Long postId) { this.postId = postId; }
+    public UUID getUserId() { return userId; }
+    public void setUserId(UUID userId) { this.userId = userId; }
     public String getContent() { return content; }
     public void setContent(String content) { this.content = content; }
     public String getTitle() { return title; }

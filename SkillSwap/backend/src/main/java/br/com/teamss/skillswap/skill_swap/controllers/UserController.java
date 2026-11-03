@@ -46,7 +46,10 @@ public class UserController {
     @Transactional
     public ResponseEntity<UserPrivateProfileDTO> getMyProfile() {
         UserDTO authUser = userServiceDTO.getAuthenticatedUser();
-        User user = userRepository.findWithProfileSkillsAndRolesByUserId(authUser.getUserId())
+        // O usuário pode ter sido criado na mesma requisição pelo provisionamento
+        // do Firebase. A busca simples evita que um EntityGraph ou uma associação
+        // opcional impeça a abertura do perfil no primeiro login.
+        User user = userRepository.findById(authUser.getUserId())
             .orElseThrow(() -> new EntityNotFoundException("Usuário não sincronizado."));
         return ResponseEntity.ok(userServiceDTO.toUserPrivateProfileDTO(user));
     }

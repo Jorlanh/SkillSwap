@@ -42,7 +42,7 @@ public class ChatbotServiceImpl implements ChatbotService {
     public ChatbotResponseDTO getChatbotResponse(ChatbotRequestDTO requestDTO) {
         if (apiKey == null || apiKey.isBlank()) {
             logger.error("API Key do Gemini não configurada. Chatbot indisponível.");
-            return new ChatbotResponseDTO("Desculpe, o chatbot está temporariamente indisponível.", null, false);
+            return new ChatbotResponseDTO("Ainda não consigo responder porque o assistente não foi configurado no servidor. A plataforma continua disponível para você.", null, false);
         }
         if (requestDTO == null || requestDTO.getMessage() == null || requestDTO.getMessage().isBlank()) {
              logger.warn("Recebida requisição de chatbot inválida (mensagem vazia).");
@@ -77,7 +77,7 @@ public class ChatbotServiceImpl implements ChatbotService {
 
             if (rawResponse.isBlank()) {
                 logger.warn("Resposta do Gemini não contém texto utilizável.");
-                return new ChatbotResponseDTO("Desculpe, não consegui gerar uma resposta neste momento.", null, false);
+                return new ChatbotResponseDTO("Não encontrei uma resposta agora. Pode tentar perguntar de outro jeito?", null, false);
             }
 
             String finalResponse = rawResponse;
@@ -92,7 +92,7 @@ public class ChatbotServiceImpl implements ChatbotService {
 
         } catch (Exception e) {
             logger.error("Erro ao comunicar com a API do Google AI Studio: {}", e.getMessage(), e);
-            return new ChatbotResponseDTO("Desculpe, ocorreu um erro inesperado. Tente novamente mais tarde.", null, false);
+            return new ChatbotResponseDTO("Tive um problema para responder agora. Tente novamente em alguns instantes.", null, false);
         }
     }
 }
