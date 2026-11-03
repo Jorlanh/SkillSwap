@@ -1,6 +1,7 @@
 package br.com.teamss.skillswap.skill_swap.model.repositories;
 
 import br.com.teamss.skillswap.skill_swap.model.entities.User;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
@@ -25,6 +26,14 @@ public interface UserRepository extends JpaRepository<User, UUID> {
      * (ex: /api/users/{username}) e para buscas.
      */
     Optional<User> findByUsername(String username);
+
+    /**
+     * Carrega os relacionamentos usados pelo perfil privado enquanto a sessão
+     * JPA ainda está aberta. Isso evita LazyInitializationException no endpoint
+     * /api/users/me.
+     */
+    @EntityGraph(attributePaths = {"profile", "skills", "roles"})
+    Optional<User> findWithProfileSkillsAndRolesByUserId(UUID userId);
 
     // ---------------------------------------------------------------------------------
     // Os métodos abaixo não são mais necessários para o fluxo de login/registro

@@ -1,11 +1,42 @@
-import { mockCommunities } from '@/data/mockData';
+import { useEffect, useState } from 'react';
 import CommunityCard from '@/components/CommunityCard';
-import { ChevronLeft, PlusCircle } from 'lucide-react';
+import { ChevronLeft } from 'lucide-react';
 import { Link, useOutletContext } from 'react-router-dom';
-import { Button } from '@/components/ui/button';
+import { HomeService } from '@/services/api';
+import type { Community } from '@/types';
+
+type ApiCommunity = {
+  communityId?: string;
+  id?: string;
+  name?: string;
+  members?: unknown[] | number;
+  memberCount?: number;
+};
+
+const toCommunity = (community: ApiCommunity): Community => ({
+  id: String(community.communityId ?? community.id ?? community.name ?? ''),
+  name: community.name ?? 'Comunidade',
+  members: Array.isArray(community.members) ? community.members.length : community.memberCount ?? Number(community.members ?? 0),
+  avatars: [],
+});
 
 const CommunitiesPage = () => {
   const { requireAuth } = useOutletContext<{ requireAuth: (action: () => void) => void }>();
+  const [communities, setCommunities] = useState<Community[]>([]);
+  const [joined, setJoined] = useState<string[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(false);
+
+  useEffect(() => {
+    HomeService.getCommunities(50)
+      .then(({ data }) => setCommunities(Array.isArray(data) ? data.map(toCommunity) : []))
+      .catch(() => setError(true))
+      .finally(() => setIsLoading(false));
+  }, []);
+
+  const join = (id: string) => requireAuth(() => {
+    HomeService.joinCommunity(id).then(() => setJoined((current) => [...new Set([...current, id])]));
+  });
 
   return (
     <div className="max-w-4xl mx-auto">
@@ -14,27 +45,21 @@ const CommunitiesPage = () => {
           <Link to="/" className="inline-flex items-center gap-1 text-foreground font-semibold hover:opacity-80">
             <ChevronLeft className="h-5 w-5" /> Voltar
           </Link>
-          <Button 
-            variant="outline" 
-            className="flex items-center gap-2"
-            onClick={() => requireAuth(() => console.log("Explorar mais comunidades"))}
-          >
-            Explorar mais <PlusCircle className="h-4 w-4" />
-          </Button>
         </div>
 
         <h1 className="font-display font-bold text-3xl text-foreground text-center mb-1">Comunidade</h1>
         <p className="text-center text-muted-foreground mb-8">Venha fazer parte de alguma também! :)</p>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {mockCommunities.map((community) => (
+        {isLoading ? <p className="py-10 text-center text-muted-foreground">Carregando comunidades...</p> : error ? <p className="py-10 text-center text-destructive">Não foi possível carregar as comunidades.</p> : communities.length === 0 ? <p className="py-10 text-center text-muted-foreground">Ainda não há comunidades cadastradas.</p> : <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {communities.map((community) => (
             <CommunityCard 
               key={community.id} 
               community={community} 
-              onJoin={() => console.log(`Entrou na: ${community.name}`)}
+              joined={joined.includes(community.id)}
+              onJoin={() => join(community.id)}
             />
           ))}
-        </div>
+        </div>}
       </div>
     </div>
   );

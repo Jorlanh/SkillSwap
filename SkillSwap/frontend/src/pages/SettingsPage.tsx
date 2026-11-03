@@ -1,13 +1,22 @@
 import { useState } from 'react';
-import { mockAccessLogs } from '@/data/mockData';
+import { useEffect } from 'react';
 import { Switch } from '@/components/ui/switch';
 import { ChevronRight, Clock, Camera, Mic, MapPin, Users, Shield, Key, Lock } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { AccessLogService } from '@/services/api';
 
 type SettingsTab = 'historico' | 'permissoes' | 'seguranca';
 
 const SettingsPage = () => {
   const [activeTab, setActiveTab] = useState<SettingsTab>('historico');
+  const [accessLogs, setAccessLogs] = useState<any[]>([]);
+  const [accessLogError, setAccessLogError] = useState(false);
+
+  useEffect(() => {
+    AccessLogService.getMyAccessHistory()
+      .then(({ data }) => setAccessLogs(Array.isArray(data) ? data : []))
+      .catch(() => setAccessLogError(true));
+  }, []);
 
   const [permissions, setPermissions] = useState({
     camera: true,
@@ -46,15 +55,16 @@ const SettingsPage = () => {
               <Clock className="h-5 w-5" /> Histórico de Acesso
             </h2>
             <div className="space-y-3">
-              {mockAccessLogs.map((log) => (
-                <div key={log.id} className="flex items-center justify-between bg-card rounded-xl px-4 py-3 border border-border">
+              {accessLogError ? <p className="text-sm text-destructive">Não foi possível carregar o histórico.</p> : accessLogs.length === 0 ? <p className="text-sm text-muted-foreground">Nenhum acesso registrado.</p> : accessLogs.map((log, index) => {
+                const date = log.accessTime ? new Date(log.accessTime) : null;
+                return <div key={`${log.accessTime ?? 'access'}-${index}`} className="flex items-center justify-between bg-card rounded-xl px-4 py-3 border border-border">
                   <div>
-                    <p className="text-sm font-medium text-foreground">{log.location}</p>
-                    <p className="text-xs text-muted-foreground">{log.date}</p>
+                    <p className="text-sm font-medium text-foreground">{log.location || log.city || 'Local não informado'}</p>
+                    <p className="text-xs text-muted-foreground">{date ? date.toLocaleDateString('pt-BR') : 'Data não informada'}</p>
                   </div>
-                  <span className="text-sm text-muted-foreground">ás {log.time}</span>
-                </div>
-              ))}
+                  <span className="text-sm text-muted-foreground">{date ? `às ${date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}` : ''}</span>
+                </div>;
+              })}
             </div>
           </>
         )}

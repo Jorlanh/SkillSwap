@@ -1,5 +1,6 @@
 package br.com.teamss.skillswap.skill_swap.model.services;
 
+import br.com.teamss.skillswap.skill_swap.dto.CommunitySummaryDTO;
 import br.com.teamss.skillswap.skill_swap.model.entities.Community;
 import br.com.teamss.skillswap.skill_swap.model.entities.Post;
 import br.com.teamss.skillswap.skill_swap.model.entities.Like;
@@ -13,7 +14,7 @@ import java.util.List;
 import java.util.UUID;
 
 public interface CommunityService {
-    List<Community> getCommunities(int limit);
+    List<CommunitySummaryDTO> getCommunities(int limit);
     Community joinCommunity(UUID communityId, UUID userId);
     List<Post> getCommunityPosts(UUID communityId);
     Post createCommunityPost(UUID communityId, UUID userId, String title, String content, 

@@ -75,7 +75,7 @@ export const SkillService = {
 // ==========================================
 export const HomeService = {
   getFeed: () => api.get('/home/feed'),
-  getTrending: () => api.get('/home/trending-topics'), // Restaurado para evitar erro no FeedPage.tsx
+  getTrending: () => api.get('/home/trending', { params: { period: 'DAY' } }),
   getTrendingTopics: (period: string = 'DAY') => api.get('/home/trending-topics', { params: { period } }),
   getTrendingPosts: (period: string = 'DAY') => api.get('/home/trending-posts', { params: { period } }),
   getPosts: (sortBy: string = 'TRENDING', period: string = 'DAY') => api.get('/home/posts', { params: { sortBy, period } }),

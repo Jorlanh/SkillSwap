@@ -40,18 +40,18 @@ const Header = () => {
 
   return (
     <header className="sticky top-0 z-50 bg-card border-b border-border">
-      <div className="flex items-center justify-between px-6 py-3">
+      <div className="flex items-center justify-between gap-2 px-3 py-3 sm:px-6">
         <Link to="/" className="flex items-center gap-2 group transition-all active:scale-95">
           {/* 🚀 APENAS A LOGO S.PNG, SEM CÍRCULO VERDE */}
           <img 
             src="/skillswap-logo.png" 
             alt="SkillSwap" 
-            className="h-10 w-auto max-w-[180px] object-contain transition-transform group-hover:scale-105" 
+            className="h-9 w-auto max-w-[140px] object-contain transition-transform group-hover:scale-105 sm:h-10 sm:max-w-[180px]" 
           />
         </Link>
 
         {/* BUSCA CENTRALIZADA */}
-        <div className="flex-1 max-w-xl mx-8">
+        <div className="flex-1 min-w-0 max-w-xl mx-2 sm:mx-8">
           <div className="relative">
             <Input
               placeholder="Buscar mestre em..."
@@ -62,11 +62,11 @@ const Header = () => {
         </div>
 
         {/* NAVEGAÇÃO E PERFIL */}
-        <div className="flex items-center gap-6">
-          <Link to="/" title="Home" className="text-foreground hover:text-skillswap-teal transition-all">
+        <div className="flex items-center gap-2 sm:gap-6">
+          <Link to="/" title="Home" className="hidden sm:block text-foreground hover:text-skillswap-teal transition-all">
             <Home className="h-6 w-6" />
           </Link>
-          <Link to="/atividades" title="Notificações" className="text-foreground hover:text-skillswap-teal transition-all">
+          <Link to="/atividades" title="Notificações" className="hidden sm:block text-foreground hover:text-skillswap-teal transition-all">
             <Bell className="h-6 w-6" />
           </Link>
 
@@ -88,7 +88,7 @@ const Header = () => {
               </Link>
               <button 
                 onClick={handleLogout}
-                className="text-[11px] uppercase font-black text-skillswap-teal hover:text-destructive transition-colors tracking-widest"
+                className="hidden sm:block text-[11px] uppercase font-black text-skillswap-teal hover:text-destructive transition-colors tracking-widest"
               >
                 SAIR
               </button>

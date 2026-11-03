@@ -1,6 +1,7 @@
 package br.com.teamss.skillswap.skill_swap.model.services.impl;
 
 import br.com.teamss.skillswap.skill_swap.dto.CommentDTO;
+import br.com.teamss.skillswap.skill_swap.dto.CommunitySummaryDTO;
 import br.com.teamss.skillswap.skill_swap.model.entities.*;
 import br.com.teamss.skillswap.skill_swap.model.exception.InappropriateContentException;
 import br.com.teamss.skillswap.skill_swap.model.repositories.*;
@@ -9,6 +10,7 @@ import br.com.teamss.skillswap.skill_swap.model.services.ContentModerationServic
 import br.com.teamss.skillswap.skill_swap.model.services.FileUploadService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 import java.time.Instant;
@@ -107,9 +109,15 @@ public class CommunityServiceImpl implements CommunityService {
     // ... (o resto dos métodos da classe continua aqui, sem alterações) ...
     
     @Override
-    public List<Community> getCommunities(int limit) {
+    @Transactional(readOnly = true)
+    public List<CommunitySummaryDTO> getCommunities(int limit) {
         return communityRepository.findAll().stream()
                 .limit(limit)
+                .map(community -> new CommunitySummaryDTO(
+                        community.getCommunityId(),
+                        community.getName(),
+                        community.getDescription(),
+                        community.getMembers().size()))
                 .collect(Collectors.toList());
     }
 

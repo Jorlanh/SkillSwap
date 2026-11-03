@@ -1,35 +1,39 @@
-# Estágio 1: build da aplicação
+# Estágio 1: Build da Aplicação
 FROM eclipse-temurin:21-jdk AS build
 
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends maven \
-    && rm -rf /var/lib/apt/lists/*
+# Instala o Maven
+RUN apt-get update && apt-get install -y maven
 
+# Define o diretório de trabalho
 WORKDIR /app
 
+# Copia o pom.xml e baixa as dependências
 COPY pom.xml .
-RUN mvn -B dependency:go-offline
+RUN mvn dependency:go-offline
 
+# Copia o resto do código fonte e compila, pulando os testes
 COPY src ./src
+RUN mvn clean install -DskipTests
 
-RUN mvn -B clean package -DskipTests -Powasp-skip
 
-
-# Estágio 2: execução da aplicação
+# Estágio 2: Execução da Aplicação
 FROM eclipse-temurin:21-jre
 
-COPY --from=build /app/target/skill-swap-*.jar /app.jar
-
+# Define o diretório de trabalho
 WORKDIR /app
 
-RUN groupadd --system app \
-    && useradd --system --gid app app \
-    && mkdir -p /app/logs/archived \
-    && chown -R app:app /app/logs \
-    && chown app:app /app.jar
+# Copia apenas o .jar compilado do estágio de build
+COPY --from=build /app/target/skill-swap-0.0.1-SNAPSHOT.jar app.jar
 
-USER app
-
+# Expõe a porta da aplicação
 EXPOSE 8080
 
-ENTRYPOINT ["java", "-jar", "/app.jar"]
+# --- MELHORIA DE SEGURANÇA: FORTALECIMENTO DO CONTÊINER ---
+# Cria um grupo e um usuário de sistema não-root para executar a aplicação
+RUN groupadd --system app && useradd --system -g app app
+
+# Muda para o usuário não-root
+USER app
+
+# Comando para iniciar a aplicação, agora executado como o usuário 'app'
+ENTRYPOINT ["java", "-jar", "app.jar"]

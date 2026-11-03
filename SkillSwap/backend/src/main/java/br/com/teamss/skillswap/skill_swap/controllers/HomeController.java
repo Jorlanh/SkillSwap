@@ -1,7 +1,6 @@
 package br.com.teamss.skillswap.skill_swap.controllers;
 
 import br.com.teamss.skillswap.skill_swap.dto.*;
-import br.com.teamss.skillswap.skill_swap.model.entities.Community;
 import br.com.teamss.skillswap.skill_swap.model.entities.Post;
 import br.com.teamss.skillswap.skill_swap.model.entities.ShareLink;
 import br.com.teamss.skillswap.skill_swap.model.repositories.ShareLinkRepository;
@@ -91,9 +90,10 @@ public class HomeController {
     }
 
     @PostMapping("/communities/{communityId}/join")
-    public ResponseEntity<Community> joinCommunity(@PathVariable UUID communityId) {
+    public ResponseEntity<Void> joinCommunity(@PathVariable UUID communityId) {
         UserDTO authenticatedUser = userServiceDTO.getAuthenticatedUser();
-        return ResponseEntity.ok(communityService.joinCommunity(communityId, authenticatedUser.getUserId()));
+        communityService.joinCommunity(communityId, authenticatedUser.getUserId());
+        return ResponseEntity.ok().build();
     }
     
     @GetMapping("/posts")
@@ -116,7 +116,7 @@ public class HomeController {
     }
 
     @GetMapping("/communities")
-    public ResponseEntity<List<Community>> getCommunities(@RequestParam(defaultValue = "5") int limit) {
+    public ResponseEntity<List<CommunitySummaryDTO>> getCommunities(@RequestParam(defaultValue = "5") int limit) {
         return ResponseEntity.ok(communityService.getCommunities(limit));
     }
 

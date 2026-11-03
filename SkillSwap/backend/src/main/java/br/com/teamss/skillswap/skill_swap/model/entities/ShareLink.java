@@ -18,7 +18,7 @@ import java.time.Instant;
 public class ShareLink {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @GeneratedValue(strategy = GenerationType.SEQUENCE)
     @Column(name = "share_id")
     private Long shareId;
 

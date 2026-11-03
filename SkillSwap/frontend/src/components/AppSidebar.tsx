@@ -27,6 +27,19 @@ const AppSidebar = ({ isAuthenticated }: AppSidebarProps) => {
 
   // Filtra os links com base na autenticação
   const visibleLinks = sidebarLinks.filter(link => link.public || isAuthenticated);
+  const links = (closeAfterNavigate = false) => visibleLinks.map(({ to, label, icon: Icon }) => (
+    <NavLink
+      key={to}
+      to={to}
+      end={to === '/'}
+      onClick={() => closeAfterNavigate && setMobileOpen(false)}
+      className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-muted-foreground hover:bg-muted transition-colors"
+      activeClassName="bg-muted text-foreground font-medium"
+    >
+      <Icon className="h-5 w-5" />
+      <span>{label}</span>
+    </NavLink>
+  ));
 
   return (
     <>
@@ -47,21 +60,12 @@ const AppSidebar = ({ isAuthenticated }: AppSidebarProps) => {
       )}
 
       <aside className="hidden lg:block sticky top-0 left-0 z-40 h-screen w-52 pt-6 px-2 bg-card border-r border-border">
-        <nav className="flex flex-col gap-1">
-          {visibleLinks.map(({ to, label, icon: Icon }) => (
-            <NavLink
-              key={to}
-              to={to}
-              end={to === '/'}
-              className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-muted-foreground hover:bg-muted transition-colors"
-              activeClassName="bg-muted text-foreground font-medium"
-            >
-              <Icon className="h-5 w-5" />
-              <span>{label}</span>
-            </NavLink>
-          ))}
-        </nav>
+        <nav className="flex flex-col gap-1">{links()}</nav>
       </aside>
+
+      {mobileOpen && <aside className="fixed inset-y-0 left-0 z-40 w-72 max-w-[85vw] bg-card border-r border-border pt-20 px-3 shadow-xl lg:hidden">
+        <nav className="flex flex-col gap-1">{links(true)}</nav>
+      </aside>}
     </>
   );
 };

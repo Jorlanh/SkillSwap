@@ -6,9 +6,10 @@ import { useOutletContext } from 'react-router-dom';
 interface CommunityCardProps {
   community: Community;
   onJoin?: () => void;
+  joined?: boolean;
 }
 
-const CommunityCard = ({ community, onJoin }: CommunityCardProps) => {
+const CommunityCard = ({ community, onJoin, joined = false }: CommunityCardProps) => {
   // ACESSO À BARREIRA GLOBAL
   const context = useOutletContext<{ requireAuth?: (action: () => void) => void }>();
 
@@ -34,6 +35,11 @@ const CommunityCard = ({ community, onJoin }: CommunityCardProps) => {
             <AvatarFallback>U</AvatarFallback>
           </Avatar>
         ))}
+        {community.avatars.length === 0 && (
+          <Avatar className="h-10 w-10 border-2 border-card">
+            <AvatarFallback>{community.name.slice(0, 1).toUpperCase()}</AvatarFallback>
+          </Avatar>
+        )}
       </div>
       <p className="text-sm text-foreground mb-3">
         <strong>{community.members}</strong> Membros
@@ -43,8 +49,9 @@ const CommunityCard = ({ community, onJoin }: CommunityCardProps) => {
         size="sm"
         className="bg-skillswap-light-blue border-foreground/20 text-foreground hover:bg-accent"
         onClick={handleJoinClick}
+        disabled={joined}
       >
-        Entrar
+        {joined ? 'Participando' : 'Entrar'}
       </Button>
     </div>
   );

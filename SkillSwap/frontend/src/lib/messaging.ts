@@ -7,10 +7,29 @@ const messaging = getMessaging(app);
 
 export const requestNotificationPermission = async () => {
   try {
+    if (!('Notification' in window) || !('serviceWorker' in navigator)) return;
+
     const permission = await Notification.requestPermission();
     if (permission === "granted") {
-      const token = await getToken(messaging, { 
-        vapidKey: import.meta.env.VITE_FIREBASE_VAPID_KEY 
+      const config = {
+        apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+        authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+        projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+        storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+        messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+        appId: import.meta.env.VITE_FIREBASE_APP_ID,
+      };
+      const workerParams = new URLSearchParams(
+        Object.entries(config).map(([key, value]) => [key, value || ''])
+      );
+      const serviceWorkerRegistration = await navigator.serviceWorker.register(
+        `/firebase-messaging-sw.js?${workerParams.toString()}`,
+        { scope: '/firebase-cloud-messaging-push-scope' }
+      );
+
+      const token = await getToken(messaging, {
+        vapidKey: import.meta.env.VITE_FIREBASE_VAPID_KEY,
+        serviceWorkerRegistration,
       });
       
       if (token) {

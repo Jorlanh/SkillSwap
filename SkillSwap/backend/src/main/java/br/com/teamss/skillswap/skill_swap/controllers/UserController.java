@@ -15,6 +15,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.transaction.annotation.Transactional;
 
 @RestController
 @RequestMapping("/api/users")
@@ -42,9 +43,10 @@ public class UserController {
     }
 
     @GetMapping("/me")
+    @Transactional(readOnly = true)
     public ResponseEntity<UserPrivateProfileDTO> getMyProfile() {
         UserDTO authUser = userServiceDTO.getAuthenticatedUser();
-        User user = userRepository.findById(authUser.getUserId())
+        User user = userRepository.findWithProfileSkillsAndRolesByUserId(authUser.getUserId())
             .orElseThrow(() -> new EntityNotFoundException("Usuário não sincronizado."));
         return ResponseEntity.ok(userServiceDTO.toUserPrivateProfileDTO(user));
     }

@@ -25,10 +25,10 @@ public class CommunityController {
     private UserServiceDTO userServiceDTO;
 
     @PostMapping("/{communityId}/join")
-    public ResponseEntity<Community> joinCommunity(@PathVariable UUID communityId) {
+    public ResponseEntity<Void> joinCommunity(@PathVariable UUID communityId) {
         UserDTO authenticatedUser = userServiceDTO.getAuthenticatedUser();
-        Community community = communityService.joinCommunity(communityId, authenticatedUser.getUserId());
-        return ResponseEntity.ok(community);
+        communityService.joinCommunity(communityId, authenticatedUser.getUserId());
+        return ResponseEntity.ok().build();
     }
 
     @GetMapping("/{communityId}/posts")

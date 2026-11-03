@@ -15,7 +15,7 @@ import lombok.Setter;
 @AllArgsConstructor
 public class Proposal {
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @GeneratedValue(strategy = GenerationType.AUTO)
     @Column(name = "proposal_id")
     private Long proposalId;
 
