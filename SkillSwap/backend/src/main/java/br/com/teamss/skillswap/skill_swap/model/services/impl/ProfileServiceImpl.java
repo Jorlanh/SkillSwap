@@ -6,6 +6,7 @@ import br.com.teamss.skillswap.skill_swap.model.entities.User;
 import br.com.teamss.skillswap.skill_swap.model.repositories.PostRepository;
 import br.com.teamss.skillswap.skill_swap.model.repositories.ProfileRepository;
 import br.com.teamss.skillswap.skill_swap.model.repositories.UserRepository;
+import br.com.teamss.skillswap.skill_swap.model.repositories.CommunityMemberRepository;
 import br.com.teamss.skillswap.skill_swap.model.services.FileUploadService;
 import br.com.teamss.skillswap.skill_swap.model.services.ProfileService;
 import jakarta.persistence.EntityNotFoundException;
@@ -36,6 +37,9 @@ public class ProfileServiceImpl implements ProfileService {
 
     @Autowired
     private FileUploadService fileUploadService;
+
+    @Autowired
+    private CommunityMemberRepository communityMemberRepository;
 
     // Construtor removido para evitar conflito com @Autowired nos campos
     // O Spring Boot injetará as dependências automaticamente.
@@ -216,9 +220,12 @@ public class ProfileServiceImpl implements ProfileService {
 
     @Override
     public List<Post> getCommunityPosts(UUID userId) {
-        User user = userRepository.findById(userId).orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
-        // Se a entidade User tiver getCommunityIds, senão ajuste para sua lógica de ManyToMany
-        return postRepository.findByCommunity_CommunityIdIn(user.getCommunityIds());
+        List<UUID> communityIds = communityMemberRepository.findById_UserIdAndMembershipStatus(userId, "APPROVED")
+                .stream().map(member -> member.getId().getCommunityId()).toList();
+        if (communityIds.isEmpty()) return List.of();
+        return postRepository.findByCommunity_CommunityIdIn(communityIds).stream()
+                .sorted((left, right) -> right.getCreatedAt().compareTo(left.getCreatedAt()))
+                .toList();
     }
 
     @Override

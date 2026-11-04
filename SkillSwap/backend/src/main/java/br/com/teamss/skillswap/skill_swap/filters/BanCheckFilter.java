@@ -2,6 +2,8 @@ package br.com.teamss.skillswap.skill_swap.filters;
 
 import br.com.teamss.skillswap.skill_swap.model.entities.User;
 import br.com.teamss.skillswap.skill_swap.model.services.LocalUserService;
+import br.com.teamss.skillswap.skill_swap.model.entities.Ban;
+import br.com.teamss.skillswap.skill_swap.model.repositories.BanRepository;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -22,9 +24,11 @@ import org.springframework.web.filter.OncePerRequestFilter;
 public class BanCheckFilter extends OncePerRequestFilter {
 
     private final LocalUserService localUserService;
+    private final BanRepository banRepository;
 
-    public BanCheckFilter(LocalUserService localUserService) {
+    public BanCheckFilter(LocalUserService localUserService, BanRepository banRepository) {
         this.localUserService = localUserService;
+        this.banRepository = banRepository;
     }
 
     @Override
@@ -37,7 +41,7 @@ public class BanCheckFilter extends OncePerRequestFilter {
         if (authentication != null && authentication.isAuthenticated() && authentication.getPrincipal() instanceof Jwt jwt) {
             try {
                 User user = localUserService.findOrCreateUser(jwt);
-                if (user.isBanned()) {
+                if (user.isBanned() || hasScopedBan(user.getUserId(), request)) {
                     response.sendError(HttpServletResponse.SC_FORBIDDEN, "Acesso negado.");
                     return;
                 }
@@ -60,5 +64,15 @@ public class BanCheckFilter extends OncePerRequestFilter {
             }
         }
         filterChain.doFilter(request, response);
+    }
+
+    private boolean hasScopedBan(java.util.UUID userId, HttpServletRequest request) {
+        String path = request.getRequestURI().toLowerCase();
+        String method = request.getMethod();
+        if (!("POST".equals(method) || "PUT".equals(method) || "PATCH".equals(method) || "DELETE".equals(method))) return false;
+        return banRepository.findByUser_UserIdAndActiveTrue(userId).stream()
+            .filter(ban -> ban.getExpiresAt() == null || ban.getExpiresAt().isAfter(java.time.Instant.now()))
+            .anyMatch(ban -> ("POSTS".equalsIgnoreCase(ban.getScope()) && path.contains("/posts"))
+                || ("COMMENTS".equalsIgnoreCase(ban.getScope()) && path.contains("comment")));
     }
 }

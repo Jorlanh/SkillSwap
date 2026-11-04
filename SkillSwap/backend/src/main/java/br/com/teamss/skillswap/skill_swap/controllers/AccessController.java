@@ -23,6 +23,8 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -82,9 +84,20 @@ public class AccessController {
         opportunity.setDescription(request.description());
         opportunity.setRequiredSkills(request.requiredSkills());
         opportunity.setRemote(request.remote());
+        opportunity.setParticipationMode(normalizeMode(request.participationMode(), request.remote()));
         opportunity.setAccessibleSupport(request.accessibleSupport());
         opportunity.setLocation(request.location());
+        opportunity.setContactUrl(request.contactUrl());
         return ResponseEntity.ok(opportunityRepository.save(opportunity));
+    }
+
+    @DeleteMapping("/opportunities/{opportunityId}")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Transactional
+    public ResponseEntity<Void> delete(@PathVariable UUID opportunityId) {
+        if (!opportunityRepository.existsById(opportunityId)) return ResponseEntity.notFound().build();
+        opportunityRepository.deleteById(opportunityId);
+        return ResponseEntity.noContent().build();
     }
 
     private AccessRecommendationDTO toRecommendation(AccessOpportunity opportunity, Set<String> skills, String profileText) {
@@ -101,6 +114,11 @@ public class AccessController {
 
     private static String safe(String value) { return value == null ? "" : value; }
 
+    private static String normalizeMode(String value, boolean remote) {
+        String mode = value == null ? (remote ? "REMOTE" : "PRESENTIAL") : value.trim().toUpperCase(Locale.ROOT);
+        return Set.of("REMOTE", "HYBRID", "PRESENTIAL").contains(mode) ? mode : "REMOTE";
+    }
+
     public record OpportunityRequest(
         @NotBlank @Size(max = 160) String organizationName,
         @NotBlank @Size(max = 180) String title,
@@ -108,6 +126,8 @@ public class AccessController {
         @NotBlank @Size(max = 1000) String requiredSkills,
         boolean remote,
         boolean accessibleSupport,
-        @Size(max = 120) String location
+        @Size(max = 120) String location,
+        String participationMode,
+        @Size(max = 1000) String contactUrl
     ) {}
 }

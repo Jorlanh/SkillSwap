@@ -79,9 +79,11 @@ public class HomeController {
     }
 
     @PostMapping("/posts/{postId}/comment")
-    public ResponseEntity<PostResponseDTO> commentOnPost(@PathVariable Long postId, @RequestParam String content) {
+    public ResponseEntity<PostResponseDTO> commentOnPost(@PathVariable Long postId, @RequestParam String content,
+                                                         @RequestParam(required = false) Long parentCommentId) {
         UserDTO authenticatedUser = userServiceDTO.getAuthenticatedUser();
-        return ResponseEntity.ok(toResponse(postService.commentOnPost(postId, authenticatedUser.getUserId(), content)));
+        commentService.createComment(postId, authenticatedUser.getUserId(), content, parentCommentId);
+        return ResponseEntity.ok(toResponse(postService.findAll().stream().filter(p -> postId.equals(p.getPostId())).findFirst().orElseThrow()));
     }
 
     @GetMapping("/notifications")
@@ -150,6 +152,19 @@ public class HomeController {
     @GetMapping("/posts/{postId}/comments")
     public ResponseEntity<List<CommentDTO>> getCommentsByPost(@PathVariable Long postId) {
         return ResponseEntity.ok(commentService.getCommentsByPost(postId));
+    }
+
+    @PostMapping("/comments/{commentId}/like")
+    public ResponseEntity<Long> toggleCommentLike(@PathVariable Long commentId) {
+        UserDTO user = userServiceDTO.getAuthenticatedUser();
+        return ResponseEntity.ok(commentService.toggleLike(commentId, user.getUserId()));
+    }
+
+    @DeleteMapping("/comments/{commentId}")
+    public ResponseEntity<Void> deleteComment(@PathVariable Long commentId) {
+        UserDTO user = userServiceDTO.getAuthenticatedUser();
+        commentService.deleteComment(commentId, user.getUserId());
+        return ResponseEntity.noContent().build();
     }
 
     private PostResponseDTO toResponse(Post post) {

@@ -53,6 +53,7 @@ export const AdminService = {
   adjustWallet: (userId: string, amount: number, reason: string, idempotencyKey?: string) =>
     api.post(`/console-management/users/${userId}/wallet-adjustment`, { amount, reason, idempotencyKey }),
   getUsers: () => api.get('/console-management/users'),
+  getActiveBans: () => api.get('/console-management/bans'),
   toggleVerification: (userId: string) => api.post(`/console-management/users/${userId}/toggle-verification`),
   banUser: (userId: string, data: any) => api.post(`/console-management/users/${userId}/ban`, data),
   unbanUser: (userId: string) => api.post(`/console-management/users/${userId}/unban`),
@@ -91,9 +92,9 @@ export const HomeService = {
   createPost: (formData: FormData) => api.post('/home/posts', formData),
   likePost: (postId: number) => api.post(`/home/posts/${postId}/like`),
   repost: (postId: number) => api.post(`/home/posts/${postId}/repost`),
-  comment: (postId: number, content: string) => api.post(`/home/posts/${postId}/comment`, null, { params: { content } }),
+  comment: (postId: number, content: string, parentCommentId?: number) => api.post(`/home/posts/${postId}/comment`, null, { params: { content, ...(parentCommentId ? { parentCommentId } : {}) } }),
   getCommunities: (limit: number = 5) => api.get('/home/communities', { params: { limit } }),
-  createCommunity: (data: { name: string; description?: string }) => api.post('/home/communities', data),
+  createCommunity: (data: { name: string; description?: string; privateCommunity?: boolean }) => api.post('/home/communities', data),
   joinCommunity: (communityId: string) => api.post(`/home/communities/${communityId}/join`),
   getUnreadNotifications: () => api.get('/home/notifications'),
   markNotificationRead: (notificationId: number) => api.post(`/home/notifications/${notificationId}/read`),
@@ -101,6 +102,8 @@ export const HomeService = {
   trackShareClick: (shareUrl: string) => api.post('/home/share/click', null, { params: { shareUrl } }),
   getPostLikes: (postId: number) => api.get(`/home/posts/${postId}/likes`),
   getPostComments: (postId: number) => api.get(`/home/posts/${postId}/comments`),
+  likeComment: (commentId: number) => api.post(`/home/comments/${commentId}/like`),
+  deleteComment: (commentId: number) => api.delete(`/home/comments/${commentId}`),
 };
 
 // ==========================================
@@ -128,6 +131,12 @@ export const CommunityService = {
   getAll: () => api.get('/communities'), // RESTAURADO para resolver o erro no ActivitiesPage
   getById: (communityId: string) => api.get(`/communities/${communityId}`),
   join: (communityId: string) => api.post(`/communities/${communityId}/join`),
+  getMembership: (communityId: string) => api.get(`/communities/${communityId}/membership`),
+  getMembers: (communityId: string, search = '') => api.get(`/communities/${communityId}/members`, { params: { search } }),
+  getPendingMembers: (communityId: string, search = '') => api.get(`/communities/${communityId}/members/pending`, { params: { search } }),
+  removeMember: (communityId: string, memberId: string) => api.delete(`/communities/${communityId}/members/${memberId}`),
+  setAdministrator: (communityId: string, memberId: string, administrator: boolean) => api.put(`/communities/${communityId}/members/${memberId}/admin`, null, { params: { administrator } }),
+  approveMember: (communityId: string, memberId: string) => api.put(`/communities/${communityId}/members/${memberId}/approve`),
   updateAvatar: (communityId: string, file: File) => {
     const formData = new FormData();
     formData.append('file', file);
@@ -156,6 +165,7 @@ export const ProfileService = {
   updateAvatar: (formData: FormData) => api.post('/profiles/me/avatar', formData),
   removeAvatar: () => api.delete('/profiles/me/avatar'),
   getMyFeed: () => api.get('/profiles/me/feed'),
+  getMyCommunityPosts: () => api.get('/profiles/me/community-posts'),
   createMyPost: (formData: FormData) => api.post('/profiles/me/posts', formData),
   deleteMyPost: (postId: number) => api.delete(`/profiles/me/posts/${postId}`),
   likeMyPost: (postId: number) => api.post(`/profiles/me/posts/${postId}/like`),
@@ -288,6 +298,7 @@ export const AccessService = {
   getRecommendations: () => api.get('/access/recommendations'),
   getOpportunities: () => api.get('/access/opportunities'),
   createOpportunity: (data: any) => api.post('/access/opportunities', data),
+  deleteOpportunity: (opportunityId: string) => api.delete(`/access/opportunities/${opportunityId}`),
 };
 
 // ==========================================

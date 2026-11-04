@@ -51,6 +51,9 @@ export interface Community {
   description?: string;
   imageUrl?: string;
   ownerId?: string;
+  privateCommunity?: boolean;
+  joined?: boolean;
+  membershipStatus?: string;
 }
 
 export interface Notification {

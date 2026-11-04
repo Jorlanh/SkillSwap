@@ -9,20 +9,19 @@ import StoriesBar from '@/components/StoriesBar';
 
 const FeedPage = () => {
   const [posts, setPosts] = useState<any[]>([]);
+  const [trending, setTrending] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const { requireAuth } = useOutletContext<{ requireAuth: (action: () => void) => void }>();
 
   useEffect(() => {
     const loadFeed = async () => {
       try {
-        const { data } = await HomeService.getTrending();
-        const safeData = Array.isArray(data) ? data : [];
-        const sortedPosts = safeData.sort((a: any, b: any) => {
-          const scoreA = (a.likesCount || 0) + (a.commentsCount || 0) + (a.sharesCount || 0) + (a.repostsCount || 0);
-          const scoreB = (b.likesCount || 0) + (b.commentsCount || 0) + (b.sharesCount || 0) + (b.repostsCount || 0);
-          return scoreB - scoreA;
-        });
-        setPosts(sortedPosts);
+        const [trendingResponse, recentResponse] = await Promise.all([
+          HomeService.getTrendingPosts('DAY'),
+          HomeService.getPosts('DATE', 'ALL'),
+        ]);
+        setTrending(Array.isArray(trendingResponse.data) ? trendingResponse.data.slice(0, 10) : []);
+        setPosts(Array.isArray(recentResponse.data) ? recentResponse.data : []);
       } catch (error) {
         console.error("Erro ao conectar com o reator backend:", error);
       } finally {
@@ -37,12 +36,21 @@ const FeedPage = () => {
     <div className="flex gap-6 max-w-4xl mx-auto p-4 justify-center">
       <div className="flex-1 min-w-0 max-w-2xl"> 
         <StoriesBar />
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center justify-between mb-3">
           <h2 className="font-display font-bold text-xl text-foreground">Em alta</h2>
           <span className="text-[10px] bg-skillswap-teal/10 text-skillswap-teal px-2 py-1 rounded flex items-center gap-1 font-bold">
             <BrainCircuit size={12} /> ALGORITMO ELOS ATIVO
           </span>
         </div>
+
+        <div className="mb-6 flex gap-3 overflow-x-auto pb-2 snap-x" aria-label="As dez publicações em alta">
+          {trending.length ? trending.map((post) => <div key={`trend-${post.postId || post.id}`} className="min-w-[260px] max-w-[300px] snap-start rounded-xl border border-border bg-card p-3 shadow-sm">
+            <p className="line-clamp-3 text-sm font-medium text-foreground">{post.content || post.title}</p>
+            <p className="mt-2 text-xs text-muted-foreground">{(post.likesCount || 0) + (post.commentsCount || 0) + (post.repostsCount || 0) + (post.sharesCount || 0)} interações</p>
+          </div>) : <p className="text-sm text-muted-foreground">Ainda não há publicações em alta.</p>}
+        </div>
+
+        <h2 className="mb-3 font-display font-bold text-xl text-foreground">Publicações recentes</h2>
 
         <div className="space-y-4">
           {isLoading ? (

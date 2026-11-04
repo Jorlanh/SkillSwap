@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import java.time.Instant;
 
 @Service
 public class AccessLogServiceImpl implements AccessLogService {
@@ -20,17 +21,21 @@ public class AccessLogServiceImpl implements AccessLogService {
 
     @Override
     public void logAccess(UUID userId, HttpServletRequest request) {
-        String ipAddress = request.getRemoteAddr();
+        String forwarded = request.getHeader("X-Forwarded-For");
+        String ipAddress = forwarded == null || forwarded.isBlank()
+            ? request.getRemoteAddr()
+            : forwarded.split(",")[0].trim();
 
         // Cria e salva o registro de acesso sem informações de localização.
         AccessLog accessLog = new AccessLog(
             userId,
             ipAddress,
-            "N/A", // location
-            "N/A", // city
-            "N/A", // subdivision
-            "N/A"  // country
+            "Local não informado", // O servidor não faz geolocalização automática.
+            null,
+            null,
+            null
         );
+        accessLog.setAccessTime(Instant.now());
         accessLogRepository.save(accessLog);
     }
 

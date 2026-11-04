@@ -11,6 +11,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.io.IOException;
 import java.time.Instant;
@@ -34,6 +35,7 @@ public class StoryController {
     }
 
     @GetMapping
+    @Transactional(readOnly = true)
     public ResponseEntity<List<StoryResponseDTO>> getActiveStories() {
         Instant now = Instant.now();
         return ResponseEntity.ok(storyRepository.findByExpiresAtAfterOrderByCreatedAtDesc(now)
@@ -42,6 +44,7 @@ public class StoryController {
 
     @PostMapping
     @PreAuthorize("isAuthenticated()")
+    @Transactional
     public ResponseEntity<StoryResponseDTO> createStory(@RequestParam("media") MultipartFile media) throws IOException {
         if (media == null || media.isEmpty()) throw new IllegalArgumentException("Escolha uma foto ou vídeo.");
         String contentType = media.getContentType() == null ? "" : media.getContentType().toLowerCase();

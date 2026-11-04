@@ -8,6 +8,7 @@ import SkillBadge from '@/components/SkillBadge';
 import PostCard from '@/components/PostCard';
 import RightSidebar from '@/components/RightSidebar';
 import VerifiedBadge from '@/components/VerifiedBadge';
+import StoriesBar from '@/components/StoriesBar';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent } from '@/components/ui/card';
 import { toast } from 'sonner';
@@ -49,6 +50,7 @@ const ProfilePage = () => {
   const [isOwnProfile, setIsOwnProfile] = useState(false);
   const [achievements, setAchievements] = useState<any[]>([]);
   const [userPosts, setUserPosts] = useState<any[]>([]);
+  const [communityPosts, setCommunityPosts] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   
   // Modais
@@ -146,6 +148,10 @@ const ProfilePage = () => {
         if (postsRes.status === 'fulfilled') {
           const allPosts = Array.isArray(postsRes.value.data) ? postsRes.value.data : [];
           setUserPosts(allPosts.filter((p: any) => (p.user?.userId === tId || p.userId === tId)));
+        }
+        if (!urlUsername || (meData && urlUsername === meData.username)) {
+          const communityPostsRes = await ProfileService.getMyCommunityPosts().catch(() => ({ data: [] }));
+          setCommunityPosts(Array.isArray(communityPostsRes.data) ? communityPostsRes.data : []);
         }
       }
     } catch (error) {
@@ -373,6 +379,7 @@ const ProfilePage = () => {
     <div className="flex w-full gap-6 max-w-[1200px] mx-auto p-4">
       {/* CORREÇÃO VISUAL DA LARGURA: Expansão do max-w para dar espaço ao Card de Reputação */}
       <div className="flex-1 min-w-0">
+        <StoriesBar />
         
         {/* CABEÇALHO */}
         <div className="flex flex-col md:flex-row items-start gap-6 mb-6 bg-card p-6 rounded-2xl border border-border shadow-sm">
@@ -572,6 +579,20 @@ const ProfilePage = () => {
               )) : (
                 <div className="col-span-full"><EmptyState icon={<Award />} message="Nenhuma conquista desbloqueada." /></div>
               )}
+            </div>
+          )}
+
+          {activeTab === 'Atividade' && (
+            <div className="space-y-3">
+              {userPosts.slice(0, 10).map((post) => <div key={`activity-${post.postId || post.id}`} className="rounded-xl border border-border bg-card p-4"><p className="text-sm">Publicou: <strong>{post.title || post.content}</strong></p><p className="mt-1 text-xs text-muted-foreground">{post.createdAt ? new Date(post.createdAt).toLocaleString('pt-BR') : 'Data não informada'}</p></div>)}
+              {!userPosts.length && <EmptyState icon={<Layers />} message="Nenhuma atividade registrada." />}
+            </div>
+          )}
+
+          {activeTab === 'Comunidades' && (
+            <div className="space-y-4">
+              {communityPosts.map((post) => <PostCard key={`community-${post.postId || post.id}`} post={post} />)}
+              {!communityPosts.length && <EmptyState icon={<Users />} message="Você ainda não tem publicações nas comunidades." />}
             </div>
           )}
         </div>

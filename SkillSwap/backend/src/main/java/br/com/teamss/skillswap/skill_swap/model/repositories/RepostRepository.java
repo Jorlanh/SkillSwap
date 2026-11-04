@@ -9,4 +9,5 @@ import java.util.UUID;
 @Repository
 public interface RepostRepository extends JpaRepository<Repost, RepostId> {
     boolean existsByPost_PostIdAndUser_UserId(Long postId, UUID userId); // ADICIONADO
+    void deleteByPost_PostIdAndUser_UserId(Long postId, UUID userId);
 }

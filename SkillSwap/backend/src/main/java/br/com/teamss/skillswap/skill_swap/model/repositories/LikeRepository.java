@@ -10,6 +10,7 @@ import java.util.UUID;
 @Repository
 public interface LikeRepository extends JpaRepository<Like, LikeId> {
     boolean existsByPost_PostIdAndUser_UserId(Long postId, UUID userId);
+    void deleteByPost_PostIdAndUser_UserId(Long postId, UUID userId);
     
     List<Like> findAllByPost_PostId(Long postId);
 }

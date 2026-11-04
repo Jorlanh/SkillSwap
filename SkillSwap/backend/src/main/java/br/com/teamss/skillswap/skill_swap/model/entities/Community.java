@@ -31,6 +31,9 @@ public class Community {
     @Column(name = "image_url", length = 1024)
     private String imageUrl;
 
+    @Column(name = "is_private", nullable = false)
+    private boolean privateCommunity;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "owner_id")
     private User owner;
@@ -47,4 +50,6 @@ public class Community {
     public void setImageUrl(String imageUrl) { this.imageUrl = imageUrl; }
     public User getOwner() { return owner; }
     public void setOwner(User owner) { this.owner = owner; }
+    public boolean isPrivateCommunity() { return privateCommunity; }
+    public void setPrivateCommunity(boolean privateCommunity) { this.privateCommunity = privateCommunity; }
 }

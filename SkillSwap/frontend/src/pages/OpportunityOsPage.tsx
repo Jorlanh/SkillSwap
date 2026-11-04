@@ -72,8 +72,10 @@ type Opportunity = {
   description: string;
   requiredSkills: string;
   remote: boolean;
+  participationMode?: 'REMOTE' | 'HYBRID' | 'PRESENTIAL';
   accessibleSupport: boolean;
   location?: string;
+  contactUrl?: string;
 };
 
 type Application = { opportunityId: string; status: string };
@@ -197,7 +199,7 @@ const OpportunityOsPage = () => {
       <section className="overflow-hidden rounded-3xl border border-border bg-gradient-to-br from-skillswap-teal/25 via-card to-card p-6 shadow-sm sm:p-8">
         <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
           <div className="max-w-3xl">
-            <div className="mb-3 flex items-center gap-2 text-xs font-black uppercase tracking-[0.18em] text-skillswap-teal"><Sparkles className="h-4 w-4" /> SkillSwap Access</div>
+            <div className="mb-3 flex items-center gap-2 text-xs font-black uppercase tracking-[0.18em] text-skillswap-teal"><Sparkles className="h-4 w-4" /> SkillSwap</div>
             <h1 className="text-3xl font-black tracking-tight sm:text-4xl">Minha jornada de oportunidades</h1>
             <p className="mt-3 text-muted-foreground">Transforme uma meta em aprendizado, projeto real, evidência verificável e candidatura. Cada etapa deixa um próximo passo claro.</p>
           </div>
@@ -269,6 +271,6 @@ const StepCard = ({ step, onAdvance }: { step: Step; onAdvance: () => void }) =>
 
 const EvidenceCard = ({ item, onReview }: { item: Evidence; onReview: () => Promise<void> }) => <div className="rounded-2xl border p-4"><div className="flex items-start justify-between gap-3"><div><h3 className="font-bold">{item.title}</h3><p className="text-xs font-semibold text-skillswap-teal">{item.skillFocus}</p></div><Badge variant="outline">{item.verificationStatus === 'SELF_REPORTED' ? 'Autodeclarada' : item.verificationStatus === 'REVIEW_REQUESTED' ? 'Em revisão' : item.verificationStatus}</Badge></div><p className="mt-2 text-sm text-muted-foreground">{item.description}</p><div className="mt-3 flex flex-wrap items-center gap-2">{item.artifactUrl && <a href={item.artifactUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs font-semibold text-skillswap-teal hover:underline">Abrir artefato <ExternalLink className="h-3 w-3" /></a>}{item.verificationStatus === 'SELF_REPORTED' && <Button variant="ghost" size="sm" onClick={() => void onReview()} className="h-7 gap-1 px-2 text-xs"><Trophy className="h-3 w-3" /> Pedir revisão</Button>}</div></div>;
 
-const OpportunityCard = ({ opportunity, applied, onApply }: { opportunity: Opportunity; applied: boolean; onApply: () => void }) => <div className="rounded-2xl border p-4"><div className="flex items-start justify-between gap-3"><div><h3 className="font-bold">{opportunity.title}</h3><p className="text-xs text-muted-foreground">{opportunity.organizationName}{opportunity.location ? ` · ${opportunity.location}` : ''}</p></div>{opportunity.remote && <Badge variant="secondary">Remoto</Badge>}</div><p className="mt-3 line-clamp-3 text-sm text-muted-foreground">{opportunity.description}</p><div className="mt-3 flex flex-wrap gap-1">{opportunity.requiredSkills.split(',').slice(0, 4).map((skill) => <Badge key={skill} variant="outline" className="text-[10px]">{skill.trim()}</Badge>)}{opportunity.accessibleSupport && <Badge variant="secondary" className="text-[10px]">Acessível</Badge>}</div><Button disabled={applied} onClick={onApply} size="sm" className="mt-4 w-full gap-2">{applied ? <><CheckCircle2 className="h-4 w-4" /> Candidatura enviada</> : <><Send className="h-4 w-4" /> Quero participar</>}</Button></div>;
+const OpportunityCard = ({ opportunity, applied, onApply }: { opportunity: Opportunity; applied: boolean; onApply: () => void }) => { const mode = opportunity.participationMode === 'HYBRID' ? 'Semi-presencial' : opportunity.participationMode === 'PRESENTIAL' ? 'Presencial' : 'Remoto'; return <div className="rounded-2xl border p-4"><div className="flex items-start justify-between gap-3"><div><h3 className="font-bold">{opportunity.title}</h3><p className="text-xs text-muted-foreground">{opportunity.organizationName}{opportunity.location ? ` · ${opportunity.location}` : ''}</p></div><Badge variant="secondary">{mode}</Badge></div><p className="mt-3 line-clamp-3 text-sm text-muted-foreground">{opportunity.description}</p><div className="mt-3 flex flex-wrap gap-1">{opportunity.requiredSkills.split(',').slice(0, 4).map((skill) => <Badge key={skill} variant="outline" className="text-[10px]">{skill.trim()}</Badge>)}{opportunity.accessibleSupport && <Badge variant="secondary" className="text-[10px]">Acessível</Badge>}</div><div className="mt-4 grid gap-2 sm:grid-cols-2"><Button disabled={applied} onClick={onApply} size="sm" className="w-full gap-2">{applied ? <><CheckCircle2 className="h-4 w-4" /> Candidatura enviada</> : <><Send className="h-4 w-4" /> Quero participar</>}</Button>{opportunity.contactUrl && <a href={opportunity.contactUrl} target="_blank" rel="noreferrer" className="inline-flex items-center justify-center rounded-md border px-3 py-2 text-sm font-medium hover:bg-muted">Contato</a>}</div></div>; };
 
 export default OpportunityOsPage;

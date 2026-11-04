@@ -136,6 +136,12 @@ public class ProfileController {
         return ResponseEntity.ok(profileService.getFeed(authenticatedUser.getUserId()));
     }
 
+    @GetMapping("/me/community-posts")
+    public ResponseEntity<List<Post>> getMyCommunityPosts() {
+        UserDTO authenticatedUser = userServiceDTO.getAuthenticatedUser();
+        return ResponseEntity.ok(profileService.getCommunityPosts(authenticatedUser.getUserId()));
+    }
+
     @PostMapping("/me/posts")
     public ResponseEntity<?> createPost(@RequestParam("content") String content, 
                                         @RequestParam(value="image", required=false) MultipartFile image) {

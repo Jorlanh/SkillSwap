@@ -18,6 +18,9 @@ type ApiCommunity = {
   description?: string;
   imageUrl?: string;
   ownerId?: string;
+  privateCommunity?: boolean;
+  joined?: boolean;
+  membershipStatus?: string;
 };
 
 const toCommunity = (community: ApiCommunity): Community => ({
@@ -28,6 +31,9 @@ const toCommunity = (community: ApiCommunity): Community => ({
   description: community.description,
   imageUrl: community.imageUrl,
   ownerId: community.ownerId,
+  privateCommunity: community.privateCommunity,
+  joined: community.joined,
+  membershipStatus: community.membershipStatus,
 });
 
 const CommunitiesPage = () => {
@@ -39,6 +45,7 @@ const CommunitiesPage = () => {
   const [showCreate, setShowCreate] = useState(false);
   const [newName, setNewName] = useState('');
   const [newDescription, setNewDescription] = useState('');
+  const [newPrivate, setNewPrivate] = useState(false);
   const [creating, setCreating] = useState(false);
 
   useEffect(() => {
@@ -64,12 +71,13 @@ const CommunitiesPage = () => {
     }
     setCreating(true);
     try {
-      const { data } = await HomeService.createCommunity({ name: newName.trim(), description: newDescription.trim() || undefined });
+      const { data } = await HomeService.createCommunity({ name: newName.trim(), description: newDescription.trim() || undefined, privateCommunity: newPrivate });
       const created = toCommunity(data);
       setCommunities((current) => [created, ...current]);
       setJoined((current) => [...new Set([...current, created.id])]);
       setNewName('');
       setNewDescription('');
+      setNewPrivate(false);
       setShowCreate(false);
       toast.success('Comunidade criada. Você já entrou como primeiro membro.');
     } catch {
@@ -106,6 +114,7 @@ const CommunitiesPage = () => {
               <Input id="community-name" value={newName} onChange={(event) => setNewName(event.target.value)} maxLength={120} required placeholder="Ex.: Aprender desenho" />
               <label className="block text-sm font-medium text-foreground" htmlFor="community-description">Descrição (opcional)</label>
               <textarea id="community-description" value={newDescription} onChange={(event) => setNewDescription(event.target.value)} maxLength={1000} rows={3} placeholder="Sobre o que as pessoas vão conversar?" className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm" />
+              <label className="flex items-center gap-2 text-sm text-foreground"><input type="checkbox" checked={newPrivate} onChange={(event) => setNewPrivate(event.target.checked)} /> Comunidade privada (entrada mediante aprovação)</label>
               <Button type="submit" disabled={creating} className="bg-skillswap-teal hover:bg-teal-700 text-white">{creating ? 'Criando...' : 'Criar comunidade'}</Button>
             </form>
           )}

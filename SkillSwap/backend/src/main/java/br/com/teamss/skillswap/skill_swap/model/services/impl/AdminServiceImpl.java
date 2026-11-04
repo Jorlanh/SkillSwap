@@ -10,6 +10,7 @@ import br.com.teamss.skillswap.skill_swap.model.entities.Ban;
 import br.com.teamss.skillswap.skill_swap.model.entities.Role;
 import br.com.teamss.skillswap.skill_swap.model.entities.User;
 import br.com.teamss.skillswap.skill_swap.model.repositories.BanRepository;
+import br.com.teamss.skillswap.skill_swap.dto.AdminBanDTO;
 import br.com.teamss.skillswap.skill_swap.model.repositories.RoleRepository;
 import br.com.teamss.skillswap.skill_swap.model.repositories.ProposalRepository;
 import br.com.teamss.skillswap.skill_swap.model.repositories.SkillRepository;
@@ -112,10 +113,17 @@ public class AdminServiceImpl implements AdminService {
 
     @Override
     public void banUser(UUID userId, String reason, Instant expiresAt, String ipAddress) {
+        banUser(userId, reason, expiresAt, ipAddress, "GENERAL");
+    }
+
+    @Override
+    public void banUser(UUID userId, String reason, Instant expiresAt, String ipAddress, String scope) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new EntityNotFoundException("Usuário não encontrado com ID: " + userId));
 
-        user.setBanned(true);
+        String normalizedScope = scope == null ? "GENERAL" : scope.trim().toUpperCase();
+        if (!List.of("GENERAL", "POSTS", "COMMENTS").contains(normalizedScope)) normalizedScope = "GENERAL";
+        user.setBanned("GENERAL".equals(normalizedScope));
         userRepository.save(user);
 
         Ban ban = new Ban();
@@ -123,7 +131,18 @@ public class AdminServiceImpl implements AdminService {
         ban.setReason(reason);
         ban.setExpiresAt(expiresAt);
         ban.setIpAddress(ipAddress);
+        ban.setScope(normalizedScope);
         banRepository.save(ban);
+    }
+
+    @Override
+    @org.springframework.transaction.annotation.Transactional(readOnly = true)
+    public List<AdminBanDTO> getActiveBans() {
+        return banRepository.findByActiveTrueOrderByCreatedAtDesc().stream()
+                .map(ban -> new AdminBanDTO(
+                        ban.getId(), ban.getUser().getUserId(), ban.getUser().getUsername(), ban.getReason(),
+                        ban.getScope(), ban.getCreatedAt(), ban.getExpiresAt(), ban.isActive()))
+                .toList();
     }
 
     @Override

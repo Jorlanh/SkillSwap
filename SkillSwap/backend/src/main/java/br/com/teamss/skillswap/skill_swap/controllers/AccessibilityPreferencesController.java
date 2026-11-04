@@ -10,6 +10,7 @@ import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -41,6 +42,7 @@ public class AccessibilityPreferencesController {
     }
 
     @PutMapping
+    @Transactional
     public ResponseEntity<AccessibilityPreferencesResponse> save(
         @Valid @RequestBody AccessibilityPreferencesRequest request
     ) {

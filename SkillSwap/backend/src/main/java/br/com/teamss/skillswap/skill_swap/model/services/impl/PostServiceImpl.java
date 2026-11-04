@@ -13,6 +13,7 @@ import br.com.teamss.skillswap.skill_swap.model.services.PostService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.beans.factory.annotation.Value;
 
 import java.io.IOException;
 import java.time.Instant;
@@ -22,6 +23,9 @@ import java.util.stream.Collectors;
 
 @Service
 public class PostServiceImpl implements PostService {
+
+    @Value("${app.frontend-url:http://localhost:5173}")
+    private String frontendUrl;
 
     private final PostRepository postRepository;
     private final UserRepository userRepository;
@@ -145,14 +149,13 @@ public class PostServiceImpl implements PostService {
         User user = userRepository.findById(userId).orElseThrow(() -> new RuntimeException("Usuário não encontrado!"));
 
         if (likeRepository.existsByPost_PostIdAndUser_UserId(postId, userId)) {
-            throw new IllegalStateException("O usuário já curtiu este post.");
+            likeRepository.deleteByPost_PostIdAndUser_UserId(postId, userId);
+            post.setLikesCount(Math.max(0, post.getLikesCount() - 1));
+        } else {
+            likeRepository.save(new Like(post, user));
+            post.setLikesCount(post.getLikesCount() + 1);
+            notificationService.createNotification(post.getUser().getUserId(), "Seu post foi curtido por " + user.getUsername());
         }
-
-        likeRepository.save(new Like(post, user));
-        post.setLikesCount(post.getLikesCount() + 1);
-        
-        notificationService.createNotification(post.getUser().getUserId(), "Seu post foi curtido por " + user.getUsername());
-
         return postRepository.save(post);
     }
 
@@ -162,30 +165,24 @@ public class PostServiceImpl implements PostService {
         Post originalPost = postRepository.findById(postId).orElseThrow(() -> new RuntimeException("Post não encontrado!"));
         User user = userRepository.findById(userId).orElseThrow(() -> new RuntimeException("Usuário não encontrado!"));
 
-        if (!repostRepository.existsByPost_PostIdAndUser_UserId(postId, userId)) {
+        if (repostRepository.existsByPost_PostIdAndUser_UserId(postId, userId)) {
+            repostRepository.deleteByPost_PostIdAndUser_UserId(postId, userId);
+            originalPost.setRepostsCount(Math.max(0, originalPost.getRepostsCount() - 1));
+        } else {
             repostRepository.save(new Repost(originalPost, user));
             originalPost.setRepostsCount(originalPost.getRepostsCount() + 1);
-            postRepository.save(originalPost);
-            
             notificationService.createNotification(originalPost.getUser().getUserId(), "Seu post foi repostado por " + user.getUsername());
         }
 
-        Post repostPost = new Post();
-        repostPost.setUser(user);
-        repostPost.setTitle("Repost: " + originalPost.getTitle());
-        repostPost.setContent(originalPost.getContent());
-        repostPost.setProfile(ensureProfile(user));
-        repostPost.setCreatedAt(Instant.now());
-        postRepository.save(repostPost);
-
-        return originalPost;
+        return postRepository.save(originalPost);
     }
 
     @Override
     @Transactional
     public String generateShareLink(Long postId) {
         Post post = postRepository.findById(postId).orElseThrow(() -> new RuntimeException("Post não encontrado!"));
-        String shareUrl = "https://skillswap.com/share/post/" + UUID.randomUUID();
+        String base = frontendUrl == null ? "http://localhost:5173" : frontendUrl.replaceAll("/+$", "");
+        String shareUrl = base + "/post/" + postId;
         
         ShareLink shareLink = new ShareLink();
         shareLink.setPost(post);
@@ -197,6 +194,16 @@ public class PostServiceImpl implements PostService {
         postRepository.save(post);
 
         return shareUrl;
+    }
+
+    @Override
+    @Transactional
+    public void deletePost(Long postId, UUID userId) {
+        Post post = postRepository.findById(postId).orElseThrow(() -> new RuntimeException("Post não encontrado."));
+        if (post.getUser() == null || !post.getUser().getUserId().equals(userId)) {
+            throw new org.springframework.security.access.AccessDeniedException("Você só pode excluir suas próprias publicações.");
+        }
+        postRepository.delete(post);
     }
 
     @Override
@@ -283,6 +290,7 @@ public class PostServiceImpl implements PostService {
     private Instant calculateStartTime(String period) {
         Instant now = Instant.now();
         return switch (period.toUpperCase()) {
+            case "ALL" -> Instant.EPOCH;
             case "WEEK" -> now.minus(7, ChronoUnit.DAYS);
             case "MONTH" -> now.minus(30, ChronoUnit.DAYS);
             default -> now.minus(1, ChronoUnit.DAYS);

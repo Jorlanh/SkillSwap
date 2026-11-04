@@ -1,6 +1,7 @@
 package br.com.teamss.skillswap.skill_swap.controllers;
 
 import br.com.teamss.skillswap.skill_swap.dto.BanRequestDTO;
+import br.com.teamss.skillswap.skill_swap.dto.AdminBanDTO;
 import br.com.teamss.skillswap.skill_swap.dto.AdminRoleRequest;
 import br.com.teamss.skillswap.skill_swap.dto.PlatformStatsDTO;
 import br.com.teamss.skillswap.skill_swap.dto.UserManagementDTO;
@@ -62,6 +63,11 @@ public class AdminController {
         return ResponseEntity.ok(adminService.getAllUsers());
     }
 
+    @GetMapping("/bans")
+    public ResponseEntity<List<AdminBanDTO>> getActiveBans() {
+        return ResponseEntity.ok(adminService.getActiveBans());
+    }
+
     @PostMapping("/users/{userId}/toggle-verification")
     public ResponseEntity<UserManagementDTO> toggleVerification(@PathVariable UUID userId) {
         return ResponseEntity.ok(adminService.toggleUserVerification(userId));
@@ -69,7 +75,7 @@ public class AdminController {
 
     @PostMapping("/users/{userId}/ban")
     public ResponseEntity<Void> banUser(@PathVariable UUID userId, @RequestBody BanRequestDTO banRequest) {
-        adminService.banUser(userId, banRequest.getReason(), banRequest.getExpiresAt(), banRequest.getIpAddress());
+        adminService.banUser(userId, banRequest.getReason(), banRequest.getExpiresAt(), banRequest.getIpAddress(), banRequest.getScope());
         return ResponseEntity.ok().build();
     }
 

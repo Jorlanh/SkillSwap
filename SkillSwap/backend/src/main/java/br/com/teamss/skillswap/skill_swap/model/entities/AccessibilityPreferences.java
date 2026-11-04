@@ -7,13 +7,14 @@ import lombok.Setter;
 
 import java.time.Instant;
 import java.util.UUID;
+import org.springframework.data.domain.Persistable;
 
 @Entity
 @Table(name = "ss_accessibility_preferences")
 @Getter
 @Setter
 @NoArgsConstructor
-public class AccessibilityPreferences {
+public class AccessibilityPreferences implements Persistable<UUID> {
     @Id
     @Column(name = "user_id", nullable = false)
     private UUID userId;
@@ -55,4 +56,33 @@ public class AccessibilityPreferences {
 
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt = Instant.now();
+
+    /**
+     * O user_id também é a chave primária da tabela. Sem esta marcação o
+     * Spring Data interpreta uma preferência nova como uma entidade existente
+     * e usa merge(), que pode resultar em StaleObjectStateException no primeiro
+     * salvamento ou quando a tela envia duas atualizações próximas.
+     */
+    @Transient
+    private boolean newEntity = true;
+
+    @Override
+    public UUID getId() {
+        return userId;
+    }
+
+    @Override
+    public boolean isNew() {
+        return newEntity;
+    }
+
+    @PostLoad
+    void markExisting() {
+        newEntity = false;
+    }
+
+    @PostPersist
+    void markPersisted() {
+        newEntity = false;
+    }
 }

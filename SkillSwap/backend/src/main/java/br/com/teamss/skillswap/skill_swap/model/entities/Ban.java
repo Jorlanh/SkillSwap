@@ -29,6 +29,9 @@ public class Ban {
     @Column(nullable = false)
     private String reason;
 
+    @Column(nullable = false, length = 20)
+    private String scope = "GENERAL";
+
     @Column(name = "banned_by")
     private UUID bannedBy; // ID do administrador que baniu
 

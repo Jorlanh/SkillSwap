@@ -1,7 +1,11 @@
 import type { Community } from '@/types';
+import { useEffect, useState } from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Link, useOutletContext } from 'react-router-dom';
+import { onIdTokenChanged } from 'firebase/auth';
+import { auth } from '@/lib/firebase';
+import { CommunityService } from '@/services/api';
 
 interface CommunityCardProps {
   community: Community;
@@ -10,8 +14,22 @@ interface CommunityCardProps {
 }
 
 const CommunityCard = ({ community, onJoin, joined = false }: CommunityCardProps) => {
+  const [membership, setMembership] = useState(community.membershipStatus || (joined || community.joined ? 'APPROVED' : 'NONE'));
   // ACESSO À BARREIRA GLOBAL
   const context = useOutletContext<{ requireAuth?: (action: () => void) => void }>();
+
+  useEffect(() => {
+    const unsubscribe = onIdTokenChanged(auth, (firebaseUser) => {
+      if (!firebaseUser || !community.id) {
+        setMembership(joined || community.joined ? 'APPROVED' : 'NONE');
+        return;
+      }
+      CommunityService.getMembership(community.id)
+        .then(({ data }) => setMembership(String(data || 'NONE')))
+        .catch(() => setMembership(joined || community.joined ? 'APPROVED' : 'NONE'));
+    });
+    return unsubscribe;
+  }, [community.id, community.joined, community.membershipStatus, joined]);
 
   const handleJoinClick = () => {
     // Se o contexto existir (veio via MainLayout), aplica a barreira
@@ -46,16 +64,23 @@ const CommunityCard = ({ community, onJoin, joined = false }: CommunityCardProps
         <strong>{community.members}</strong> Membros
       </p>
       <div className="flex flex-wrap items-center justify-center gap-2">
-        <Button
-          variant="outline"
-          size="sm"
-          className="bg-skillswap-light-blue border-foreground/20 text-foreground hover:bg-accent"
-          onClick={handleJoinClick}
-          disabled={joined}
-        >
-          {joined ? 'Participando' : 'Entrar'}
-        </Button>
-        <Link to={`/comunidades/${community.id}`} className="text-sm font-semibold text-skillswap-teal hover:underline">Abrir</Link>
+        {membership === 'PENDING' ? (
+          <span className="rounded-md bg-amber-100 px-3 py-2 text-sm font-semibold text-amber-800">Aguardando</span>
+        ) : membership === 'APPROVED' || membership === 'ADMIN' || membership === 'OWNER' || joined || community.joined ? (
+          <Link to={`/comunidades/${community.id}`} className="rounded-md bg-skillswap-teal px-3 py-2 text-sm font-semibold text-white hover:bg-teal-700">Abrir</Link>
+        ) : (
+          <>
+            <Button
+              variant="outline"
+              size="sm"
+              className="bg-skillswap-light-blue border-foreground/20 text-foreground hover:bg-accent"
+              onClick={handleJoinClick}
+            >
+              Entrar
+            </Button>
+            <Link to={`/comunidades/${community.id}`} className="text-sm font-semibold text-skillswap-teal hover:underline">Abrir</Link>
+          </>
+        )}
       </div>
     </div>
   );

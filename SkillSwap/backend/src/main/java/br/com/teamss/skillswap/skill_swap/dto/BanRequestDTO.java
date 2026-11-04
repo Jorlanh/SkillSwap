@@ -10,4 +10,5 @@ public class BanRequestDTO {
     private String reason;
     private Instant expiresAt; // Nulo para permanente
     private String ipAddress;
+    private String scope = "GENERAL"; // GENERAL, POSTS ou COMMENTS
 }

@@ -6,6 +6,7 @@ import br.com.teamss.skillswap.skill_swap.dto.AdminOperationsReportDTO;
 import br.com.teamss.skillswap.skill_swap.dto.SwapCoinLedgerResponse;
 import br.com.teamss.skillswap.skill_swap.dto.AdminWalletAdjustmentRequest;
 import br.com.teamss.skillswap.skill_swap.dto.SwapCoinWalletResponse;
+import br.com.teamss.skillswap.skill_swap.dto.AdminBanDTO;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import java.time.Instant;
@@ -19,7 +20,9 @@ public interface AdminService {
 
     // Novos métodos
     void banUser(UUID userId, String reason, Instant expiresAt, String ipAddress);
+    void banUser(UUID userId, String reason, Instant expiresAt, String ipAddress, String scope);
     void unbanUser(UUID userId);
+    List<AdminBanDTO> getActiveBans();
     UserManagementDTO setRole(UUID userId, String roleName, boolean enabled);
     AdminOperationsReportDTO getOperationsReport();
     Page<SwapCoinLedgerResponse> getLedgerAudit(Pageable pageable);

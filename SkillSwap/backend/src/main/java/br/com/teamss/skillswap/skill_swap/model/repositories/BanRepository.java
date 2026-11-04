@@ -7,4 +7,5 @@ import java.util.UUID;
 
 public interface BanRepository extends JpaRepository<Ban, Long> {
     List<Ban> findByUser_UserIdAndActiveTrue(UUID userId);
+    List<Ban> findByActiveTrueOrderByCreatedAtDesc();
 }

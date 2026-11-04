@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { MessageSquare, Repeat2, ArrowUp, Share, Send, Heart, Trash2, Reply } from 'lucide-react';
+import { MessageSquare, Repeat2, ArrowUp, Share, Send, Heart, Trash2, Reply, BadgeCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useOutletContext, useNavigate } from 'react-router-dom';
@@ -56,9 +56,22 @@ const PostCard = ({ post }: PostCardProps) => {
   const [newComment, setNewComment] = useState("");
   const [commentsList, setCommentsList] = useState<any[]>(post.comments || []);
   const [commentsCount, setCommentsCount] = useState(post.commentsCount || 0);
+  const [replyTo, setReplyTo] = useState<number | null>(null);
+  const [commentLikes, setCommentLikes] = useState<Record<number, number>>({});
 
   const author = post.user || post.author || { username: 'Usuário', avatarUrl: '' };
   const postId = post.postId ?? post.id;
+
+  useEffect(() => {
+    if (!showComments || !postId) return;
+    HomeService.getPostComments(postId)
+      .then(({ data }) => {
+        const list = Array.isArray(data) ? data : [];
+        setCommentsList(list);
+        setCommentLikes(Object.fromEntries(list.map((comment: any) => [comment.commentId ?? comment.id, Number(comment.likesCount ?? 0)])));
+      })
+      .catch(() => toast.error('Não foi possível carregar os comentários agora.'));
+  }, [showComments, postId]);
 
   // --- AÇÕES DO POST ---
 
@@ -86,9 +99,10 @@ const PostCard = ({ post }: PostCardProps) => {
     requireAuth(async () => {
       try {
         await HomeService.repost(postId);
-        setIsReposted(true);
-        setRepostsCount((prev: number) => prev + 1);
-        toast.success("Repostado com sucesso!");
+        const next = !isReposted;
+        setIsReposted(next);
+        setRepostsCount((prev: number) => Math.max(0, next ? prev + 1 : prev - 1));
+        toast.success(next ? "Repostado com sucesso!" : "Repost removido.");
       } catch {
         toast.error("Não foi possível repostar agora.");
       }
@@ -126,15 +140,16 @@ const PostCard = ({ post }: PostCardProps) => {
 
     requireAuth(async () => {
       try {
-        await HomeService.comment(postId, newComment);
+        await HomeService.comment(postId, newComment, replyTo ?? undefined);
         setCommentsList([
-          { id: `local-${Date.now()}`, content: newComment, user: loggedUser },
+          { id: `local-${Date.now()}`, commentId: `local-${Date.now()}`, content: newComment, username: loggedUser.username, user: loggedUser, parentCommentId: replyTo },
           ...commentsList,
         ]);
         // Tipagem (prev: number) adicionada
         setCommentsCount((prev: number) => prev + 1);
         setNewComment("");
-        toast.success("Comentário enviado!");
+        setReplyTo(null);
+        toast.success(replyTo ? "Resposta enviada!" : "Comentário enviado!");
       } catch (error) {
         toast.error("Não foi possível enviar o comentário. Tente novamente.");
       }
@@ -142,9 +157,22 @@ const PostCard = ({ post }: PostCardProps) => {
   };
 
   const handleLikeComment = (commentId: number) => {
-    requireAuth(() => {
-      toast.info("Comentário curtido");
-      // Aqui chamaria o RatingService ou PostService.likeComment(commentId)
+    requireAuth(async () => {
+      try {
+        const { data } = await HomeService.likeComment(commentId);
+        setCommentLikes((current) => ({ ...current, [commentId]: Number(data ?? current[commentId] ?? 0) }));
+      } catch { toast.error('Não foi possível curtir o comentário.'); }
+    });
+  };
+
+  const handleDeleteComment = (commentId: number) => {
+    requireAuth(async () => {
+      try {
+        await HomeService.deleteComment(commentId);
+        setCommentsList((current) => current.filter((comment) => (comment.commentId ?? comment.id) !== commentId));
+        setCommentsCount((current) => Math.max(0, current - 1));
+        toast.success('Comentário excluído.');
+      } catch { toast.error('Não foi possível excluir o comentário.'); }
     });
   };
 
@@ -162,8 +190,9 @@ const PostCard = ({ post }: PostCardProps) => {
           </Avatar>
           
           <div className="min-w-0">
-            <p className="text-sm font-bold text-foreground truncate group-hover:text-skillswap-teal transition-colors">
+            <p className="text-sm font-bold text-foreground truncate group-hover:text-skillswap-teal transition-colors flex items-center gap-1">
               {author.name || author.username}
+              {author.verifiedBadge && <BadgeCheck className="h-4 w-4 text-skillswap-teal shrink-0" aria-label="Usuário verificado" />}
             </p>
             <p className="text-xs text-muted-foreground truncate">@{author.username?.toLowerCase()}</p>
           </div>
@@ -182,6 +211,8 @@ const PostCard = ({ post }: PostCardProps) => {
       <div className="mb-3 space-y-2">
         {post.title && <h3 className="font-bold text-base">{post.title}</h3>}
         <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">{post.content}</p>
+        {(post.community || post.communityName) && <p className="text-xs text-muted-foreground">Publicado em {post.community || post.communityName}</p>}
+        {post.createdAt && <time dateTime={post.createdAt} className="text-[11px] text-muted-foreground">{new Date(post.createdAt).toLocaleString('pt-BR')}</time>}
       </div>
 
       {(post.imageUrl || post.image) && (
@@ -215,6 +246,7 @@ const PostCard = ({ post }: PostCardProps) => {
       {/* SEÇÃO DE COMENTÁRIOS EXPANSÍVEL */}
       {showComments && (
         <div className="mt-4 pt-4 border-t border-border animate-in fade-in slide-in-from-top-2">
+          {replyTo && <div className="mb-2 flex items-center justify-between rounded-md bg-muted px-3 py-2 text-xs">Respondendo a um comentário<button type="button" onClick={() => setReplyTo(null)} className="font-semibold underline">Cancelar</button></div>}
           <form onSubmit={submitComment} className="flex gap-2 mb-4">
             <Avatar className="h-8 w-8 shrink-0">
               <AvatarImage src={loggedUser.avatarUrl || loggedUser.imageUrl} />
@@ -234,29 +266,30 @@ const PostCard = ({ post }: PostCardProps) => {
           <div className="space-y-4">
             {commentsList.map((comment: any) => (
               <div key={comment.commentId ?? comment.id} className="flex gap-3 group">
-                <Avatar className="h-7 w-7 shrink-0 cursor-pointer" onClick={() => navigate(`/perfil/${comment.user?.username}`)}>
+                <Avatar className="h-7 w-7 shrink-0 cursor-pointer" onClick={() => navigate(`/perfil/${comment.user?.username || comment.username}`)}>
                   <AvatarImage src={comment.user?.avatarUrl || comment.user?.imageUrl || comment.user?.avatar} />
-                  <AvatarFallback className="text-[10px]">{comment.user?.username?.[0]?.toUpperCase()}</AvatarFallback>
+                  <AvatarFallback className="text-[10px]">{(comment.user?.username || comment.username)?.[0]?.toUpperCase()}</AvatarFallback>
                 </Avatar>
                 <div className="flex-1">
                   <div className="bg-muted/40 p-2 px-3 rounded-2xl rounded-tl-sm relative">
-                    <p className="text-[11px] font-bold text-skillswap-teal mb-0.5">@{comment.user?.username}</p>
+                    <p className="text-[11px] font-bold text-skillswap-teal mb-0.5">@{comment.user?.username || comment.username}</p>
                     <p className="text-xs text-foreground/90">{comment.content}</p>
                     
                     <button 
-                        onClick={() => handleLikeComment(comment.id)}
+                        onClick={() => handleLikeComment(comment.commentId ?? comment.id)}
                         className="absolute -right-2 -bottom-2 bg-card border border-border rounded-full p-1 shadow-sm hover:scale-110 transition-transform text-muted-foreground hover:text-red-500"
                     >
                         <Heart size={10} className="fill-current" />
+                        <span className="text-[10px]">{commentLikes[comment.commentId ?? comment.id] ?? comment.likesCount ?? 0}</span>
                     </button>
                   </div>
                   
                   <div className="flex items-center gap-3 mt-1 ml-1">
                     <button className="text-[10px] font-bold text-muted-foreground hover:text-foreground flex items-center gap-1">
-                        <Reply size={10} /> Responder
+                        <Reply size={10} /> <span onClick={() => setReplyTo(comment.commentId ?? comment.id)}>Responder</span>
                     </button>
-                    {comment.user?.username === loggedUser.username && (
-                        <button className="text-[10px] font-bold text-muted-foreground hover:text-red-500">
+                    {(comment.user?.username || comment.username) === loggedUser.username && Number(comment.commentId ?? comment.id) > 0 && (
+                        <button onClick={() => handleDeleteComment(comment.commentId ?? comment.id)} className="text-[10px] font-bold text-muted-foreground hover:text-red-500">
                             Excluir
                         </button>
                     )}

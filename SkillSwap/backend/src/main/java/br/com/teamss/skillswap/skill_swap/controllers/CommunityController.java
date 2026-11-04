@@ -31,6 +31,48 @@ public class CommunityController {
         return ResponseEntity.ok().build();
     }
 
+    @GetMapping("/{communityId}/membership")
+    public ResponseEntity<String> getMembership(@PathVariable UUID communityId) {
+        UserDTO authenticatedUser = userServiceDTO.getAuthenticatedUser();
+        return ResponseEntity.ok(communityService.getMembershipStatus(communityId, authenticatedUser.getUserId()));
+    }
+
+    @GetMapping("/{communityId}/members")
+    public ResponseEntity<List<CommunityMemberDTO>> listMembers(@PathVariable UUID communityId,
+                                                                 @RequestParam(defaultValue = "") String search) {
+        UserDTO authenticatedUser = userServiceDTO.getAuthenticatedUser();
+        return ResponseEntity.ok(communityService.listMembers(communityId, authenticatedUser.getUserId(), search));
+    }
+
+    @GetMapping("/{communityId}/members/pending")
+    public ResponseEntity<List<CommunityMemberDTO>> listPendingMembers(@PathVariable UUID communityId,
+                                                                         @RequestParam(defaultValue = "") String search) {
+        UserDTO authenticatedUser = userServiceDTO.getAuthenticatedUser();
+        return ResponseEntity.ok(communityService.listPendingMembers(communityId, authenticatedUser.getUserId(), search));
+    }
+
+    @DeleteMapping("/{communityId}/members/{memberId}")
+    public ResponseEntity<Void> removeMember(@PathVariable UUID communityId, @PathVariable UUID memberId) {
+        UserDTO authenticatedUser = userServiceDTO.getAuthenticatedUser();
+        communityService.removeMember(communityId, authenticatedUser.getUserId(), memberId);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PutMapping("/{communityId}/members/{memberId}/admin")
+    public ResponseEntity<Void> setAdministrator(@PathVariable UUID communityId, @PathVariable UUID memberId,
+                                                  @RequestParam boolean administrator) {
+        UserDTO authenticatedUser = userServiceDTO.getAuthenticatedUser();
+        communityService.setAdministrator(communityId, authenticatedUser.getUserId(), memberId, administrator);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PutMapping("/{communityId}/members/{memberId}/approve")
+    public ResponseEntity<Void> approveMember(@PathVariable UUID communityId, @PathVariable UUID memberId) {
+        UserDTO authenticatedUser = userServiceDTO.getAuthenticatedUser();
+        communityService.approveMember(communityId, authenticatedUser.getUserId(), memberId);
+        return ResponseEntity.noContent().build();
+    }
+
     @GetMapping("/{communityId}")
     public ResponseEntity<CommunitySummaryDTO> getCommunity(@PathVariable UUID communityId) {
         return ResponseEntity.ok(communityService.getCommunity(communityId));

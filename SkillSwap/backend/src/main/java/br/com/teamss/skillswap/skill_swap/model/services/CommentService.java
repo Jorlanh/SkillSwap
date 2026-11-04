@@ -7,6 +7,9 @@ import java.util.UUID;
 
 public interface CommentService {
     Comment createComment(Long postId, UUID userId, String content);
+    Comment createComment(Long postId, UUID userId, String content, Long parentCommentId);
     
     List<CommentDTO> getCommentsByPost(Long postId);
+    void deleteComment(Long commentId, UUID userId);
+    long toggleLike(Long commentId, UUID userId);
 }

@@ -34,7 +34,7 @@ const AccessPage = () => {
         <div className="flex items-start gap-4">
           <div className="rounded-2xl bg-skillswap-teal p-3 text-white"><BriefcaseBusiness /></div>
           <div>
-            <p className="text-xs font-black uppercase tracking-widest text-skillswap-teal">SkillSwap Access</p>
+            <p className="text-xs font-black uppercase tracking-widest text-skillswap-teal">SkillSwap</p>
             <h1 className="mt-2 text-3xl font-black">Aprendizagem que se transforma em oportunidade</h1>
             <p className="mt-3 max-w-3xl text-muted-foreground">Uma experiência para qualquer pessoa, com foco principal em remover barreiras de acessibilidade, mostrar habilidades na prática e explicar por que cada curso, mentor, projeto ou vaga foi recomendado.</p>
           </div>

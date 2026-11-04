@@ -10,6 +10,7 @@ import br.com.teamss.skillswap.skill_swap.model.services.CommunityService;
 import br.com.teamss.skillswap.skill_swap.model.services.ContentModerationService;
 import br.com.teamss.skillswap.skill_swap.model.services.FileUploadService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -21,6 +22,9 @@ import java.util.stream.Collectors;
 
 @Service
 public class CommunityServiceImpl implements CommunityService {
+
+    @Value("${app.frontend-url:http://localhost:5173}")
+    private String frontendUrl;
 
     private final CommunityRepository communityRepository;
     private final UserRepository userRepository;
@@ -66,6 +70,7 @@ public class CommunityServiceImpl implements CommunityService {
                 .orElseThrow(() -> new RuntimeException("Usuário não encontrado!"));
         Community community = communityRepository.findById(communityId)
                 .orElseThrow(() -> new RuntimeException("Comunidade não encontrada!"));
+        ensureApprovedMember(communityId, userId);
         Profile profile = profileRepository.findByUser_UserId(userId).orElseGet(() -> {
             Profile created = new Profile();
             created.setUser(user);
@@ -100,12 +105,19 @@ public class CommunityServiceImpl implements CommunityService {
                 .orElseThrow(() -> new RuntimeException("Post não encontrado!"));
         User user = userRepository.findById(commentDTO.getUserId())
                 .orElseThrow(() -> new RuntimeException("Usuário não encontrado!"));
+        ensureApprovedMember(communityId, user.getUserId());
 
         Comment comment = new Comment();
         comment.setPost(post);
         comment.setUser(user);
         comment.setContent(commentDTO.getContent());
         comment.setCreatedAt(Instant.now());
+        if (commentDTO.getParentCommentId() != null) {
+            Comment parent = commentRepository.findById(commentDTO.getParentCommentId())
+                    .orElseThrow(() -> new RuntimeException("Comentário principal não encontrado."));
+            if (!parent.getPost().getPostId().equals(postId)) throw new IllegalArgumentException("A resposta pertence a outro post.");
+            comment.setParentComment(parent);
+        }
 
         post.setCommentsCount(post.getCommentsCount() + 1);
         postRepository.save(post);
@@ -124,9 +136,10 @@ public class CommunityServiceImpl implements CommunityService {
                         community.getCommunityId(),
                         community.getName(),
                         community.getDescription(),
-                        community.getMembers().size(),
+                        (int) communityMemberRepository.countById_CommunityIdAndMembershipStatus(community.getCommunityId(), "APPROVED"),
                         community.getImageUrl(),
-                        community.getOwner() == null ? null : community.getOwner().getUserId()))
+                        community.getOwner() == null ? null : community.getOwner().getUserId(),
+                        community.isPrivateCommunity(), false, null))
                 .collect(Collectors.toList());
     }
 
@@ -140,12 +153,13 @@ public class CommunityServiceImpl implements CommunityService {
         community.setName(request.name().trim());
         community.setDescription(request.description() == null ? null : request.description().trim());
         community.setOwner(creator);
+        community.setPrivateCommunity(request.privateCommunity());
         Community saved = communityRepository.save(community);
 
         // Quem cria a comunidade já entra como primeiro membro.
         joinCommunityWithMemberRepository(saved.getCommunityId(), creator.getUserId());
         return new CommunitySummaryDTO(saved.getCommunityId(), saved.getName(), saved.getDescription(), 1,
-                saved.getImageUrl(), creator.getUserId());
+                saved.getImageUrl(), creator.getUserId(), saved.isPrivateCommunity(), true, "OWNER");
     }
 
     @Override
@@ -153,8 +167,18 @@ public class CommunityServiceImpl implements CommunityService {
     public CommunitySummaryDTO getCommunity(UUID communityId) {
         Community community = communityRepository.findById(communityId)
             .orElseThrow(() -> new RuntimeException("Comunidade não encontrada!"));
+        int memberCount = (int) communityMemberRepository.countById_CommunityIdAndMembershipStatus(communityId, "APPROVED");
         return new CommunitySummaryDTO(community.getCommunityId(), community.getName(), community.getDescription(),
-            community.getMembers().size(), community.getImageUrl(), community.getOwner() == null ? null : community.getOwner().getUserId());
+            memberCount, community.getImageUrl(), community.getOwner() == null ? null : community.getOwner().getUserId(),
+            community.isPrivateCommunity(), false, null);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public String getMembershipStatus(UUID communityId, UUID userId) {
+        return communityMemberRepository.findById_CommunityIdAndId_UserId(communityId, userId)
+                .map(CommunityMember::getMembershipStatus)
+                .orElse("NONE");
     }
 
     @Override
@@ -196,11 +220,14 @@ public class CommunityServiceImpl implements CommunityService {
         id.setUserId(userId);
         communityMember.setId(id);
         communityMember.setJoinedAt(Instant.now());
+        communityMember.setMemberRole(community.getOwner() != null && community.getOwner().getUserId().equals(userId) ? "OWNER" : "MEMBER");
+        communityMember.setMembershipStatus(community.isPrivateCommunity() && !community.getOwner().getUserId().equals(userId) ? "PENDING" : "APPROVED");
 
         return communityMemberRepository.save(communityMember);
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<Post> getCommunityPosts(UUID communityId) {
         return postRepository.findByCommunity_CommunityId(communityId);
     }
@@ -211,9 +238,13 @@ public class CommunityServiceImpl implements CommunityService {
                 .orElseThrow(() -> new RuntimeException("Post não encontrado!"));
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("Usuário não encontrado!"));
+        ensureApprovedMember(communityId, userId);
 
         if (likeRepository.existsByPost_PostIdAndUser_UserId(postId, userId)) {
-            throw new IllegalStateException("Usuário já curtiu este post!");
+            likeRepository.deleteByPost_PostIdAndUser_UserId(postId, userId);
+            post.setLikesCount(Math.max(0, post.getLikesCount() - 1));
+            postRepository.save(post);
+            return null;
         }
 
         Like like = new Like(post, user);
@@ -229,9 +260,13 @@ public class CommunityServiceImpl implements CommunityService {
                 .orElseThrow(() -> new RuntimeException("Post não encontrado!"));
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("Usuário não encontrado!"));
+        ensureApprovedMember(communityId, userId);
 
         if (repostRepository.existsByPost_PostIdAndUser_UserId(postId, userId)) {
-            throw new IllegalStateException("Usuário já repostou este post!");
+            repostRepository.deleteByPost_PostIdAndUser_UserId(postId, userId);
+            post.setRepostsCount(Math.max(0, post.getRepostsCount() - 1));
+            postRepository.save(post);
+            return null;
         }
 
         Repost repost = new Repost(post, user);
@@ -247,8 +282,9 @@ public class CommunityServiceImpl implements CommunityService {
                 .orElseThrow(() -> new RuntimeException("Post não encontrado!"));
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("Usuário não encontrado!"));
+        ensureApprovedMember(communityId, userId);
 
-        String shareUrl = "https://skillswap.com/share/post/" + UUID.randomUUID();
+        String shareUrl = frontendUrl.replaceAll("/$", "") + "/post/" + postId;
 
         ShareLink shareLink = new ShareLink();
         shareLink.setPost(post);
@@ -260,5 +296,78 @@ public class CommunityServiceImpl implements CommunityService {
         postRepository.save(post);
 
         return shareLinkRepository.save(shareLink);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<br.com.teamss.skillswap.skill_swap.dto.CommunityMemberDTO> listMembers(UUID communityId, UUID actorId, String search) {
+        ensureModerator(communityId, actorId);
+        return toMemberDtos(communityMemberRepository.findById_CommunityIdAndMembershipStatusOrderByJoinedAtAsc(communityId, "APPROVED"), search);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<br.com.teamss.skillswap.skill_swap.dto.CommunityMemberDTO> listPendingMembers(UUID communityId, UUID actorId, String search) {
+        ensureModerator(communityId, actorId);
+        return toMemberDtos(communityMemberRepository.findById_CommunityIdAndMembershipStatusOrderByJoinedAtAsc(communityId, "PENDING"), search);
+    }
+
+    private List<br.com.teamss.skillswap.skill_swap.dto.CommunityMemberDTO> toMemberDtos(List<CommunityMember> source, String search) {
+        String normalized = search == null ? "" : search.trim().toLowerCase();
+        return source.stream()
+            .filter(member -> member.getUser() != null && (normalized.isBlank()
+                || member.getUser().getUsername().toLowerCase().contains(normalized)
+                || (member.getUser().getName() != null && member.getUser().getName().toLowerCase().contains(normalized))))
+            .map(member -> new br.com.teamss.skillswap.skill_swap.dto.CommunityMemberDTO(
+                member.getUser().getUserId(), member.getUser().getUsername(), member.getUser().getName(),
+                member.getUser().getProfile() == null ? null : member.getUser().getProfile().getImageUrl(),
+                member.getMemberRole(), member.getMembershipStatus()))
+            .toList();
+    }
+
+    @Override
+    @Transactional
+    public void removeMember(UUID communityId, UUID actorId, UUID memberId) {
+        ensureModerator(communityId, actorId);
+        Community community = communityRepository.findById(communityId).orElseThrow();
+        if (community.getOwner() != null && community.getOwner().getUserId().equals(memberId)) throw new IllegalArgumentException("O criador não pode ser removido.");
+        CommunityMemberId id = new CommunityMemberId(); id.setCommunityId(communityId); id.setUserId(memberId);
+        communityMemberRepository.deleteById(id);
+    }
+
+    @Override
+    @Transactional
+    public void setAdministrator(UUID communityId, UUID actorId, UUID memberId, boolean administrator) {
+        ensureModerator(communityId, actorId);
+        Community community = communityRepository.findById(communityId).orElseThrow();
+        if (community.getOwner() != null && community.getOwner().getUserId().equals(memberId)) return;
+        CommunityMember member = communityMemberRepository.findById_CommunityIdAndId_UserId(communityId, memberId).orElseThrow(() -> new IllegalArgumentException("Membro não encontrado."));
+        member.setMemberRole(administrator ? "ADMIN" : "MEMBER");
+        communityMemberRepository.save(member);
+    }
+
+    @Override
+    @Transactional
+    public void approveMember(UUID communityId, UUID actorId, UUID memberId) {
+        ensureModerator(communityId, actorId);
+        CommunityMember member = communityMemberRepository.findById_CommunityIdAndId_UserId(communityId, memberId)
+                .orElseThrow(() -> new IllegalArgumentException("Solicitação não encontrada."));
+        member.setMembershipStatus("APPROVED");
+        communityMemberRepository.save(member);
+    }
+
+    private void ensureModerator(UUID communityId, UUID actorId) {
+        Community community = communityRepository.findById(communityId).orElseThrow(() -> new RuntimeException("Comunidade não encontrada."));
+        if (community.getOwner() != null && community.getOwner().getUserId().equals(actorId)) return;
+        CommunityMember member = communityMemberRepository.findById_CommunityIdAndId_UserId(communityId, actorId).orElseThrow(() -> new org.springframework.security.access.AccessDeniedException("Você não administra esta comunidade."));
+        if (!"ADMIN".equals(member.getMemberRole()) || !"APPROVED".equals(member.getMembershipStatus())) throw new org.springframework.security.access.AccessDeniedException("Você não administra esta comunidade.");
+    }
+
+    private void ensureApprovedMember(UUID communityId, UUID userId) {
+        CommunityMember member = communityMemberRepository.findById_CommunityIdAndId_UserId(communityId, userId)
+                .orElseThrow(() -> new org.springframework.security.access.AccessDeniedException("Entre na comunidade antes de publicar."));
+        if (!"APPROVED".equals(member.getMembershipStatus())) {
+            throw new org.springframework.security.access.AccessDeniedException("Sua entrada na comunidade ainda aguarda aprovação.");
+        }
     }
 }

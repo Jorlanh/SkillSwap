@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { AdminService } from '@/services/api';
+import { AccessService, AdminService } from '@/services/api';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ShieldCheck, UserX, UserCheck, Activity, Users, Zap, ArrowLeft, KeyRound } from 'lucide-react';
+import { ShieldCheck, UserX, UserCheck, Activity, Users, Zap, ArrowLeft, KeyRound, BriefcaseBusiness, Trash2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 type Stats = { totalUsers: number; totalSkills: number; totalProposals: number; pendingProposals: number; completedProposals: number };
@@ -19,22 +19,33 @@ type ManagedUser = {
   banned: boolean;
   createdAt: string;
 };
+type ActiveBan = { id: number; userId: string; username: string; reason: string; scope: string; createdAt?: string; expiresAt?: string };
+type Opportunity = { opportunityId: string; organizationName: string; title: string; description: string; requiredSkills: string; participationMode?: string; location?: string; contactUrl?: string; };
 
 const AdminConsole = () => {
   const [stats, setStats] = useState<Stats | null>(null);
   const [users, setUsers] = useState<ManagedUser[]>([]);
+  const [activeBans, setActiveBans] = useState<ActiveBan[]>([]);
+  const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
+  const [opportunityForm, setOpportunityForm] = useState({ organizationName: '', title: '', description: '', requiredSkills: '', participationMode: 'REMOTE', location: '', contactUrl: '', accessibleSupport: true });
+  const [banHours, setBanHours] = useState('24');
+  const [banScope, setBanScope] = useState('GENERAL');
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
   const loadAdminData = useCallback(async () => {
     setLoading(true);
     try {
-      const [statsRes, usersRes] = await Promise.all([
+      const [statsRes, usersRes, bansRes, opportunitiesRes] = await Promise.all([
         AdminService.getStats(),
         AdminService.getUsers(),
+        AdminService.getActiveBans(),
+        AccessService.getOpportunities(),
       ]);
       setStats(statsRes.data);
       setUsers(usersRes.data);
+      setActiveBans(Array.isArray(bansRes.data) ? bansRes.data : []);
+      setOpportunities(Array.isArray(opportunitiesRes.data) ? opportunitiesRes.data : []);
     } catch {
       toast({ title: 'Acesso negado', description: 'Sua conta não possui a função ADMIN.', variant: 'destructive' });
     } finally {
@@ -54,12 +65,35 @@ const AdminConsole = () => {
     }
   };
 
+  const createOpportunity = async (event: React.FormEvent) => {
+    event.preventDefault();
+    try {
+      await AccessService.createOpportunity({
+        ...opportunityForm,
+        remote: opportunityForm.participationMode === 'REMOTE',
+        contactUrl: opportunityForm.contactUrl || null,
+        location: opportunityForm.location || null,
+      });
+      setOpportunityForm({ organizationName: '', title: '', description: '', requiredSkills: '', participationMode: 'REMOTE', location: '', contactUrl: '', accessibleSupport: true });
+      toast({ title: 'Oportunidade publicada', description: 'Ela já aparece na Minha Jornada.' });
+      await loadAdminData();
+    } catch { toast({ title: 'Erro', description: 'Não foi possível publicar a oportunidade.', variant: 'destructive' }); }
+  };
+
+  const deleteOpportunity = async (opportunityId: string) => {
+    if (!window.confirm('Remover esta oportunidade?')) return;
+    try { await AccessService.deleteOpportunity(opportunityId); toast({ title: 'Oportunidade removida' }); await loadAdminData(); }
+    catch { toast({ title: 'Erro', description: 'Não foi possível remover a oportunidade.', variant: 'destructive' }); }
+  };
+
   const handleBan = async (userId: string, banned: boolean) => {
     try {
       if (banned) {
         await AdminService.unbanUser(userId);
       } else {
-        await AdminService.banUser(userId, { reason: 'Ação administrativa pela plataforma', expiresAt: null, ipAddress: null });
+        const hours = Number(banHours);
+        const expiresAt = Number.isFinite(hours) && hours > 0 ? new Date(Date.now() + hours * 60 * 60 * 1000).toISOString() : null;
+        await AdminService.banUser(userId, { reason: 'Ação administrativa pela plataforma', expiresAt, scope: banScope, ipAddress: null });
       }
       toast({ title: banned ? 'Usuário reativado' : 'Usuário banido' });
       loadAdminData();
@@ -80,15 +114,15 @@ const AdminConsole = () => {
   };
 
   return (
-    <div className="p-8 space-y-8 bg-zinc-950 min-h-screen text-white">
+    <div className="p-4 sm:p-8 space-y-8 bg-white min-h-screen text-slate-900">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <p className="text-xs uppercase tracking-[0.25em] text-red-400 font-black">Área protegida</p>
-          <h1 className="text-3xl font-bold flex items-center gap-3"><ShieldCheck className="text-red-500" size={32} /> Painel do administrador</h1>
+          <p className="text-xs uppercase tracking-[0.25em] text-skillswap-teal font-black">Área protegida</p>
+          <h1 className="text-3xl font-bold flex items-center gap-3"><ShieldCheck className="text-skillswap-teal" size={32} /> Painel do administrador</h1>
         </div>
         <div className="flex items-center gap-3">
-          <Badge variant="outline" className="text-red-500 border-red-500">ADMIN</Badge>
-          <Link to="/" className="inline-flex items-center gap-2 text-sm text-zinc-300 hover:text-white"><ArrowLeft size={16} /> Voltar ao usuário</Link>
+          <Badge variant="outline" className="text-skillswap-teal border-skillswap-teal">ADMIN</Badge>
+          <Link to="/" className="inline-flex items-center gap-2 text-sm text-slate-600 hover:text-slate-900"><ArrowLeft size={16} /> Voltar ao usuário</Link>
         </div>
       </div>
 
@@ -99,10 +133,10 @@ const AdminConsole = () => {
         <StatCard title="Concluídas" value={stats?.completedProposals ?? 0} icon={<KeyRound />} />
       </div>
 
-      <Card className="bg-zinc-900 border-zinc-800 text-white">
-        <CardHeader><CardTitle>Gestão de usuários, selos e segurança</CardTitle></CardHeader>
+      <Card className="bg-white border-slate-200 text-slate-900 shadow-sm">
+        <CardHeader><CardTitle>Gestão de usuários, selos e segurança</CardTitle><p className="text-sm text-slate-500">Defina a duração e o alcance da suspensão antes de clicar em Banir.</p><div className="flex flex-wrap gap-3"><label className="text-sm">Duração (horas)<input type="number" min="1" value={banHours} onChange={(event) => setBanHours(event.target.value)} className="ml-2 w-24 rounded border px-2 py-1" /></label><label className="text-sm">Ação<select value={banScope} onChange={(event) => setBanScope(event.target.value)} className="ml-2 rounded border px-2 py-1"><option value="GENERAL">Conta inteira</option><option value="POSTS">Publicações</option><option value="COMMENTS">Comentários</option></select></label></div></CardHeader>
         <CardContent>
-          {loading ? <p className="text-zinc-400 py-8">Carregando dados protegidos...</p> : (
+          {loading ? <p className="text-slate-500 py-8">Carregando dados protegidos...</p> : (
             <Table>
               <TableHeader><TableRow className="border-zinc-800"><TableHead className="text-zinc-400">Usuário</TableHead><TableHead className="text-zinc-400">Papéis</TableHead><TableHead className="text-zinc-400">Verificação</TableHead><TableHead className="text-zinc-400 text-right">Ações</TableHead></TableRow></TableHeader>
               <TableBody>{users.map((user) => {
@@ -122,12 +156,32 @@ const AdminConsole = () => {
           )}
         </CardContent>
       </Card>
+      <Card className="bg-white border-slate-200 text-slate-900 shadow-sm">
+        <CardHeader><CardTitle>Suspensões ativas e ações automáticas</CardTitle><p className="text-sm text-slate-500">Aqui aparecem os bloqueios registrados pela moderação e pelo painel.</p></CardHeader>
+        <CardContent>{activeBans.length ? <div className="space-y-2">{activeBans.map((ban) => <div key={ban.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 p-3"><div><p className="font-semibold">@{ban.username} <Badge variant="outline" className="ml-2">{ban.scope}</Badge></p><p className="text-sm text-slate-600">{ban.reason}</p></div><p className="text-sm text-slate-500">{ban.expiresAt ? `até ${new Date(ban.expiresAt).toLocaleString('pt-BR')}` : 'permanente'}</p></div>)}</div> : <p className="text-sm text-slate-500">Nenhuma suspensão ativa.</p>}</CardContent>
+      </Card>
+      <Card className="bg-white border-slate-200 text-slate-900 shadow-sm">
+        <CardHeader><CardTitle className="flex items-center gap-2"><BriefcaseBusiness className="h-5 w-5 text-skillswap-teal" /> Projetos e oportunidades</CardTitle><p className="text-sm text-slate-500">Cadastre o que deve aparecer em Minha Jornada. O acesso continua gratuito.</p></CardHeader>
+        <CardContent className="space-y-5">
+          <form onSubmit={createOpportunity} className="grid gap-3 md:grid-cols-2">
+            <input required value={opportunityForm.organizationName} onChange={(event) => setOpportunityForm({ ...opportunityForm, organizationName: event.target.value })} placeholder="Organização ou responsável" className="rounded border px-3 py-2" />
+            <input required value={opportunityForm.title} onChange={(event) => setOpportunityForm({ ...opportunityForm, title: event.target.value })} placeholder="Título" className="rounded border px-3 py-2" />
+            <textarea required value={opportunityForm.description} onChange={(event) => setOpportunityForm({ ...opportunityForm, description: event.target.value })} placeholder="Descrição" className="min-h-24 rounded border px-3 py-2 md:col-span-2" />
+            <input required value={opportunityForm.requiredSkills} onChange={(event) => setOpportunityForm({ ...opportunityForm, requiredSkills: event.target.value })} placeholder="Habilidades (separadas por vírgula)" className="rounded border px-3 py-2" />
+            <select value={opportunityForm.participationMode} onChange={(event) => setOpportunityForm({ ...opportunityForm, participationMode: event.target.value })} className="rounded border px-3 py-2"><option value="REMOTE">Remoto</option><option value="HYBRID">Semi-presencial</option><option value="PRESENTIAL">Presencial</option></select>
+            <input value={opportunityForm.location} onChange={(event) => setOpportunityForm({ ...opportunityForm, location: event.target.value })} placeholder="Local (opcional)" className="rounded border px-3 py-2" />
+            <input type="url" value={opportunityForm.contactUrl} onChange={(event) => setOpportunityForm({ ...opportunityForm, contactUrl: event.target.value })} placeholder="Link de contato WhatsApp ou e-mail (opcional)" className="rounded border px-3 py-2" />
+            <Button type="submit" className="w-fit bg-skillswap-teal text-white">Publicar oportunidade</Button>
+          </form>
+          <div className="space-y-2 border-t border-slate-200 pt-4">{opportunities.map((opportunity) => <div key={opportunity.opportunityId} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 p-3"><div><p className="font-semibold">{opportunity.title}</p><p className="text-sm text-slate-600">{opportunity.organizationName} · {opportunity.participationMode === 'HYBRID' ? 'Semi-presencial' : opportunity.participationMode === 'PRESENTIAL' ? 'Presencial' : 'Remoto'}</p></div><Button type="button" size="sm" variant="outline" className="text-red-600" onClick={() => void deleteOpportunity(opportunity.opportunityId)}><Trash2 className="mr-1 h-4 w-4" /> Remover</Button></div>)}{!opportunities.length && <p className="text-sm text-slate-500">Nenhuma oportunidade cadastrada.</p>}</div>
+        </CardContent>
+      </Card>
     </div>
   );
 };
 
 const StatCard = ({ title, value, icon }: { title: string; value: number | string; icon: React.ReactNode }) => (
-  <Card className="bg-zinc-900 border-zinc-800 text-white"><CardHeader className="flex flex-row items-center justify-between pb-2"><CardTitle className="text-sm font-medium text-zinc-400">{title}</CardTitle><div className="text-zinc-500">{icon}</div></CardHeader><CardContent><div className="text-2xl font-bold">{value}</div></CardContent></Card>
+  <Card className="bg-white border-slate-200 text-slate-900 shadow-sm"><CardHeader className="flex flex-row items-center justify-between pb-2"><CardTitle className="text-sm font-medium text-slate-500">{title}</CardTitle><div className="text-skillswap-teal">{icon}</div></CardHeader><CardContent><div className="text-2xl font-bold">{value}</div></CardContent></Card>
 );
 
 export default AdminConsole;

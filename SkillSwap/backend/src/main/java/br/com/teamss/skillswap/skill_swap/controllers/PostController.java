@@ -10,7 +10,10 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import br.com.teamss.skillswap.skill_swap.model.services.FileUploadService;
+import br.com.teamss.skillswap.skill_swap.model.services.CommentService;
+import br.com.teamss.skillswap.skill_swap.dto.CommentDTO;
 import java.util.List;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/posts")
@@ -19,11 +22,13 @@ public class PostController {
     private final PostService postService;
     private final UserServiceDTO userServiceDTO;
     private final FileUploadService fileUploadService;
+    private final CommentService commentService;
 
-    public PostController(PostService postService, UserServiceDTO userServiceDTO, FileUploadService fileUploadService) {
+    public PostController(PostService postService, UserServiceDTO userServiceDTO, FileUploadService fileUploadService, CommentService commentService) {
         this.postService = postService;
         this.userServiceDTO = userServiceDTO;
         this.fileUploadService = fileUploadService;
+        this.commentService = commentService;
     }
 
     @GetMapping
@@ -50,6 +55,40 @@ public class PostController {
         } catch (Exception e) {
             return ResponseEntity.badRequest().body("Falha ao salvar postagem: " + e.getMessage());
         }
+    }
+
+    @PostMapping("/{postId}/like")
+    public ResponseEntity<PostResponseDTO> like(@PathVariable Long postId) {
+        UserDTO user = userServiceDTO.getAuthenticatedUser();
+        return ResponseEntity.ok(toResponse(postService.likePost(postId, user.getUserId())));
+    }
+
+    @PostMapping("/{postId}/repost")
+    public ResponseEntity<PostResponseDTO> repost(@PathVariable Long postId) {
+        UserDTO user = userServiceDTO.getAuthenticatedUser();
+        return ResponseEntity.ok(toResponse(postService.repost(postId, user.getUserId())));
+    }
+
+    @PostMapping("/{postId}/comment")
+    public ResponseEntity<PostResponseDTO> comment(@PathVariable Long postId, @RequestParam String content,
+                                                    @RequestParam(required = false) Long parentCommentId) {
+        UserDTO user = userServiceDTO.getAuthenticatedUser();
+        CommentDTO created = new CommentDTO();
+        var comment = commentService.createComment(postId, user.getUserId(), content, parentCommentId);
+        created.setCommentId(comment.getCommentId());
+        created.setPostId(postId);
+        created.setUserId(user.getUserId());
+        created.setUsername(user.getUsername());
+        created.setContent(comment.getContent());
+        created.setCreatedAt(comment.getCreatedAt());
+        return ResponseEntity.ok(toResponse(postService.findAll().stream().filter(p -> postId.equals(p.getPostId())).findFirst().orElseThrow()));
+    }
+
+    @DeleteMapping("/{postId}")
+    public ResponseEntity<Void> delete(@PathVariable Long postId) {
+        UserDTO user = userServiceDTO.getAuthenticatedUser();
+        postService.deletePost(postId, user.getUserId());
+        return ResponseEntity.noContent().build();
     }
 
     private PostResponseDTO toResponse(Post post) {

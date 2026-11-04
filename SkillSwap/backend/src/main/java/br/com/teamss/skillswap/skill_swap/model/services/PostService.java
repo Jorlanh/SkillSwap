@@ -20,4 +20,5 @@ public interface PostService {
     List<String> getTrendingTopics(String period);
     void incrementViewCount(Long postId);
     List<LikeDTO> getLikesByPost(Long postId);
+    void deletePost(Long postId, UUID userId);
 }

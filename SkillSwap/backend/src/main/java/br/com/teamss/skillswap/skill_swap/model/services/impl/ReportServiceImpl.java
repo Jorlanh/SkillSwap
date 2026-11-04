@@ -57,13 +57,16 @@ public class ReportServiceImpl implements ReportService {
         List<Report> pendingReports = getPendingReports();
         for (Report report : pendingReports) {
             boolean isContentInappropriate = contentModerationService.isContentInappropriate(report.getReason());
-            if (isContentInappropriate) {
+            boolean reportedUserIsAdmin = report.getReportedUser().getRoles().stream()
+                    .anyMatch(role -> "ADMIN".equalsIgnoreCase(role.getName()) || "ROLE_ADMIN".equalsIgnoreCase(role.getName()));
+            if (isContentInappropriate && !reportedUserIsAdmin) {
                 adminService.banUser(report.getReportedUser().getUserId(),
                                      "Violação das diretrizes da comunidade (detectado automaticamente).",
                                      Instant.now().plus(24, ChronoUnit.HOURS),
-                                     null);
+                                     null, "GENERAL");
                 report.setStatus(ReportStatus.ACTION_TAKEN);
             } else {
+                // A classificação automática nunca aplica banimento permanente a uma conta administrativa.
                 report.setStatus(ReportStatus.REVIEWED);
             }
             reportRepository.save(report);

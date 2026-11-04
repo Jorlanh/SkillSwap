@@ -32,11 +32,17 @@ public class AccessOpportunity {
     @Column(nullable = false)
     private boolean remote;
 
+    @Column(nullable = false, length = 20)
+    private String participationMode = "REMOTE";
+
     @Column(nullable = false)
     private boolean accessibleSupport;
 
     @Column(length = 120)
     private String location;
+
+    @Column(length = 1000)
+    private String contactUrl;
 
     @Column(nullable = false)
     private Instant createdAt = Instant.now();
@@ -52,9 +58,13 @@ public class AccessOpportunity {
     public void setRequiredSkills(String value) { requiredSkills = value; }
     public boolean isRemote() { return remote; }
     public void setRemote(boolean value) { remote = value; }
+    public String getParticipationMode() { return participationMode; }
+    public void setParticipationMode(String value) { participationMode = value; remote = "REMOTE".equals(value); }
     public boolean isAccessibleSupport() { return accessibleSupport; }
     public void setAccessibleSupport(boolean value) { accessibleSupport = value; }
     public String getLocation() { return location; }
     public void setLocation(String value) { location = value; }
+    public String getContactUrl() { return contactUrl; }
+    public void setContactUrl(String value) { contactUrl = value; }
     public Instant getCreatedAt() { return createdAt; }
 }

@@ -22,7 +22,7 @@ public class GeminiTranslationServiceImpl implements TranslationService {
     @Value("${gemini.api.key}")
     private String apiKey;
 
-    @Value("${gemini.api.model:gemini-2.5-flash}")
+    @Value("${gemini.api.model:gemini-2.0-flash}")
     private String model;
 
     private final WebClient webClient;
