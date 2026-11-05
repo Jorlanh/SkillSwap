@@ -210,16 +210,22 @@ public class ProfileController {
     }
 
     @PostMapping("/me/follow/{targetUserId}")
-    public ResponseEntity<Void> followUser(@PathVariable UUID targetUserId) {
+    public ResponseEntity<Map<String, Object>> followUser(@PathVariable UUID targetUserId) {
         UserDTO authenticatedUser = userServiceDTO.getAuthenticatedUser();
         profileService.followUser(authenticatedUser.getUserId(), targetUserId);
-        return ResponseEntity.ok().build();
+        UserDTO refreshedUser = userServiceDTO.getAuthenticatedUser();
+        return ResponseEntity.ok(Map.of(
+                "following", refreshedUser.getFollowingIds().contains(targetUserId),
+                "followingIds", refreshedUser.getFollowingIds()));
     }
 
     @PostMapping("/me/unfollow/{targetUserId}")
-    public ResponseEntity<Void> unfollowUser(@PathVariable UUID targetUserId) {
+    public ResponseEntity<Map<String, Object>> unfollowUser(@PathVariable UUID targetUserId) {
         UserDTO authenticatedUser = userServiceDTO.getAuthenticatedUser();
         profileService.unfollowUser(authenticatedUser.getUserId(), targetUserId);
-        return ResponseEntity.ok().build();
+        UserDTO refreshedUser = userServiceDTO.getAuthenticatedUser();
+        return ResponseEntity.ok(Map.of(
+                "following", refreshedUser.getFollowingIds().contains(targetUserId),
+                "followingIds", refreshedUser.getFollowingIds()));
     }
 }

@@ -140,10 +140,18 @@ const PostCard = ({ post }: PostCardProps) => {
 
   const handleRepost = () => requireAuth(async () => {
     try {
-      await HomeService.repost(postId);
-      const next = !isReposted;
+      const { data } = await HomeService.repost(postId);
+      const next = typeof data?.repostedByMe === 'boolean'
+        ? data.repostedByMe
+        : typeof data?.isRepostedByMe === 'boolean'
+          ? data.isRepostedByMe
+          : !isReposted;
       setIsReposted(next);
-      setRepostsCount((previous: number) => Math.max(0, next ? previous + 1 : previous - 1));
+      if (data?.repostsCount !== undefined) {
+        setRepostsCount(Number(data.repostsCount));
+      } else {
+        setRepostsCount((previous: number) => Math.max(0, next ? previous + 1 : previous - 1));
+      }
       window.dispatchEvent(new CustomEvent('skillswap:post-updated', { detail: { postId } }));
       toast.success(next ? 'Repostado com sucesso!' : 'Repost removido.');
     } catch { toast.error('Não foi possível repostar agora.'); }

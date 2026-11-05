@@ -290,15 +290,15 @@ const ProfilePage = () => {
     const targetId = user.userId || user.id;
     try {
       if (isFollowing) {
-        await UserService.unfollowUser(targetId);
+        const { data } = await UserService.unfollowUser(targetId);
+        setIsFollowing(Boolean(data?.following));
         toast.info(`Você deixou de seguir ${user.username}.`);
-        setIsFollowing(false);
       } else {
-        await UserService.followUser(targetId);
+        const { data } = await UserService.followUser(targetId);
+        setIsFollowing(Boolean(data?.following));
         toast.success(`Você começou a seguir ${user.username}!`);
-        setIsFollowing(true);
       }
-      loadProfileData();
+      await loadProfileData();
     } catch (error) {
       toast.error("Erro de conexão ao tentar seguir usuário.");
     }
@@ -432,15 +432,15 @@ const ProfilePage = () => {
                 <p className="text-skillswap-teal font-semibold break-all">@{user?.username?.toLowerCase()}</p>
               </div>
               
-              <div className="flex w-full sm:w-auto flex-wrap gap-2 shrink-0">
+              <div className="flex w-full flex-wrap items-center gap-2">
                  {!isOwnProfile && <ReportButton reportedUserId={user?.userId || user?.id} targetType="USER" targetId={user?.userId || user?.id} />}
                  {!isOwnProfile ? (
                   <>
                     <Button onClick={() => setIsProposalOpen(true)} className="bg-skillswap-teal hover:bg-teal-700 text-white font-bold rounded-full px-6">
                       Enviar Proposta
                     </Button>
-                    <Button onClick={handleToggleFollow} variant="outline" size="sm" className="rounded-full font-bold px-4 border-skillswap-teal text-skillswap-teal hover:bg-skillswap-teal hover:text-white transition-colors">
-                       {isFollowing ? "Deixar de Seguir" : "Seguir"}
+                    <Button onClick={handleToggleFollow} variant={isFollowing ? "default" : "outline"} size="sm" aria-pressed={isFollowing} className={`rounded-full font-bold px-4 border-skillswap-teal transition-colors ${isFollowing ? 'bg-skillswap-teal text-white hover:bg-teal-700' : 'text-skillswap-teal hover:bg-skillswap-teal hover:text-white'}`}>
+                       {isFollowing ? "Deixar de seguir" : "Seguir"}
                     </Button>
                     {/* BOTÃO CHAT CORRIGIDO */}
                     <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-muted hover:bg-skillswap-teal hover:text-white" onClick={handleOpenChat}>

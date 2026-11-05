@@ -2,6 +2,7 @@ package br.com.teamss.skillswap.skill_swap.dto;
 
 import java.util.Set;
 import java.util.UUID;
+import java.util.List;
 import java.util.HashSet;
 import java.time.Instant;
 
@@ -18,6 +19,7 @@ public record UserPrivateProfileDTO(
     ProfileDTO profile,
     Set<SkillDTO> skills,
     Set<String> roles,
+    List<UUID> followingIds,
     // --- START: Accessibility Settings ---
     boolean librasAvatarEnabled,
     String preferredTheme,
@@ -30,6 +32,7 @@ public record UserPrivateProfileDTO(
      public UserPrivateProfileDTO {
          skills = (skills != null) ? skills : new HashSet<>();
          roles = (roles != null) ? roles : new HashSet<>();
+         followingIds = (followingIds != null) ? List.copyOf(followingIds) : List.of();
      }
 }
 

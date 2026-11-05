@@ -281,6 +281,7 @@ public class UserServiceDTOImpl implements UserServiceDTO {
             user.getUserId(), user.getUsername(), user.getEmail(), user.getName(),
             user.getCreatedAt(),
             user.isVerifiedBadge(), profileDTO, skills, roles,
+            user.getFollowingIds() == null ? List.of() : List.copyOf(user.getFollowingIds()),
             // --- START: Accessibility Settings ---
             user.isLibrasAvatarEnabled(),
             user.getPreferredTheme(),
