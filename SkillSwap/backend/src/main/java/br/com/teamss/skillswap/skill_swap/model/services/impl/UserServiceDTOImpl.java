@@ -93,6 +93,9 @@ public class UserServiceDTOImpl implements UserServiceDTO {
         userDTO.setRoles(roles);
         userDTO.setProfile(profileDTO);
         userDTO.setSkills(skills);
+        userDTO.setFollowingIds(user.getFollowingIds() == null
+                ? List.of()
+                : List.copyOf(user.getFollowingIds()));
         userDTO.setEmail(user.getEmail());
         userDTO.setPhoneNumber(user.getPhoneNumber());
         // Nunca serializar segredos de segundo fator ou códigos de verificação.
@@ -311,6 +314,7 @@ public class UserServiceDTOImpl implements UserServiceDTO {
         Hibernate.initialize(loaded.getProfile());
         Hibernate.initialize(loaded.getSkills());
         Hibernate.initialize(loaded.getRoles());
+        Hibernate.initialize(loaded.getFollowingIds());
         return loaded;
     }
 }

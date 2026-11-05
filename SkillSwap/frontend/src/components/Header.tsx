@@ -40,19 +40,19 @@ const Header = () => {
   };
 
   return (
-    <header className="sticky top-0 z-50 bg-card border-b border-border">
-      <div className="flex items-center justify-between gap-2 px-3 py-3 sm:px-6">
-        <Link to="/" className="flex items-center gap-2 group transition-all active:scale-95">
+    <header className="sticky top-0 z-[70] w-full overflow-visible bg-card border-b border-border">
+      <div className="flex min-h-16 w-full items-center gap-2 px-2 py-2 sm:px-6 sm:py-3">
+        <Link to="/" className="flex min-w-0 shrink-0 items-center gap-2 pl-12 sm:pl-0 group transition-all active:scale-95">
           {/* 🚀 APENAS A LOGO S.PNG, SEM CÍRCULO VERDE */}
           <img 
             src="/skillswap-logo.png" 
             alt="SkillSwap" 
-            className="h-9 w-auto max-w-[140px] object-contain transition-transform group-hover:scale-105 sm:h-10 sm:max-w-[180px]" 
+            className="h-7 w-auto max-w-[82px] object-contain transition-transform group-hover:scale-105 sm:h-10 sm:max-w-[180px]" 
           />
         </Link>
 
         {/* BUSCA CENTRALIZADA */}
-        <div className="flex-1 min-w-0 max-w-xl mx-2 sm:mx-8">
+        <div className="flex min-w-0 flex-1 mx-1 sm:mx-8 sm:max-w-xl">
           <div className="relative">
             <Input
               placeholder="Buscar mestre em..."
@@ -61,14 +61,14 @@ const Header = () => {
               onKeyDown={(event) => {
                 if (event.key === 'Enter' && search.trim()) navigate(`/busca?query=${encodeURIComponent(search.trim())}`);
               }}
-              className="pr-10 bg-muted border-border rounded-full focus-visible:ring-skillswap-teal h-11"
+              className="h-9 pr-9 bg-muted border-border rounded-full focus-visible:ring-skillswap-teal sm:h-11"
             />
-            <button type="button" aria-label="Pesquisar" onClick={() => search.trim() && navigate(`/busca?query=${encodeURIComponent(search.trim())}`)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-skillswap-teal"><Search className="h-4 w-4" /></button>
+            <button type="button" aria-label="Pesquisar" onClick={() => search.trim() && navigate(`/busca?query=${encodeURIComponent(search.trim())}`)} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-skillswap-teal sm:right-3"><Search className="h-4 w-4" /></button>
           </div>
         </div>
 
         {/* NAVEGAÇÃO E PERFIL */}
-        <div className="flex items-center gap-2 sm:gap-6">
+        <div className="flex shrink-0 items-center gap-1.5 sm:gap-6">
           <Link to="/" title="Home" className="hidden sm:block text-foreground hover:text-skillswap-teal transition-all">
             <Home className="h-6 w-6" />
           </Link>
@@ -77,18 +77,18 @@ const Header = () => {
           </Link>
 
           {user ? (
-            <div className="flex items-center gap-4 animate-in fade-in slide-in-from-right-2 ml-2">
+            <div className="flex items-center gap-1.5 sm:gap-4 animate-in fade-in slide-in-from-right-2">
               {user.roles?.some((role: string) => {
                 const normalized = role.toUpperCase();
                 return normalized === 'ADMIN' || normalized === 'ROLE_ADMIN';
               }) && (
-                <Link to="/admin" title="Painel do administrador" className="text-red-500 hover:text-red-400 transition-colors">
-                  <ShieldCheck className="h-6 w-6" />
+                <Link to="/admin" title="Painel do administrador" aria-label="Painel do administrador" className="text-red-500 hover:text-red-400 transition-colors">
+                  <ShieldCheck className="h-5 w-5 sm:h-6 sm:w-6" />
                 </Link>
               )}
               <Link to="/perfil">
                 {/* Mantive o Teal apenas na borda do perfil para destacar o usuário logado */}
-                <Avatar className="h-10 w-10 border-[3px] border-skillswap-teal hover:scale-105 transition-transform bg-muted/30 shadow-sm">
+                <Avatar className="h-8 w-8 border-2 border-skillswap-teal hover:scale-105 transition-transform bg-muted/30 shadow-sm sm:h-10 sm:w-10 sm:border-[3px]">
                   <AvatarImage src={user.profile?.imageUrl || user.avatarUrl} />
                   <AvatarFallback className="font-bold text-lg text-foreground bg-transparent">
                     {user.username?.[0]?.toUpperCase() || 'U'}
@@ -105,7 +105,7 @@ const Header = () => {
           ) : (
             <button 
               onClick={handleLogin}
-              className="flex items-center gap-2 bg-skillswap-teal text-white px-6 py-2.5 rounded-full text-sm font-bold hover:bg-teal-700 shadow-lg transition-all active:scale-95 ml-2"
+                className="flex items-center gap-1.5 bg-skillswap-teal text-white px-3 py-2 rounded-full text-xs font-bold hover:bg-teal-700 shadow-lg transition-all active:scale-95 sm:gap-2 sm:px-6 sm:py-2.5 sm:text-sm"
             >
               <LogIn size={18} /> Entrar
             </button>

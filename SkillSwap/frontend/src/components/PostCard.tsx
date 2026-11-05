@@ -91,6 +91,16 @@ const PostCard = ({ post }: PostCardProps) => {
     return () => { active = false; unsubscribe(); };
   }, []);
 
+  useEffect(() => {
+    // O mesmo post pode ser recarregado depois de uma curtida ou repostagem.
+    // Sincronizamos o estado visual com a resposta da API para não voltar ao
+    // estado antigo após uma troca de aba ou atualização do feed.
+    setIsLiked(Boolean(post.isLikedByMe));
+    setLikesCount(Number(post.likesCount ?? 0));
+    setIsReposted(Boolean(post.isRepostedByMe));
+    setRepostsCount(Number(post.repostsCount ?? 0));
+  }, [postId, post.isLikedByMe, post.likesCount, post.isRepostedByMe, post.repostsCount]);
+
   const refreshComments = useCallback(async () => {
     if (!postId) return;
     const { data } = await HomeService.getPostComments(postId);
@@ -114,7 +124,11 @@ const PostCard = ({ post }: PostCardProps) => {
       setIsLiked(!isLiked);
       setLikesCount((previous: number) => isLiked ? Math.max(0, previous - 1) : previous + 1);
       try {
-        await HomeService.likePost(postId);
+        const { data } = await HomeService.likePost(postId);
+        if (typeof data?.likedByMe === 'boolean' || typeof data?.isLikedByMe === 'boolean') {
+          setIsLiked(Boolean(data.likedByMe ?? data.isLikedByMe));
+        }
+        if (data?.likesCount !== undefined) setLikesCount(Number(data.likesCount));
         if (!originalLiked) toast.success('Post curtido!');
       } catch {
         setIsLiked(originalLiked);
@@ -130,6 +144,7 @@ const PostCard = ({ post }: PostCardProps) => {
       const next = !isReposted;
       setIsReposted(next);
       setRepostsCount((previous: number) => Math.max(0, next ? previous + 1 : previous - 1));
+      window.dispatchEvent(new CustomEvent('skillswap:post-updated', { detail: { postId } }));
       toast.success(next ? 'Repostado com sucesso!' : 'Repost removido.');
     } catch { toast.error('Não foi possível repostar agora.'); }
   });

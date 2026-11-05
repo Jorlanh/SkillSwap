@@ -46,7 +46,8 @@ const AppSidebar = ({ isAuthenticated }: AppSidebarProps) => {
       <Button
         variant="ghost"
         size="icon"
-        className="fixed top-3 left-3 z-50 lg:hidden"
+        className="fixed left-2 top-3 z-[80] h-10 w-10 rounded-lg border border-border bg-card shadow-sm lg:hidden"
+        aria-label={mobileOpen ? 'Fechar menu de navegação' : 'Abrir menu de navegação'}
         onClick={() => setMobileOpen(!mobileOpen)}
       >
         {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
@@ -54,7 +55,7 @@ const AppSidebar = ({ isAuthenticated }: AppSidebarProps) => {
 
       {mobileOpen && (
         <div
-          className="fixed inset-0 bg-foreground/20 z-30 lg:hidden"
+          className="fixed inset-0 z-[60] bg-foreground/20 lg:hidden"
           onClick={() => setMobileOpen(false)}
         />
       )}
@@ -63,7 +64,7 @@ const AppSidebar = ({ isAuthenticated }: AppSidebarProps) => {
         <nav className="flex flex-col gap-1">{links()}</nav>
       </aside>
 
-      {mobileOpen && <aside className="fixed inset-y-0 left-0 z-40 w-72 max-w-[85vw] bg-card border-r border-border pt-20 px-3 shadow-xl lg:hidden">
+      {mobileOpen && <aside className="fixed inset-y-0 left-0 z-[70] w-72 max-w-[85vw] overflow-y-auto bg-card border-r border-border pt-20 px-3 shadow-xl lg:hidden">
         <nav className="flex flex-col gap-1">{links(true)}</nav>
       </aside>}
     </>

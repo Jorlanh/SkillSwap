@@ -25,8 +25,10 @@ import org.springframework.stereotype.Service;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class ProposalServiceImpl implements ProposalService {
@@ -56,12 +58,33 @@ public class ProposalServiceImpl implements ProposalService {
     private static final long VERIFICATION_THRESHOLD = 100;
 
     @Override
+    @Transactional
     public Proposal sendProposal(ProposalRequestDTO proposalRequest) {
         User sender = userRepository.findById(proposalRequest.getSenderId())
                 .orElseThrow(() -> new EntityNotFoundException("Usuário remetente não encontrado"));
         
         User receiver = userRepository.findById(proposalRequest.getReceiverId())
                 .orElseThrow(() -> new EntityNotFoundException("Usuário destinatário não encontrado"));
+
+        boolean senderHasSkills = sender.getSkills() != null && !sender.getSkills().isEmpty();
+        boolean receiverHasSkills = receiver.getSkills() != null && !receiver.getSkills().isEmpty();
+        if (!senderHasSkills && !receiverHasSkills) {
+            throw new IllegalArgumentException("A proposta não foi enviada. Você e a outra pessoa precisam cadastrar pelo menos uma habilidade.");
+        }
+        if (!senderHasSkills) {
+            throw new IllegalArgumentException("A proposta não foi enviada. Você precisa cadastrar pelo menos uma habilidade no seu perfil.");
+        }
+        if (!receiverHasSkills) {
+            throw new IllegalArgumentException("A proposta não foi enviada. A outra pessoa precisa cadastrar pelo menos uma habilidade no perfil.");
+        }
+        if (proposalRequest.getOfferedSkillId() == null
+                || sender.getSkills().stream().noneMatch(skill -> Objects.equals(skill.getSkillId(), proposalRequest.getOfferedSkillId()))) {
+            throw new IllegalArgumentException("A habilidade oferecida não está cadastrada no seu perfil.");
+        }
+        if (proposalRequest.getRequestedSkillId() == null
+                || receiver.getSkills().stream().noneMatch(skill -> Objects.equals(skill.getSkillId(), proposalRequest.getRequestedSkillId()))) {
+            throw new IllegalArgumentException("A habilidade solicitada não está cadastrada no perfil da outra pessoa.");
+        }
 
         Skill offeredSkill = skillRepository.findById(proposalRequest.getOfferedSkillId())
                 .orElseThrow(() -> new EntityNotFoundException("Habilidade oferecida não encontrada"));

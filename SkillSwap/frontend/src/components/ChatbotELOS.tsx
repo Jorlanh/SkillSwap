@@ -66,13 +66,13 @@ export const ChatbotELOS = () => {
   const handleInputChange = (event: ChangeEvent<HTMLInputElement>) => setMessage(event.target.value);
 
   return (
-    <div className="fixed bottom-6 right-6 z-[100]" aria-label="Assistente de acessibilidade ELOS">
+    <div className="mobile-floating-action fixed bottom-6 right-3 z-[90] sm:right-6" aria-label="Assistente de acessibilidade ELOS">
       {!isOpen ? (
         <Button onClick={() => setIsOpen(true)} aria-label="Abrir assistente ELOS" className="rounded-full w-14 h-14 shadow-lg bg-skillswap-teal focus-visible:ring-4 focus-visible:ring-teal-300">
           <MessageSquare className="h-6 w-6 text-white" />
         </Button>
       ) : (
-        <div className="w-80 h-[480px] bg-card border border-border rounded-2xl shadow-2xl flex flex-col overflow-hidden" role="dialog" aria-modal="false" aria-labelledby="elos-title">
+        <div className="elos-panel w-80 h-[480px] bg-card border border-border rounded-2xl shadow-2xl flex flex-col overflow-hidden" role="dialog" aria-modal="false" aria-labelledby="elos-title">
           <div className="bg-skillswap-teal p-4 flex justify-between items-center text-white">
             <div className="flex items-center gap-2"><Bot className="h-5 w-5" /><span id="elos-title" className="font-bold">MIND-ELOS</span></div>
             <Button variant="ghost" size="icon" aria-label="Fechar assistente" onClick={() => setIsOpen(false)} className="hover:bg-teal-700 text-white"><X className="h-4 w-4" /></Button>

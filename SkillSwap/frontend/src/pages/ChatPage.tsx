@@ -4,13 +4,16 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { ChevronLeft, Send, Plus, Video, Info, Mic, Calendar, CheckCircle2, UserPlus, UserMinus } from 'lucide-react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import RatingModal from '@/components/RatingModal';
 import { auth } from '@/lib/firebase';
 
 const ChatPage = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const openChatWith = (location.state as any)?.openChatWith;
+  const openChatTargetId = openChatWith?.userId || openChatWith?.id;
   
   // ESTADOS DE DADOS REAIS
   const [conversations, setConversations] = useState<any[]>([]);
@@ -36,11 +39,38 @@ const ChatPage = () => {
 
   // 1. CARREGAR LISTA DE CONVERSAS DO BACKEND
   useEffect(() => {
+    // Espera o usuário autenticado estar carregado para que a conversa direta
+    // aberta a partir de um perfil consiga buscar o histórico correto.
+    if (!myData.userId) return;
+
     ChatService.getConversations()
       .then(res => {
         const data = Array.isArray(res.data) ? res.data : [];
-        setConversations(data);
-        if (data.length > 0) handleSelectConversation(data[0]);
+        const existingConversation = openChatTargetId
+          ? data.find((convo: any) => String(convo?.user?.id || convo?.user?.userId) === String(openChatTargetId))
+          : undefined;
+        const directConversation = openChatWith && openChatTargetId && !existingConversation
+          ? {
+              id: `direct-${openChatTargetId}`,
+              user: {
+                id: openChatTargetId,
+                userId: openChatTargetId,
+                username: openChatWith.username,
+                name: openChatWith.name,
+                avatarUrl: openChatWith.avatarUrl || openChatWith.profile?.imageUrl,
+              },
+              lastMessage: 'Nova conversa...',
+            }
+          : null;
+        const nextConversations = directConversation ? [directConversation, ...data] : data;
+        setConversations(nextConversations);
+        const conversationToOpen = existingConversation || directConversation;
+        if (conversationToOpen) {
+          handleSelectConversation(conversationToOpen);
+          navigate(location.pathname, { replace: true, state: {} });
+        } else if (data.length > 0) {
+          handleSelectConversation(data[0]);
+        }
       })
       .catch(() => {
           console.warn("Rota /conversations não encontrada ou vazia no servidor.");
@@ -48,7 +78,7 @@ const ChatPage = () => {
       });
       
     return () => socket.current?.close();
-  }, []);
+  }, [myData.userId, openChatTargetId, navigate, location.pathname]);
 
   // 2. SELECIONAR CONVERSA E SINCRONIZAR HISTÓRICO
   const handleSelectConversation = async (convo: any) => {
@@ -56,8 +86,9 @@ const ChatPage = () => {
     setShowInfoPanel(false);
     
     // Busca histórico real (Java: /history/{id1}/{id2})
-    if (myData.userId && convo.user?.id) {
-        ChatService.getHistory(myData.userId, convo.user.id)
+    const conversationUserId = convo.user?.id || convo.user?.userId;
+    if (myData.userId && conversationUserId) {
+        ChatService.getHistory(myData.userId, conversationUserId)
           .then(res => {
             setMessages(res.data || []);
             scrollToBottom();
@@ -109,7 +140,7 @@ const ChatPage = () => {
     const payload = { 
       content: message, 
       senderId: myData.userId,
-      receiverId: selectedConvo.user.id,
+      receiverId: selectedConvo.user.id || selectedConvo.user.userId,
       type: 'TEXT'
     };
     

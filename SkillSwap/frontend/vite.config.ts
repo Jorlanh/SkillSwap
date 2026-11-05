@@ -24,30 +24,23 @@ export default defineConfig(({ mode }) => ({
     react(),
     VitePWA({
       registerType: "autoUpdate",
-      includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'mask-icon.svg'],
+      // O manifesto público é mantido em public/manifest.json para que o
+      // navegador use os ícones 192/512 e não crie um segundo manifesto menor.
+      manifest: false,
+      includeAssets: ['favicon.ico', 'logo.png', 'skillswap-logo.png'],
       workbox: {
         navigateFallbackDenylist: [/^\/~oauth/, /^\/api/], // Evita que o PWA intercepte chamadas de API do Java
         globPatterns: ["**/*.{js,css,html,ico,png,svg,jpg,jpeg,woff2}"],
         maximumFileSizeToCacheInBytes: 3000000, // Aumenta limite de cache para 3MB
       },
-      manifest: {
-        name: "SkillSwap HUB",
-        short_name: "SkillSwap",
-        description: "Plataforma de troca de habilidades e conhecimento",
-        start_url: "/",
-        display: "standalone",
-        background_color: "#ffffff",
-        theme_color: "#2a9d8f",
-        icons: [
-          {
-            src: "/favicon.ico",
-            sizes: "64x64",
-            type: "image/x-icon"
-          },
-          // Adicione ícones 192 e 512 aqui futuramente para conformidade PWA total
-        ],
-      },
     }),
+    {
+      name: "keep-public-pwa-manifest",
+      enforce: "post",
+      transformIndexHtml(html: string) {
+        return html.replace(/\s*<link rel="manifest" href="\/manifest\.webmanifest">/g, "");
+      },
+    },
   ].filter(Boolean),
   resolve: {
     alias: {

@@ -30,7 +30,7 @@ export const AccessibilityToolbar = () => {
   };
 
   return (
-    <div className="fixed bottom-6 left-6 z-[90] flex gap-2" role="toolbar" aria-label="Ferramentas de leitura">
+    <div className="mobile-floating-action fixed bottom-6 left-3 z-[90] flex gap-2 sm:left-6" role="toolbar" aria-label="Ferramentas de leitura">
       <Button type="button" variant="outline" onClick={speaking ? stopReading : readPage} aria-label={speaking ? 'Parar leitura da página' : 'Ler página em voz alta'} className="rounded-full shadow-lg bg-card">
         {speaking ? <StopCircle size={17} /> : <Volume2 size={17} />}
         <span className="sr-only">{speaking ? 'Parar leitura' : 'Ler página'}</span>

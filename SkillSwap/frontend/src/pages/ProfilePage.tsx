@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { UserService, AchievementService, PostService, ProfileService, ProposalService } from '@/services/api';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { MapPin, Calendar, Mail, Award, BookOpen, Layers, Users, Edit3, Camera, Lock, Unlock, Send, Star, GraduationCap, Image as ImageIcon, Trash2, Plus, Eye, Upload } from 'lucide-react';
+import { MapPin, Calendar, Mail, Award, BookOpen, Layers, Users, Edit3, Camera, Lock, Send, Star, GraduationCap, Image as ImageIcon, Trash2, Eye, Upload } from 'lucide-react';
 import SkillBadge from '@/components/SkillBadge';
 import PostCard from '@/components/PostCard';
 import RightSidebar from '@/components/RightSidebar';
@@ -55,7 +55,6 @@ const ProfilePage = () => {
   
   // Modais
   const [isEditing, setIsEditing] = useState(false);
-  const [isCoursesModalOpen, setIsCoursesModalOpen] = useState(false); 
 
   // Estados Dinâmicos de Interação
   const [isFollowing, setIsFollowing] = useState(false);
@@ -130,12 +129,12 @@ const ProfilePage = () => {
       setIsPrivate(targetUser.profile?.isPrivate || false);
       setSkillsList(targetUser.skills?.map((s: any) => s.name) || []);
       
-      // Verifica Followers
-      if (meData?.following && Array.isArray(meData.following)) {
-        setIsFollowing(meData.following.some((f: any) => f.id === targetUser.id));
-      } else {
-        setIsFollowing(false);
-      }
+      // O backend devolve os IDs persistidos que o usuário segue. Não usamos
+      // o texto do toast para inferir o estado: o botão só muda depois que a
+      // operação real termina e o estado é recarregado do banco.
+      const targetId = targetUser.userId || targetUser.id;
+      const followingIds = Array.isArray(meData?.followingIds) ? meData.followingIds : [];
+      setIsFollowing(followingIds.some((id: any) => String(id) === String(targetId)));
 
       const tId = targetUser.userId || targetUser.id;
       if (tId) {
@@ -147,7 +146,13 @@ const ProfilePage = () => {
         if (achRes.status === 'fulfilled') setAchievements(achRes.value.data || []);
         if (postsRes.status === 'fulfilled') {
           const allPosts = Array.isArray(postsRes.value.data) ? postsRes.value.data : [];
-          setUserPosts(allPosts.filter((p: any) => (p.user?.userId === tId || p.userId === tId)));
+          const viewingOwnProfile = !urlUsername || (meData && urlUsername === meData.username);
+          setUserPosts(allPosts.filter((p: any) => {
+            const authorId = p.user?.userId ?? p.userId;
+            // A repostagem é uma relação persistida no backend, não um novo
+            // post. No próprio perfil, ela também aparece como publicação.
+            return String(authorId) === String(tId) || (viewingOwnProfile && Boolean(p.isRepostedByMe));
+          }));
         }
         if (!urlUsername || (meData && urlUsername === meData.username)) {
           const communityPostsRes = await ProfileService.getMyCommunityPosts().catch(() => ({ data: [] }));
@@ -166,6 +171,12 @@ const ProfilePage = () => {
     return unsubscribe;
   }, [urlUsername]);
 
+  useEffect(() => {
+    const refreshAfterPostChange = () => { void loadProfileData(); };
+    window.addEventListener('skillswap:post-updated', refreshAfterPostChange);
+    return () => window.removeEventListener('skillswap:post-updated', refreshAfterPostChange);
+  }, [urlUsername]);
+
   const handleSaveProfile = async () => {
     try {
       await UserService.updateProfile({ 
@@ -177,7 +188,6 @@ const ProfilePage = () => {
       });
       toast.success("Perfil atualizado!");
       setIsEditing(false);
-      setIsCoursesModalOpen(false); 
       
       if (editUsername !== user.username && isOwnProfile) {
         navigate(`/perfil/${editUsername}`, { replace: true });
@@ -187,26 +197,6 @@ const ProfilePage = () => {
       }
     } catch (error) {
       toast.error("Erro ao salvar. Verifique se o username já existe.");
-    }
-  };
-
-  const handleRemoveSkill = async (skillToRemove: string) => {
-    try {
-       const newSkills = skillsList.filter(s => s !== skillToRemove);
-       setSkillsList(newSkills); 
-       
-       await UserService.updateProfile({ 
-        name: editName,
-        username: editUsername,
-        description: editBio, 
-        location: editLocation,
-        skills: newSkills 
-      });
-      
-      toast.success("Curso removido com sucesso!");
-      loadProfileData(); 
-    } catch (error) {
-      toast.error("Erro ao tentar remover o curso.");
     }
   };
 
@@ -266,8 +256,16 @@ const ProfilePage = () => {
       const me = (await UserService.getMe()).data;
       const offeredSkillId = me?.skills?.[0]?.skillId ?? me?.skills?.[0]?.id;
       const requestedSkillId = user?.skills?.[0]?.skillId ?? user?.skills?.[0]?.id;
-      if (!offeredSkillId || !requestedSkillId) {
-        toast.error('Cadastre uma habilidade sua e uma habilidade no perfil da pessoa antes de enviar a proposta.');
+      if (!offeredSkillId && !requestedSkillId) {
+        toast.error('A proposta não foi enviada. Você e a outra pessoa precisam cadastrar habilidades.');
+        return;
+      }
+      if (!offeredSkillId) {
+        toast.error('A proposta não foi enviada. Cadastre pelo menos uma habilidade no seu perfil.');
+        return;
+      }
+      if (!requestedSkillId) {
+        toast.error('A proposta não foi enviada. A outra pessoa precisa cadastrar pelo menos uma habilidade.');
         return;
       }
       await ProposalService.create({
@@ -282,8 +280,9 @@ const ProfilePage = () => {
       setIsProposalOpen(false);
       setProposalMessage("");
       navigate('/propostas');
-    } catch (error) {
-      toast.error("Erro ao enviar proposta para a API.");
+    } catch (error: any) {
+      const message = error?.response?.data?.message || error?.response?.data?.error;
+      toast.error(message || "Erro ao enviar proposta para a API.");
     }
   };
 
@@ -416,11 +415,11 @@ const ProfilePage = () => {
             <input type="file" ref={fileInputRef} hidden accept="image/*" onChange={handleAvatarChange} />
           </div>
 
-          <div className="flex-1 w-full min-w-0">
+          <div className="flex-1 w-full min-w-0 overflow-hidden">
             <div className="flex justify-between items-start gap-3 mb-2 flex-wrap">
-              <div>
-                <h1 className="font-display font-bold text-2xl text-foreground flex flex-wrap items-center gap-2 break-words">
-                  <span className="break-words">{user?.name || user?.username}</span>
+              <div className="min-w-0 max-w-full">
+                <h1 className="font-display font-bold text-2xl text-foreground flex flex-wrap items-center gap-2 break-words [overflow-wrap:anywhere]">
+                  <span className="break-words [overflow-wrap:anywhere]">{user?.name || user?.username}</span>
                   <VerifiedBadge user={user} />
                   {user?.accessibilitySymbol && accessibilitySymbolDetails[user.accessibilitySymbol] && (
                     <span
@@ -430,7 +429,7 @@ const ProfilePage = () => {
                     />
                   )}
                 </h1>
-                <p className="text-skillswap-teal font-semibold">@{user?.username?.toLowerCase()}</p>
+                <p className="text-skillswap-teal font-semibold break-all">@{user?.username?.toLowerCase()}</p>
               </div>
               
               <div className="flex w-full sm:w-auto flex-wrap gap-2 shrink-0">
@@ -538,25 +537,14 @@ const ProfilePage = () => {
 
           {activeTab === 'Cursos' && (
             <div className="space-y-4">
-              {isOwnProfile && (
-                // CORREÇÃO: Abre especificamente o modal de Cursos
-                <Button variant="outline" className="w-full border-dashed border-2 py-10 rounded-2xl flex flex-col gap-2 opacity-50 hover:opacity-100 transition-opacity" onClick={() => setIsCoursesModalOpen(true)}>
-                  <Plus size={24}/> <span className="font-bold uppercase text-[10px]">Adicionar novo curso</span>
-                </Button>
-              )}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {user?.skills?.map((s: any) => (
-                  <Card key={s.skillId || s.id || s.name} className="group relative border-border bg-card/50">
-                    <CardContent className="p-4 flex justify-between items-center">
-              <div className="flex items-center gap-3">
-                        <div className="p-2 bg-skillswap-teal/10 rounded-lg text-skillswap-teal"><BookOpen size={20}/></div>
-                        <div><p className="font-bold text-sm">{s.name}</p><p className="text-[10px] text-muted-foreground font-bold uppercase">Disponível para troca</p></div>
-                      </div>
-                      {isOwnProfile && <button onClick={() => handleRemoveSkill(s.name)} className="text-red-500 opacity-0 group-hover:opacity-100 transition-opacity p-2 bg-red-100 rounded-full hover:bg-red-200"><Trash2 size={16}/></button>}
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
+              <Card className="border-border bg-card/50">
+                <CardContent className="p-5">
+                  <h3 className="font-bold text-base">Cursos e aulas</h3>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    As habilidades para troca são cadastradas em <strong>Editar Perfil</strong>. Os cursos e aulas concluídos aparecem nesta área quando forem registrados.
+                  </p>
+                </CardContent>
+              </Card>
             </div>
           )}
 
@@ -626,46 +614,42 @@ const ProfilePage = () => {
         <Dialog open={isEditing} onOpenChange={setIsEditing}>
           <DialogContent className="max-w-md bg-card border-border shadow-2xl">
             <DialogHeader>
-               <DialogTitle className="font-bold text-xl text-skillswap-teal">Configurações de Perfil</DialogTitle>
+               <DialogTitle className="font-bold text-xl text-skillswap-teal">Editar perfil e habilidades</DialogTitle>
                <DialogDescription className="hidden">Painel de edição.</DialogDescription>
             </DialogHeader>
-            <div className="space-y-4 py-4">
-              <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-4 py-4 max-h-[70vh] overflow-y-auto pr-1">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1"><label className="text-[10px] font-bold uppercase text-muted-foreground">Nome Exibido</label><Input value={editName} onChange={e => setEditName(e.target.value)} /></div>
                 <div className="space-y-1"><label className="text-[10px] font-bold uppercase text-muted-foreground">Username Único</label><Input value={editUsername} onChange={e => setEditUsername(e.target.value)} /></div>
               </div>
               <div className="space-y-1"><label className="text-[10px] font-bold uppercase text-muted-foreground">Biografia</label><Textarea value={editBio} onChange={e => setEditBio(e.target.value)} className="resize-none" rows={3}/></div>
               <div className="space-y-1"><label className="text-[10px] font-bold uppercase text-muted-foreground">Localização</label><Input value={editLocation} onChange={e => setEditLocation(e.target.value)} /></div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold uppercase text-muted-foreground">Habilidades para troca</label>
+                <Input
+                  placeholder="Digite uma habilidade e pressione Enter"
+                  value={skillInput}
+                  onChange={e => setSkillInput(e.target.value)}
+                  onKeyDown={handleAddSkill}
+                />
+                <p className="text-xs text-muted-foreground">Cadastre aquilo que você sabe ensinar ou quer trocar na plataforma.</p>
+                <div className="flex flex-wrap gap-2">
+                  {skillsList.map(skill => (
+                    <span key={skill} className="inline-flex items-center gap-2 rounded-full bg-skillswap-teal/10 px-3 py-1.5 text-xs font-bold text-skillswap-teal">
+                      {skill}
+                      <button type="button" onClick={() => setSkillsList(current => current.filter(item => item !== skill))} className="hover:text-red-500" aria-label={`Remover habilidade ${skill}`}>
+                        <Trash2 size={12} />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              </div>
               <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
                 <div className="flex items-center gap-2"><Lock size={16}/> <span className="text-xs font-bold uppercase">Perfil Privado</span></div>
                 <Button variant={isPrivate ? "default" : "outline"} size="sm" onClick={togglePrivacy} className={isPrivate ? "bg-skillswap-teal" : ""}>{isPrivate ? "Ativado" : "Desativado"}</Button>
               </div>
             </div>
             <Button onClick={handleSaveProfile} className="w-full bg-skillswap-teal text-white font-bold h-12 shadow-lg">Confirmar no Banco</Button>
-          </DialogContent>
-        </Dialog>
-
-        {/* MODAL ESPECÍFICO DE CURSOS */}
-        <Dialog open={isCoursesModalOpen} onOpenChange={setIsCoursesModalOpen}>
-          <DialogContent className="max-w-md bg-card border-border shadow-2xl">
-            <DialogHeader>
-               <DialogTitle className="font-bold text-xl text-skillswap-teal">Adicionar Cursos</DialogTitle>
-               <DialogDescription className="hidden">Gerenciador de cursos.</DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4 py-4">
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold uppercase text-muted-foreground">Novos Cursos (Pressione Enter para inserir)</label>
-                <Input placeholder="Ex: Aulas de Xadrez, Culinária Italiana..." value={skillInput} onChange={e => setSkillInput(e.target.value)} onKeyDown={handleAddSkill} />
-                <div className="flex flex-wrap gap-2 mt-4">
-                  {skillsList.map(s => (
-                    <span key={s} className="bg-skillswap-teal/10 text-skillswap-teal px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-2 group">
-                      {s} <button onClick={() => setSkillsList(skillsList.filter(i => i !== s))} className="hover:text-red-500"><Trash2 size={12}/></button>
-                    </span>
-                  ))}
-                </div>
-              </div>
-            </div>
-            <Button onClick={handleSaveProfile} className="w-full bg-skillswap-teal text-white font-bold h-12 shadow-lg">Salvar Cursos</Button>
           </DialogContent>
         </Dialog>
 

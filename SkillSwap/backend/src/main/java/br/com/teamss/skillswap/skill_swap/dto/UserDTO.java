@@ -4,6 +4,8 @@ import jakarta.validation.constraints.NotNull;
 import java.util.Set;
 import java.util.UUID;
 import java.util.HashSet;
+import java.util.List;
+import java.util.ArrayList;
 
 public class UserDTO {
     @NotNull(message = "userId não pode ser nulo")
@@ -12,6 +14,7 @@ public class UserDTO {
     private Set<String> roles = new HashSet<>(); // Inicializar
     private ProfileDTO profile;
     private Set<SkillDTO> skills = new HashSet<>(); // Inicializar
+    private List<UUID> followingIds = new ArrayList<>();
     private String twoFactorSecret;
     private String phoneNumber;
     private String email;
@@ -53,6 +56,10 @@ public class UserDTO {
     public void setProfile(ProfileDTO profile) { this.profile = profile; }
     public Set<SkillDTO> getSkills() { return skills; }
     public void setSkills(Set<SkillDTO> skills) { this.skills = (skills != null) ? skills : new HashSet<>(); } // Garantir inicialização no setter
+    public List<UUID> getFollowingIds() { return followingIds; }
+    public void setFollowingIds(List<UUID> followingIds) {
+        this.followingIds = (followingIds != null) ? followingIds : new ArrayList<>();
+    }
     public String getTwoFactorSecret() { return twoFactorSecret; }
     public void setTwoFactorSecret(String twoFactorSecret) { this.twoFactorSecret = twoFactorSecret; }
     public String getPhoneNumber() { return phoneNumber; }

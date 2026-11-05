@@ -20,10 +20,10 @@ const MainLayout = ({ requireAuth }: MainLayoutProps) => {
   return (
     <div className="min-h-screen bg-background">
       <Header />
-      <div className="flex">
+      <div className="flex min-w-0">
         {/* Agora o AppSidebar aceita a prop e o erro 2322 some! */}
         <AppSidebar isAuthenticated={isAuthenticated} />
-        <main className="flex-1 min-h-[calc(100vh-57px)] p-4 lg:p-6 pb-20 lg:pb-6">
+        <main className="min-w-0 flex-1 min-h-[calc(100vh-4rem)] p-3 sm:p-4 lg:p-6 pb-24 lg:pb-6">
           {/* O Outlet passa o contexto para os filhos (PostCard, etc) */}
           <Outlet context={{ requireAuth }} />
         </main>
