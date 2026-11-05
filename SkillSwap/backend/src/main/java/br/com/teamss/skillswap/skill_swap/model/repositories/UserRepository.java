@@ -48,12 +48,6 @@ public interface UserRepository extends JpaRepository<User, UUID> {
     boolean existsByEmail(String email);
 
     /**
-     * @deprecated (Para registro) O Auth0 agora gerencia a disponibilidade de username
-     * (ou você pode tratar isso na lógica de provisionamento JIT no BanCheckFilter).
-     */
-    boolean existsByUsername(String username);
-
-    /**
      * @deprecated (Para verificação) O Auth0 agora gerencia códigos de verificação.
      */
     Optional<User> findByVerificationCode(String verificationCode);

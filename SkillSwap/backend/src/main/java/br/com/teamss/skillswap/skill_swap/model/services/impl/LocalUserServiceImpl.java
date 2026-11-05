@@ -39,18 +39,20 @@ public class LocalUserServiceImpl implements LocalUserService {
     @Override
     @Transactional
     public User findOrCreateUser(Jwt jwt) {
-        String email = jwt.getClaimAsString("email");
+        String tokenEmail = jwt.getClaimAsString("email");
         String subject = jwt.getSubject();
-        if (email == null || email.isBlank()) {
+        if (tokenEmail == null || tokenEmail.isBlank()) {
             if (subject == null || subject.isBlank()) {
                 throw new IllegalArgumentException("O token não contém uma identidade válida.");
             }
             // Alguns provedores não enviam o e-mail no token. Ainda assim,
             // a identidade Firebase continua sendo suficiente para criar o
             // perfil local pela primeira vez.
-            email = "firebase_" + subject.replaceAll("[^a-zA-Z0-9._-]", "_") + "@local.skillswap";
+            tokenEmail = "firebase_" + subject.replaceAll("[^a-zA-Z0-9._-]", "_") + "@local.skillswap";
         }
 
+        // A variável capturada pelas lambdas abaixo precisa ser efetivamente final.
+        final String email = tokenEmail;
         User user = userRepository.findByEmail(email).orElseGet(() -> createUserFromJwt(jwt, email));
         boolean changed = ensureRole(user, "USER");
         if (user.getProfile() == null) {
@@ -87,7 +89,7 @@ public class LocalUserServiceImpl implements LocalUserService {
 
         String candidate = firstNonBlank(jwt.getClaimAsString("nickname"), jwt.getClaimAsString("name"), email.split("@")[0]);
         String username = candidate.toLowerCase().replaceAll("[^a-z0-9_]+", "_");
-        if (username.isBlank() || userRepository.existsByUsername(username)) {
+        if (username.isBlank() || userRepository.findByUsername(username).isPresent()) {
             username = email.substring(0, email.indexOf('@')).toLowerCase().replaceAll("[^a-z0-9_]+", "_")
                 + "_" + UUID.randomUUID().toString().substring(0, 6);
         }
