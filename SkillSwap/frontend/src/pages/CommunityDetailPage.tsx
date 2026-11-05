@@ -165,7 +165,8 @@ const CommunityDetailPage = () => {
 
   const currentUserId = me?.userId ?? me?.id;
   const ownerId = community.ownerId ?? community.owner?.userId ?? community.owner?.id;
-  const isOwner = Boolean(currentUserId && ownerId && String(currentUserId) === String(ownerId));
+  const isOwner = membershipStatus === 'OWNER'
+    || Boolean(currentUserId && ownerId && String(currentUserId) === String(ownerId));
   const isAdmin = membershipStatus === 'ADMIN';
   const isCommunityManager = isOwner || isAdmin;
   const isModerator = isCommunityManager || membershipStatus === 'MODERATOR';

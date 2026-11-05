@@ -50,6 +50,7 @@ public class ReportServiceImpl implements ReportService {
     }
 
     @Override
+    @org.springframework.transaction.annotation.Transactional(readOnly = true)
     public List<Report> getPendingReports() {
         return reportRepository.findByStatus(ReportStatus.PENDING);
     }

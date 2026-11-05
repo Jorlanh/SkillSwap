@@ -42,26 +42,39 @@ const AdminConsole = () => {
 
   const loadAdminData = useCallback(async () => {
     setLoading(true);
-    try {
-      const [statsRes, usersRes, bansRes, opportunitiesRes, reportsRes, communitiesRes] = await Promise.all([
-        AdminService.getStats(),
-        AdminService.getUsers(),
-        AdminService.getActiveBans(),
-        AccessService.getOpportunities(),
-        AdminReportService.getPending(),
-        AdminService.getCommunities(),
-      ]);
-      setStats(statsRes.data);
-      setUsers(usersRes.data);
-      setActiveBans(Array.isArray(bansRes.data) ? bansRes.data : []);
-      setOpportunities(Array.isArray(opportunitiesRes.data) ? opportunitiesRes.data : []);
-      setReports(Array.isArray(reportsRes.data) ? reportsRes.data : []);
-      setCommunities(Array.isArray(communitiesRes.data) ? communitiesRes.data : []);
-    } catch {
-      toast({ title: 'Acesso negado', description: 'Sua conta não possui a função ADMIN.', variant: 'destructive' });
-    } finally {
-      setLoading(false);
+    const results = await Promise.allSettled([
+      AdminService.getStats(),
+      AdminService.getUsers(),
+      AdminService.getActiveBans(),
+      AccessService.getOpportunities(),
+      AdminReportService.getPending(),
+      AdminService.getCommunities(),
+    ]);
+
+    const [statsRes, usersRes, bansRes, opportunitiesRes, reportsRes, communitiesRes] = results;
+    if (statsRes.status === 'fulfilled') setStats(statsRes.value.data);
+    if (usersRes.status === 'fulfilled') setUsers(usersRes.value.data);
+    if (bansRes.status === 'fulfilled') setActiveBans(Array.isArray(bansRes.value.data) ? bansRes.value.data : []);
+    if (opportunitiesRes.status === 'fulfilled') setOpportunities(Array.isArray(opportunitiesRes.value.data) ? opportunitiesRes.value.data : []);
+    if (reportsRes.status === 'fulfilled') setReports(Array.isArray(reportsRes.value.data) ? reportsRes.value.data : []);
+    if (communitiesRes.status === 'fulfilled') setCommunities(Array.isArray(communitiesRes.value.data) ? communitiesRes.value.data : []);
+
+    const failures = results.filter((result) => result.status === 'rejected');
+    if (failures.length > 0) {
+      const authenticationFailure = failures.some((result) => {
+        if (result.status !== 'rejected') return false;
+        const status = (result.reason as { response?: { status?: number } })?.response?.status;
+        return status === 401 || status === 403;
+      });
+      toast({
+        title: authenticationFailure ? 'Acesso negado' : 'Dados parcialmente indisponíveis',
+        description: authenticationFailure
+          ? 'Sua conta precisa ter a função ADMIN para acessar o painel.'
+          : 'Algumas informações não puderam ser carregadas. As demais continuam disponíveis.',
+        variant: 'destructive',
+      });
     }
+    setLoading(false);
   }, [toast]);
 
   useEffect(() => { loadAdminData(); }, [loadAdminData]);
@@ -179,7 +192,7 @@ const AdminConsole = () => {
                   <TableCell className="text-right space-x-2 space-y-2">
                     <Button size="sm" variant="outline" onClick={() => handleToggleVerify(user.userId)}>{user.verifiedBadge ? 'Remover selo' : 'Dar selo'}</Button>
                     <Button size="sm" variant={isAdmin ? 'destructive' : 'outline'} onClick={() => handleRole(user)}><KeyRound size={14} className="mr-1" />{isAdmin ? 'Remover admin' : 'Tornar admin'}</Button>
-                    {user.banned ? <Button size="sm" variant="outline" onClick={() => handleBan(user.userId, true)}><UserCheck size={14} className="mr-1" />Reativar</Button> : <Button size="sm" variant="destructive" onClick={() => handleBan(user.userId, false)}><UserX size={14} className="mr-1" />Suspender</Button>}
+                {user.banned ? <Button size="sm" variant="outline" onClick={() => handleBan(user.userId, true)}><UserCheck size={14} className="mr-1" />Reativar</Button> : <Button size="sm" variant="destructive" title="Aplicar suspensão personalizada" onClick={() => handleBan(user.userId, false)}><UserX size={14} className="mr-1" />Suspensão</Button>}
                   </TableCell>
                 </TableRow>;
               })}</TableBody>

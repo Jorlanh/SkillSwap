@@ -3,6 +3,9 @@ package br.com.teamss.skillswap.skill_swap.model.repositories;
 import br.com.teamss.skillswap.skill_swap.model.entities.CommunityMember;
 import br.com.teamss.skillswap.skill_swap.model.entities.CommunityMemberId; // ADICIONADO
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 import java.util.UUID;
 import java.util.List;
@@ -16,4 +19,8 @@ public interface CommunityMemberRepository extends JpaRepository<CommunityMember
     List<CommunityMember> findById_CommunityId(UUID communityId);
     List<CommunityMember> findById_UserIdAndMembershipStatus(UUID userId, String status);
     long countById_CommunityIdAndMembershipStatus(UUID communityId, String status);
+
+    @Modifying
+    @Query("delete from CommunityMember member where member.id.communityId = :communityId")
+    int deleteAllByCommunityId(@Param("communityId") UUID communityId);
 }
