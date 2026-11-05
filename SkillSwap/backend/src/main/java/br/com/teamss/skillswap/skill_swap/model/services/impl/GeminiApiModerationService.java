@@ -27,10 +27,10 @@ public class GeminiApiModerationService implements ContentModerationService {
     @Value("${gemini.api.key:}")
     private String apiKey;
 
-    @Value("${gemini.api.model:gemini-2.5-flash}")
+    @Value("${gemini.api.model:gemini-3.8-flash}")
     private String model;
 
-    @Value("${gemini.api.fallback-model:gemini-2.5-flash}")
+    @Value("${gemini.api.fallback-model:gemini-3.8-flash}")
     private String fallbackModel;
 
     @Value("${gemini.api.timeout-seconds:10}")
@@ -39,7 +39,7 @@ public class GeminiApiModerationService implements ContentModerationService {
     @Value("${groq.api.key:}")
     private String groqApiKey;
 
-    @Value("${groq.api.model:llama-3.1-8b-instant}")
+    @Value("${groq.api.model:openai/gpt-oss-20b}")
     private String groqModel;
 
     @Value("${groq.api.url:https://api.groq.com/openai/v1/chat/completions}")

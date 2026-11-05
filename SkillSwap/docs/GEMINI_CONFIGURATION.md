@@ -1,14 +1,14 @@
 # Gemini configurável
 
-O SkillSwap usa um modelo Gemini configurável para chat, tradução, simplificação de texto e moderação de conteúdo. Para o chatbot, o backend usa a Interactions API, que recebe `input` e devolve a resposta em `steps`. Como o modelo informado nos logs retornou erro 503, o exemplo usa um modelo Gemini habilitado para a chave, como `gemini-2.5-flash`; confirme no Google AI Studio quais modelos a sua chave pode usar:
+O SkillSwap usa um modelo Gemini configurável para chat, tradução, simplificação de texto e moderação de conteúdo. Para o chatbot, o backend usa a Interactions API, que recebe `input` e devolve a resposta em `steps`. O exemplo abaixo segue a documentação atual da Interactions API com `gemini-3.8-flash`; confirme no Google AI Studio se esse modelo está habilitado para a sua chave:
 
 ```env
-GEMINI_MODEL=gemini-2.5-flash
-GEMINI_FALLBACK_MODEL=gemini-2.5-flash
+GEMINI_MODEL=gemini-3.8-flash
+GEMINI_FALLBACK_MODEL=gemini-3.8-flash
 GEMINI_API_KEY=coloque-no-secret-manager
 GEMINI_TIMEOUT_SECONDS=10
 GROQ_API_KEY=coloque-no-secret-manager
-GROQ_MODEL=llama-3.1-8b-instant
+GROQ_MODEL=openai/gpt-oss-20b
 GROQ_API_URL=https://api.groq.com/openai/v1/chat/completions
 ```
 

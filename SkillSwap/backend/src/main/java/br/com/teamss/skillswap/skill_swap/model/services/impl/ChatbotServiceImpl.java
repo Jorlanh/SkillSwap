@@ -54,10 +54,10 @@ public class ChatbotServiceImpl implements ChatbotService {
     @Value("${gemini.api.key}")
     private String apiKey;
 
-    @Value("${gemini.api.model:gemini-2.5-flash}")
+    @Value("${gemini.api.model:gemini-3.8-flash}")
     private String model;
 
-    @Value("${gemini.api.fallback-model:gemini-2.5-flash}")
+    @Value("${gemini.api.fallback-model:gemini-3.8-flash}")
     private String fallbackModel;
 
     @Value("${gemini.api.timeout-seconds:10}")
@@ -66,7 +66,7 @@ public class ChatbotServiceImpl implements ChatbotService {
     @Value("${groq.api.key:}")
     private String groqApiKey;
 
-    @Value("${groq.api.model:llama-3.1-8b-instant}")
+    @Value("${groq.api.model:openai/gpt-oss-20b}")
     private String groqModel;
 
     @Value("${groq.api.url:https://api.groq.com/openai/v1/chat/completions}")
@@ -226,7 +226,7 @@ public class ChatbotServiceImpl implements ChatbotService {
 
         } catch (WebClientResponseException e) {
 
-            logGeminiError(e);
+            logProviderError("Gemini", e);
 
             return new ChatbotResponseDTO(
                 "O assistente está temporariamente indisponível. Tente novamente em alguns instantes.",
@@ -382,7 +382,16 @@ public class ChatbotServiceImpl implements ChatbotService {
         }
 
         if (!isBlank(groqApiKey)) {
-            return callGroq(input, systemPrompt);
+            try {
+                return callGroq(input, systemPrompt);
+            } catch (Exception groqError) {
+                logger.error(
+                    "Fallback Groq também falhou com o modelo {}: {}",
+                    groqModel,
+                    groqError.getMessage()
+                );
+                throw groqError;
+            }
         }
 
         throw new IllegalStateException(
@@ -400,14 +409,20 @@ public class ChatbotServiceImpl implements ChatbotService {
             "temperature", 0.2
         );
 
-        String response = webClient.post()
-            .uri(groqApiUrl)
-            .header(HttpHeaders.AUTHORIZATION, "Bearer " + groqApiKey)
-            .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
-            .bodyValue(requestBody)
-            .retrieve()
-            .bodyToMono(String.class)
-            .block(requestTimeout());
+        String response;
+        try {
+            response = webClient.post()
+                .uri(groqApiUrl)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + groqApiKey)
+                .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+                .bodyValue(requestBody)
+                .retrieve()
+                .bodyToMono(String.class)
+                .block(requestTimeout());
+        } catch (WebClientResponseException error) {
+            logProviderError("Groq", error);
+            throw error;
+        }
 
         if (response == null || response.isBlank()) {
             throw new IllegalStateException("Groq retornou uma resposta vazia.");
@@ -473,6 +488,7 @@ public class ChatbotServiceImpl implements ChatbotService {
                 String response = webClient.post()
                     .uri(INTERACTIONS_ENDPOINT)
                     .header("x-goog-api-key", apiKey)
+                    .header("Api-Revision", "2026-05-20")
                     .header(
                         HttpHeaders.CONTENT_TYPE,
                         MediaType.APPLICATION_JSON_VALUE
@@ -662,10 +678,11 @@ public class ChatbotServiceImpl implements ChatbotService {
     }
 
     // =========================================================
-    // LOG DE ERROS DO GEMINI
+    // LOG DE ERROS DOS PROVEDORES
     // =========================================================
 
-    private void logGeminiError(
+    private void logProviderError(
+        String provider,
         WebClientResponseException error
     ) {
 
@@ -676,7 +693,8 @@ public class ChatbotServiceImpl implements ChatbotService {
         }
 
         logger.error(
-            "Erro na API Gemini (HTTP {}): {}",
+            "Erro na API {} (HTTP {}): {}",
+            provider,
             error.getStatusCode().value(),
             body
         );
