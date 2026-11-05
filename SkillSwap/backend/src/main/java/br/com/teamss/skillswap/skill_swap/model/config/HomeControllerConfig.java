@@ -1,6 +1,7 @@
 package br.com.teamss.skillswap.skill_swap.model.config;
 
 import br.com.teamss.skillswap.skill_swap.controllers.HomeController;
+import br.com.teamss.skillswap.skill_swap.model.repositories.ProfileRepository;
 import br.com.teamss.skillswap.skill_swap.model.repositories.ShareLinkRepository;
 import br.com.teamss.skillswap.skill_swap.model.services.CommunityService;
 import br.com.teamss.skillswap.skill_swap.model.services.NotificationService;
@@ -20,7 +21,8 @@ public class HomeControllerConfig {
     public HomeController homeController(PostService postService, CommunityService communityService,
                                          NotificationService notificationService, ShareLinkRepository shareLinkRepository,
                                          TrendingService trendingService, CommentService commentService,
-                                         UserServiceDTO userServiceDTO) { // 2. Adicione o UserServiceDTO como parâmetro
-        return new HomeController(postService, communityService, notificationService, shareLinkRepository, trendingService, commentService, userServiceDTO); // 3. Passe para o construtor
+                                         UserServiceDTO userServiceDTO, ProfileRepository profileRepository) {
+        return new HomeController(postService, communityService, notificationService, shareLinkRepository,
+                trendingService, commentService, userServiceDTO, profileRepository);
     }
 }
