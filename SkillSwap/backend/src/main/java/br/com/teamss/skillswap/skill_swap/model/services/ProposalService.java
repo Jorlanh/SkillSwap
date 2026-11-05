@@ -14,4 +14,5 @@ public interface ProposalService {
     Proposal rejectProposal(Long proposalId);
     Proposal blockProposal(Long proposalId);
     Proposal completeProposal(Long proposalId);
+    boolean canMessage(UUID userId1, UUID userId2);
 }

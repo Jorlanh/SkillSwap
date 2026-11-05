@@ -12,10 +12,12 @@ import org.springframework.web.bind.annotation.RestController;
 
 import br.com.teamss.skillswap.skill_swap.dto.UserDTO;
 import br.com.teamss.skillswap.skill_swap.model.services.UserServiceDTO;
+import br.com.teamss.skillswap.skill_swap.model.services.ProposalService;
 import io.livekit.server.AccessToken;
 import io.livekit.server.RoomJoin;
 import io.livekit.server.RoomName;
 import io.livekit.server.RoomServiceClient;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/video")
@@ -23,6 +25,7 @@ public class VideoController {
 
     private final UserServiceDTO userServiceDTO;
     private final RoomServiceClient roomServiceClient;
+    private final ProposalService proposalService;
 
     @Value("${livekit.api.key}")
     private String livekitApiKey;
@@ -30,9 +33,10 @@ public class VideoController {
     @Value("${livekit.api.secret}")
     private String livekitApiSecret;
 
-    public VideoController(UserServiceDTO userServiceDTO, RoomServiceClient roomServiceClient) {
+    public VideoController(UserServiceDTO userServiceDTO, RoomServiceClient roomServiceClient, ProposalService proposalService) {
         this.userServiceDTO = userServiceDTO;
         this.roomServiceClient = roomServiceClient;
+        this.proposalService = proposalService;
     }
 
     /**
@@ -47,8 +51,20 @@ public class VideoController {
             return ResponseEntity.badRequest().body(Map.of("error", "roomName é obrigatório."));
         }
 
+        String peerUserId = request.get("peerUserId");
+        if (peerUserId == null || peerUserId.isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "peerUserId é obrigatório."));
+        }
+
         // Pega o usuário autenticado via UserServiceDTO
         UserDTO authenticatedUser = userServiceDTO.getAuthenticatedUser();
+        try {
+            if (!proposalService.canMessage(authenticatedUser.getUserId(), UUID.fromString(peerUserId))) {
+                return ResponseEntity.status(403).body(Map.of("error", "A chamada só fica disponível depois que uma proposta é aceita."));
+            }
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", "peerUserId inválido."));
+        }
 
         try {
             // Criação do Token. Parâmetros TTL podem ser adicionados isoladamente, se necessário.

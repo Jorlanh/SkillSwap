@@ -27,17 +27,28 @@ const ProposalsPage = () => {
 
   useEffect(() => { fetchProposals(); }, []);
 
+  const proposalId = (proposal: any) => proposal?.proposalId ?? proposal?.id;
+
+  const proposalSummary = (proposal: any) => {
+    const offered = proposal?.offeredSkill?.name || proposal?.offeredSkill?.title;
+    const requested = proposal?.requestedSkill?.name || proposal?.requestedSkill?.title;
+    if (offered && requested) return `Oferece ${offered} e procura ${requested}`;
+    if (offered) return `Oferece ${offered}`;
+    if (requested) return `Procura ${requested}`;
+    return 'Proposta de troca de conhecimento';
+  };
+
   const handleAction = async (action: 'accept' | 'reject' | 'block') => {
     try {
       if (action === 'accept') {
-        await ProposalService.accept(selectedProposal.id);
+        await ProposalService.accept(proposalId(selectedProposal));
         toast.success("Proposta aceita! Abrindo chat...");
-        navigate('/mensagens'); 
+        navigate('/mensagens', { state: { openChatWith: selectedProposal.sender } });
       } else if (action === 'reject') {
-        await ProposalService.reject(selectedProposal.id);
+        await ProposalService.reject(proposalId(selectedProposal));
         toast.info("Recusado. Inicie uma negociação no chat abaixo.");
       } else {
-        await ProposalService.block(selectedProposal.id);
+        await ProposalService.block(proposalId(selectedProposal));
         toast.error("Usuário bloqueado.");
         fetchProposals();
       }
@@ -60,15 +71,15 @@ const ProposalsPage = () => {
         <span className="bg-skillswap-teal text-white text-xs font-bold px-2 py-1 rounded-full">{proposals.length}</span>
       </div>
 
-      <div className="flex gap-6">
-        <div className="w-80 shrink-0 space-y-2">
+      <div className="flex flex-col md:flex-row gap-6">
+        <div className="w-full md:w-80 shrink-0 space-y-2">
           {proposals.map((p) => (
-            <div key={p.id} onClick={() => setSelectedProposal(p)} className={`flex items-center justify-between p-4 rounded-xl cursor-pointer border transition-all ${selectedProposal?.id === p.id ? 'bg-skillswap-teal/10 border-skillswap-teal shadow-md' : 'hover:bg-muted border-transparent'}`}>
+            <div key={proposalId(p)} onClick={() => setSelectedProposal(p)} className={`flex items-center justify-between p-4 rounded-xl cursor-pointer border transition-all ${proposalId(selectedProposal) === proposalId(p) ? 'bg-skillswap-teal/10 border-skillswap-teal shadow-md' : 'hover:bg-muted border-transparent'}`}>
               <div className="flex items-center gap-3 flex-1 min-w-0">
                 <Avatar className="h-10 w-10"><AvatarImage src={p.sender?.avatarUrl} /></Avatar>
                 <div className="min-w-0">
                   <p className="text-sm font-bold">{p.sender?.username}</p>
-                  <p className="text-[10px] text-muted-foreground truncate font-bold uppercase">{p.message}</p>
+                  <p className="text-[10px] text-muted-foreground truncate font-bold uppercase">{proposalSummary(p)}</p>
                 </div>
               </div>
             </div>
@@ -76,7 +87,7 @@ const ProposalsPage = () => {
         </div>
 
         {selectedProposal && (
-          <div className="flex-1 bg-card rounded-2xl p-8 border shadow-xl relative overflow-hidden">
+          <div className="flex-1 min-w-0 bg-card rounded-2xl p-4 sm:p-8 border shadow-xl relative overflow-hidden">
             <div className="flex flex-col items-center mb-8">
               <Avatar className="h-24 w-24 mb-4 border-4 border-skillswap-teal"><AvatarImage src={selectedProposal.sender?.avatarUrl} /></Avatar>
               <h2 className="font-bold text-2xl">@{selectedProposal.sender?.username}</h2>
@@ -84,7 +95,7 @@ const ProposalsPage = () => {
             </div>
 
             <div className="bg-muted/30 p-6 rounded-2xl mb-8 border border-dashed border-skillswap-teal italic text-sm text-center">
-               "{selectedProposal.message}"
+               {proposalSummary(selectedProposal)}
             </div>
 
             <div className="flex gap-3 justify-center">

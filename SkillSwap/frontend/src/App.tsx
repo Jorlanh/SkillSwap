@@ -26,6 +26,7 @@ import SharedPostPage from '@/pages/SharedPostPage';
 import { ChatbotELOS } from '@/components/ChatbotELOS';
 import AuthPage from '@/pages/AuthPage';
 import SuspensionRecoveryPage from '@/pages/SuspensionRecoveryPage';
+import VideoCallPage from '@/pages/VideoCallPage';
 import { auth } from './lib/firebase';
 import { onIdTokenChanged } from 'firebase/auth';
 
@@ -73,6 +74,7 @@ const App = () => {
             <Route element={<MainLayout requireAuth={requireAuth} />}>
               <Route path="/" element={<FeedPage />} />
               <Route path="/mensagens" element={<ChatPage />} />
+              <Route path="/chamada/:userId" element={<ProtectedRoute><VideoCallPage /></ProtectedRoute>} />
               <Route path="/perfil/:username?" element={<ProfilePage />} />
               <Route path="/busca" element={<SearchPage />} />
               <Route path="/comunidades" element={<CommunitiesPage />} />

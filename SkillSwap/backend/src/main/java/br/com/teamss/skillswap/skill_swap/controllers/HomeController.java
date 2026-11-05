@@ -120,7 +120,12 @@ public class HomeController {
             @RequestParam(defaultValue = "TRENDING") String sortBy,
             @RequestParam(defaultValue = "DAY") String period) {
         List<PostResponseDTO> posts = postService.getPosts(sortBy, period, authenticatedUserIdOrNull());
-        posts.forEach(post -> postService.incrementViewCount(post.getPostId()));
+        posts.forEach(post -> {
+            postService.incrementViewCount(post.getPostId());
+            // Reflete a visualização atual na mesma resposta, sem esperar um
+            // novo refresh para o contador aparecer atualizado.
+            post.setViewsCount(post.getViewsCount() + 1);
+        });
         return ResponseEntity.ok(posts);
     }
 

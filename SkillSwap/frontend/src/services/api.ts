@@ -266,6 +266,7 @@ export const ProposalService = {
   reject: (proposalId: number) => api.post(`/proposal/reject/${proposalId}`),
   block: (proposalId: number) => api.post(`/proposal/block/${proposalId}`),
   complete: (proposalId: number) => api.post(`/proposal/complete/${proposalId}`),
+  canMessage: (userId: string) => api.get(`/proposal/can-message/${userId}`),
   
   // RESTAURADO O QUE O FRONTEND ESTAVA USANDO ANTERIORMENTE PARA NÃO QUEBRAR
   create: (data: any) => api.post('/proposal/send', data),
@@ -276,7 +277,7 @@ export const ProposalService = {
 // VÍDEO
 // ==========================================
 export const VideoService = {
-  getJoinToken: (roomName: string) => api.post('/video/join-room', { roomName }),
+  getJoinToken: (roomName: string, peerUserId: string) => api.post('/video/join-room', { roomName, peerUserId }),
 };
 
 // ==========================================

@@ -4,6 +4,7 @@ import br.com.teamss.skillswap.skill_swap.dto.LessonScheduleRequestDTO;
 import br.com.teamss.skillswap.skill_swap.dto.LessonCompletionResponse;
 import br.com.teamss.skillswap.skill_swap.dto.LessonCertificateResponse;
 import br.com.teamss.skillswap.skill_swap.model.entities.Lesson;
+import br.com.teamss.skillswap.skill_swap.model.entities.Notification;
 import br.com.teamss.skillswap.skill_swap.model.entities.User;
 import br.com.teamss.skillswap.skill_swap.model.repositories.LessonRepository;
 import br.com.teamss.skillswap.skill_swap.model.repositories.NotificationRepository;
@@ -91,6 +92,7 @@ public class LessonServiceImpl implements LessonService {
 
     // ... O resto da sua classe (scheduleLesson, createCalendarEvent, etc.) continua aqui sem alterações ...
     @Override
+    @Transactional
     public Lesson scheduleLesson(LessonScheduleRequestDTO lessonRequest) {
         User teacher = userRepository.findById(lessonRequest.getTeacherId())
                 .orElseThrow(() -> new EntityNotFoundException("Professor não encontrado com ID: " + lessonRequest.getTeacherId()));
@@ -105,7 +107,11 @@ public class LessonServiceImpl implements LessonService {
         lesson.setScheduledTime(lessonRequest.getScheduledTime());
         lesson.setStatus("SCHEDULED");
         createCalendarEvent(lesson, teacher.getEmail(), student.getEmail());
-        return lessonRepository.save(lesson);
+        Lesson savedLesson = lessonRepository.save(lesson);
+        notifyParticipants(savedLesson,
+                "Aula agendada para " + savedLesson.getScheduledTime()
+                        + " com " + teacher.getUsername() + ".");
+        return savedLesson;
     }
 
     private void createCalendarEvent(Lesson lesson, String teacherEmail, String studentEmail) {
@@ -195,6 +201,7 @@ public class LessonServiceImpl implements LessonService {
     }
 
     @Override
+    @Transactional
     public void notifyLesson(Long lessonId) {
         Lesson lesson = lessonRepository.findById(lessonId)
                 .orElseThrow(() -> new RuntimeException("Lesson not found"));
@@ -203,14 +210,33 @@ public class LessonServiceImpl implements LessonService {
         ZonedDateTime now = ZonedDateTime.now(ZoneId.of("America/Sao_Paulo"));
         ZonedDateTime lessonTime = lesson.getScheduledTime().atZone(ZoneId.of("America/Sao_Paulo"));
 
-        if (now.toLocalDate().equals(lessonTime.toLocalDate())) {
-            String lessonDetails = "Aula agendada para hoje às " + lessonTime.toLocalTime() + " com " + teacher.getUsername();
-            // ... (lógica de notificação)
+        String lessonDetails = null;
+        if (now.toLocalTime().isAfter(lessonTime.toLocalTime().minusMinutes(15))
+                && now.toLocalTime().isBefore(lessonTime.toLocalTime().plusMinutes(15))) {
+            lessonDetails = "A aula com " + teacher.getUsername()
+                    + " começa agora às " + lessonTime.toLocalTime() + ".";
+        } else if (now.toLocalDate().equals(lessonTime.toLocalDate())) {
+            lessonDetails = "Aula agendada para hoje às " + lessonTime.toLocalTime()
+                    + " com " + teacher.getUsername() + ".";
         }
+        if (lessonDetails != null) {
+            notifyParticipants(lesson, lessonDetails);
+        }
+    }
 
-        if (now.toLocalTime().isAfter(lessonTime.toLocalTime().minusMinutes(15)) && now.toLocalTime().isBefore(lessonTime.toLocalTime().plusMinutes(15))) {
-            String lessonDetails = "A aula com " + teacher.getUsername() + " começa agora às " + lessonTime.toLocalTime();
-            // ... (lógica de notificação)
+    private void notifyParticipants(Lesson lesson, String message) {
+        for (User participant : List.of(lesson.getTeacher(), lesson.getStudent())) {
+            Notification notification = new Notification();
+            notification.setUser(participant);
+            notification.setMessage(message);
+            notification.setSentAt(Instant.now());
+            notification.setRead(false);
+            notificationRepository.save(notification);
+            try {
+                emailService.sendLessonNotification(participant.getEmail(), message);
+            } catch (RuntimeException exception) {
+                System.err.println("Aviso: não foi possível enviar o e-mail da aula: " + exception.getMessage());
+            }
         }
     }
 

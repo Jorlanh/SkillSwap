@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.UUID;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/proposal")
@@ -70,5 +71,11 @@ public class ProposalController {
     public ResponseEntity<Proposal> completeProposal(@PathVariable Long proposalId) {
         Proposal updatedProposal = proposalService.completeProposal(proposalId);
         return ResponseEntity.ok(updatedProposal);
+    }
+
+    @GetMapping("/can-message/{userId}")
+    public ResponseEntity<Map<String, Boolean>> canMessage(@PathVariable UUID userId) {
+        UUID currentUserId = userServiceDTO.getAuthenticatedUser().getUserId();
+        return ResponseEntity.ok(Map.of("allowed", proposalService.canMessage(currentUserId, userId)));
     }
 }

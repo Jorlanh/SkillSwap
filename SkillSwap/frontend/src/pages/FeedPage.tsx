@@ -2,23 +2,31 @@ import { useEffect, useRef, useState } from 'react';
 import { HomeService } from '@/services/api';
 import PostCard from '@/components/PostCard';
 import RightSidebar from '@/components/RightSidebar';
-import { BrainCircuit } from 'lucide-react';
+import { BrainCircuit, Eye } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Link, useOutletContext } from 'react-router-dom';
+import { auth } from '@/lib/firebase';
+import { onAuthStateChanged } from 'firebase/auth';
 
 const FeedPage = () => {
   const [posts, setPosts] = useState<any[]>([]);
   const [trending, setTrending] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
   const trendingRef = useRef<HTMLDivElement>(null);
   const { requireAuth } = useOutletContext<{ requireAuth: (action: () => void) => void }>();
 
+  useEffect(() => onAuthStateChanged(auth, (currentUser) => {
+    setIsAuthenticated(Boolean(currentUser));
+  }), []);
+
   useEffect(() => {
+    if (isAuthenticated === null) return;
     const loadFeed = async () => {
       try {
         const [trendingResponse, recentResponse] = await Promise.all([
           HomeService.getTrendingPosts('DAY'),
-          HomeService.getPosts('DATE', 'ALL'),
+          HomeService.getPosts(isAuthenticated ? 'PERSONALIZED' : 'DATE', 'ALL'),
         ]);
         setTrending(Array.isArray(trendingResponse.data) ? trendingResponse.data.slice(0, 10) : []);
         setPosts(Array.isArray(recentResponse.data) ? recentResponse.data : []);
@@ -29,7 +37,7 @@ const FeedPage = () => {
       }
     };
     loadFeed();
-  }, []);
+  }, [isAuthenticated]);
 
   useEffect(() => {
     const container = trendingRef.current;
@@ -60,7 +68,13 @@ const FeedPage = () => {
             <p className="line-clamp-3 text-sm font-medium text-foreground">{post.content || post.title}</p>
             {post.user?.username && <p className="mt-2 text-xs text-muted-foreground">Por <Link className="text-skillswap-teal hover:underline" to={`/perfil/${post.user.username}`}>@{post.user.username}</Link></p>}
             {post.communityId && <Link className="mt-1 block text-xs text-skillswap-teal hover:underline" to={`/comunidades/${post.communityId}`}>Ver comunidade: {post.communityName || post.community}</Link>}
-            <p className="mt-2 text-xs text-muted-foreground">{(post.likesCount || 0) + (post.commentsCount || 0) + (post.repostsCount || 0) + (post.sharesCount || 0)} interações</p>
+            <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-muted-foreground" aria-label="Pontuação em alta">
+              <span>{post.likesCount || 0} curtidas</span>
+              <span>{post.commentsCount || 0} comentários</span>
+              <span>{post.repostsCount || 0} reposts</span>
+              <span>{post.sharesCount || 0} compartilhamentos</span>
+              <span className="inline-flex items-center gap-1"><Eye className="h-3 w-3" />{post.viewsCount || 0} views</span>
+            </div>
           </div>) : <p className="text-sm text-muted-foreground">Ainda não há publicações em alta.</p>}
         </div>
 

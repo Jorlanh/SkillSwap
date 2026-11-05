@@ -68,7 +68,7 @@ const Header = () => {
         </div>
 
         {/* NAVEGAÇÃO E PERFIL */}
-        <div className="flex shrink-0 items-center gap-1.5 sm:gap-6">
+        <div className="relative z-10 ml-auto flex shrink-0 items-center gap-1.5 sm:gap-6">
           <Link to="/" title="Home" className="hidden sm:block text-foreground hover:text-skillswap-teal transition-all">
             <Home className="h-6 w-6" />
           </Link>

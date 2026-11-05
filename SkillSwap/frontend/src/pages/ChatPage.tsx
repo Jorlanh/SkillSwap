@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
-import { ChatService, BASE_URL, RatingService, UserService, ProfileService } from '@/services/api';
+import { ChatService, BASE_URL, RatingService, UserService, ProfileService, LessonService } from '@/services/api';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -26,10 +26,15 @@ const ChatPage = () => {
   const [showInfoPanel, setShowInfoPanel] = useState(false);
   const [isFollowing, setIsFollowing] = useState(false);
   const [isRatingModalOpen, setIsRatingModalOpen] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const [showSchedule, setShowSchedule] = useState(false);
+  const [scheduledAt, setScheduledAt] = useState('');
   
   const socket = useRef<WebSocket | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
 
   const [myData, setMyData] = useState<any>({});
 
@@ -49,8 +54,26 @@ const ChatPage = () => {
         const existingConversation = openChatTargetId
           ? data.find((convo: any) => String(convo?.user?.id || convo?.user?.userId) === String(openChatTargetId))
           : undefined;
-        const directConversation = openChatWith && openChatTargetId && !existingConversation
-          ? {
+        const openExistingOrFirst = (conversationData: any[]) => {
+          setConversations(conversationData);
+          const conversationToOpen = existingConversation || conversationData[0];
+          if (conversationToOpen) {
+            handleSelectConversation(conversationToOpen);
+            navigate(location.pathname, { replace: true, state: {} });
+          }
+        };
+
+        if (openChatWith && openChatTargetId && !existingConversation) {
+          // Não criamos uma conversa apenas no navegador. O backend só libera
+          // o chat depois que uma proposta entre os dois usuários for aceita.
+          ChatService.canMessage(String(openChatTargetId)).then((permission) => {
+            if (!permission.data?.allowed) {
+              toast.info('Envie uma proposta e aguarde a aceitação para iniciar a conversa.');
+              openExistingOrFirst(data);
+              navigate(location.pathname, { replace: true, state: {} });
+              return;
+            }
+            const directConversation = {
               id: `direct-${openChatTargetId}`,
               user: {
                 id: openChatTargetId,
@@ -59,17 +82,16 @@ const ChatPage = () => {
                 name: openChatWith.name,
                 avatarUrl: openChatWith.avatarUrl || openChatWith.profile?.imageUrl,
               },
-              lastMessage: 'Nova conversa...',
-            }
-          : null;
-        const nextConversations = directConversation ? [directConversation, ...data] : data;
-        setConversations(nextConversations);
-        const conversationToOpen = existingConversation || directConversation;
-        if (conversationToOpen) {
-          handleSelectConversation(conversationToOpen);
-          navigate(location.pathname, { replace: true, state: {} });
-        } else if (data.length > 0) {
-          handleSelectConversation(data[0]);
+              lastMessage: 'Conversa liberada',
+            };
+            openExistingOrFirst([directConversation, ...data]);
+          }).catch(() => {
+            toast.info('Envie uma proposta e aguarde a aceitação para iniciar a conversa.');
+            openExistingOrFirst(data);
+            navigate(location.pathname, { replace: true, state: {} });
+          });
+        } else {
+          openExistingOrFirst(data);
         }
       })
       .catch(() => {
@@ -120,6 +142,10 @@ const ChatPage = () => {
       socket.current.onmessage = (event) => {
         try {
           const msg = JSON.parse(event.data);
+          if (msg?.type === 'error') {
+            toast.error(msg.message || 'Não foi possível enviar a mensagem.');
+            return;
+          }
           setMessages(prev => [...prev, msg]);
           scrollToBottom();
         } catch (e) { console.error("Erro na decodificação WS."); }
@@ -157,6 +183,70 @@ const ChatPage = () => {
                 setMessage('');
                 scrollToBottom();
             }).catch(() => toast.error("Conexão com servidor de chat falhou."));
+    }
+  };
+
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    const receiverId = selectedConvo?.user?.id || selectedConvo?.user?.userId;
+    if (!file || !receiverId) return;
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('receiverId', receiverId);
+    try {
+      const { data } = await ChatService.uploadAttachment(formData);
+      setMessages((current) => [...current, data]);
+      toast.success('Arquivo enviado.');
+    } catch { toast.error('Não foi possível enviar o arquivo.'); }
+    event.target.value = '';
+  };
+
+  const startAudioRecording = async () => {
+    if (isRecording || !selectedConvo) return;
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream);
+      audioChunksRef.current = [];
+      recorder.ondataavailable = (event) => { if (event.data.size > 0) audioChunksRef.current.push(event.data); };
+      recorder.onstop = async () => {
+        stream.getTracks().forEach((track) => track.stop());
+        const receiverId = selectedConvo?.user?.id || selectedConvo?.user?.userId;
+        if (!receiverId) return;
+        const formData = new FormData();
+        formData.append('voice', new Blob(audioChunksRef.current, { type: recorder.mimeType || 'audio/webm' }), 'mensagem.webm');
+        formData.append('receiverId', receiverId);
+        try {
+          const { data } = await ChatService.sendVoiceMessage(formData);
+          setMessages((current) => [...current, data]);
+        } catch { toast.error('Não foi possível enviar o áudio.'); }
+      };
+      mediaRecorderRef.current = recorder;
+      recorder.start();
+      setIsRecording(true);
+    } catch { toast.error('Permita o microfone para gravar uma mensagem de áudio.'); }
+  };
+
+  const stopAudioRecording = () => {
+    mediaRecorderRef.current?.stop();
+    mediaRecorderRef.current = null;
+    setIsRecording(false);
+  };
+
+  const scheduleLesson = async () => {
+    const teacherId = selectedConvo?.user?.id || selectedConvo?.user?.userId;
+    if (!teacherId || !myData.userId || !scheduledAt) return;
+    try {
+      const { data } = await LessonService.schedule({
+        teacherId,
+        studentId: myData.userId,
+        scheduledTime: new Date(scheduledAt).toISOString(),
+      });
+      if (data?.lessonId) await LessonService.notify(data.lessonId).catch(() => undefined);
+      setShowSchedule(false);
+      setScheduledAt('');
+      toast.success('Aula agendada. Os participantes foram notificados.');
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || 'Não foi possível agendar a aula.');
     }
   };
 
@@ -238,9 +328,13 @@ const ChatPage = () => {
                     <p className="text-xs text-muted-foreground">@{selectedConvo?.user?.username}</p>
                 </div>
               </div>
-              <div className="flex gap-2 shrink-0">
-                 <Button variant="default" size="sm" className="hidden sm:flex bg-green-600 hover:bg-green-700 text-white font-bold" onClick={() => setIsRatingModalOpen(true)}>
-                    <CheckCircle2 size={16} className="mr-2"/> Encerrar Curso
+              <div className="flex flex-wrap justify-end gap-1 sm:gap-2 shrink-0">
+                 <Button variant="outline" size="sm" className="h-9 w-9 px-0 sm:h-10 sm:w-auto sm:px-3" title="Iniciar chamada de vídeo e áudio" onClick={() => navigate(`/chamada/${selectedConvo?.user?.id || selectedConvo?.user?.userId}`)} disabled={!selectedConvo?.user?.id && !selectedConvo?.user?.userId}>
+                    <Video size={16} className="sm:mr-2" /><span className="hidden sm:inline">Chamada</span>
+                 </Button>
+                 <Button variant="outline" size="sm" className="h-9 w-9 px-0 sm:h-10 sm:w-auto sm:px-3" title="Agendar aula" onClick={() => setShowSchedule((current) => !current)}><Calendar size={16} className="sm:mr-2" /><span className="hidden sm:inline">Agendar</span></Button>
+                 <Button variant="default" size="sm" className="h-9 w-9 px-0 sm:h-10 sm:w-auto sm:px-3 bg-green-600 hover:bg-green-700 text-white font-bold" title="Encerrar curso" onClick={() => setIsRatingModalOpen(true)}>
+                    <CheckCircle2 size={16} className="sm:mr-2"/><span className="hidden sm:inline">Encerrar Curso</span>
                  </Button>
                  <Button variant="ghost" size="icon" onClick={() => setShowInfoPanel(!showInfoPanel)}>
                     <Info size={20} className={showInfoPanel ? "text-skillswap-teal" : ""} />
@@ -249,22 +343,39 @@ const ChatPage = () => {
             </div>
 
             <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
-              {messages.map((msg, i) => (
-                <div key={i} className={`flex flex-col ${msg?.senderId === myData.userId || msg?.isOwn ? 'items-end' : 'items-start'}`}>
-                  <div className={`max-w-[75%] px-4 py-2 text-sm shadow-sm relative ${msg?.senderId === myData.userId || msg?.isOwn ? 'bg-skillswap-teal text-white rounded-2xl rounded-tr-none' : 'bg-card border border-border rounded-2xl rounded-tl-none'}`}>
-                    <p className="whitespace-pre-wrap break-words">{msg?.content}</p>
+              {messages.map((msg, i) => {
+                const senderId = msg?.senderId || msg?.sender?.userId || msg?.sender?.id;
+                const ownMessage = String(senderId) === String(myData.userId) || msg?.isOwn;
+                return (
+                <div key={msg?.messageId || msg?.id || i} className={`flex flex-col ${ownMessage ? 'items-end' : 'items-start'}`}>
+                  <div className={`max-w-[90%] sm:max-w-[75%] px-4 py-2 text-sm shadow-sm relative ${ownMessage ? 'bg-skillswap-teal text-white rounded-2xl rounded-tr-none' : 'bg-card border border-border rounded-2xl rounded-tl-none'}`}>
+                    {msg?.content && <p className="whitespace-pre-wrap break-words">{msg.content}</p>}
+                    {msg?.voiceData && <audio controls className="max-w-full" src={`data:audio/webm;base64,${msg.voiceData}`} />}
+                    {msg?.fileData && <a className="underline" download="arquivo" href={`data:${msg.fileType || 'application/octet-stream'};base64,${msg.fileData}`}>Baixar arquivo</a>}
                   </div>
                   <span className="text-[10px] text-muted-foreground mt-1 px-1">{formatMessageTime(msg.timestamp || msg.sentAt)}</span>
                 </div>
-              ))}
+                );
+              })}
               <div ref={messagesEndRef} />
             </div>
+
+            {showSchedule && <div className="border-t border-border bg-card p-3">
+              <div className="flex flex-wrap items-end gap-2">
+                <label className="text-xs font-semibold text-muted-foreground">Data e hora da aula
+                  <input type="datetime-local" min={new Date().toISOString().slice(0, 16)} value={scheduledAt} onChange={(event) => setScheduledAt(event.target.value)} className="mt-1 block rounded-md border border-border bg-background px-2 py-2 text-sm" />
+                </label>
+                <Button type="button" onClick={() => void scheduleLesson()} disabled={!scheduledAt} className="bg-skillswap-teal text-white">Salvar no calendário</Button>
+              </div>
+              <p className="mt-2 text-xs text-muted-foreground">Se o Google Calendar estiver habilitado no backend, o evento também será criado no calendário compartilhado.</p>
+            </div>}
 
             {/* BARRA DE INPUT */}
             <div className="p-4 bg-background border-t border-border">
               <div className="flex items-end gap-2 bg-muted/30 p-2 rounded-3xl border border-border focus-within:ring-1 focus-within:ring-skillswap-teal transition-shadow">
                 <Button variant="ghost" size="icon" className="rounded-full shrink-0" onClick={() => fileInputRef.current?.click()}><Plus size={22} /></Button>
-                <input type="file" ref={fileInputRef} hidden />
+                <input type="file" ref={fileInputRef} hidden onChange={(event) => void handleFileUpload(event)} />
+                <Button variant={isRecording ? 'destructive' : 'ghost'} size="icon" className="rounded-full shrink-0" onClick={() => isRecording ? stopAudioRecording() : void startAudioRecording()} aria-label={isRecording ? 'Parar gravação' : 'Gravar mensagem de áudio'}><Mic size={20} /></Button>
                 <Textarea
                   value={message}
                   onChange={(e) => setMessage(e.target.value)}
@@ -283,7 +394,7 @@ const ChatPage = () => {
           <div className="flex-1 flex items-center justify-center text-muted-foreground flex-col gap-4 text-center p-8">
              <Send className="text-skillswap-teal w-12 h-12 opacity-20 ml-2" />
              <p className="font-bold text-lg text-foreground">Sua Central de Trocas</p>
-             <p className="text-sm max-w-xs">Selecione um navegador na lista para iniciar uma troca de conhecimento.</p>
+             <p className="text-sm max-w-xs">Selecione uma conversa na lista para iniciar uma troca de conhecimento.</p>
           </div>
         )}
 

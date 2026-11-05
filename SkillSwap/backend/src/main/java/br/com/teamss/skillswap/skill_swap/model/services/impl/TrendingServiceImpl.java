@@ -29,7 +29,7 @@ public class TrendingServiceImpl implements TrendingService {
     @Override
     public List<Post> getTrendingPosts(String period, int limit) {
         Instant startTime = getStartTime(period);
-        List<Post> posts = postRepository.findTrendingPosts(startTime);
+        List<Post> posts = postRepository.findTrendingPostsWithViews(startTime);
         if (posts.isEmpty()) {
             // Uma plataforma nova ainda precisa mostrar o conteúdo recente,
             // mesmo antes de existir volume suficiente para a janela de alta.
@@ -49,10 +49,14 @@ public class TrendingServiceImpl implements TrendingService {
         return posts.stream()
                 .map(post -> {
                     int clicks = shareClicks.getOrDefault(post.getPostId(), 0);
-                    double score = (post.getLikesCount() * 0.25) +
-                                   (post.getCommentsCount() * 0.25) +
-                                   (post.getRepostsCount() * 0.25) +
-                                   (clicks * 0.25);
+                    // Ranking público: curtidas, comentários, reposts,
+                    // compartilhamentos e visualizações.
+                    double score = post.getLikesCount()
+                            + post.getCommentsCount()
+                            + post.getRepostsCount()
+                            + post.getSharesCount()
+                            + clicks
+                            + post.getViewsCount();
                     post.setTrendingScore(score);
                     return post;
                 })

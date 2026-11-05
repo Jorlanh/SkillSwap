@@ -120,8 +120,8 @@ public class ProposalServiceImpl implements ProposalService {
         return proposals.stream().map(proposal -> {
             ProposalResponseDTO dto = new ProposalResponseDTO();
             dto.setProposalId(proposal.getProposalId());
-            dto.setSender(new UserSummaryDTO(proposal.getSender().getUsername(), proposal.getSender().getName()));
-            dto.setReceiver(new UserSummaryDTO(proposal.getReceiver().getUsername(), proposal.getReceiver().getName()));
+            dto.setSender(toSummary(proposal.getSender()));
+            dto.setReceiver(toSummary(proposal.getReceiver()));
             dto.setOfferedSkill(proposal.getOfferedSkill());
             dto.setRequestedSkill(proposal.getRequestedSkill());
             dto.setStatus(proposal.getStatus());
@@ -129,6 +129,13 @@ public class ProposalServiceImpl implements ProposalService {
             dto.setUpdatedAt(proposal.getUpdatedAt());
             return dto;
         }).collect(Collectors.toList());
+    }
+
+    private UserSummaryDTO toSummary(User user) {
+        UserSummaryDTO summary = new UserSummaryDTO(user.getUserId(), user.getUsername(), user.getName());
+        summary.setVerifiedBadge(user.isVerifiedBadge());
+        summary.setAvatarUrl(user.getProfile() == null ? null : user.getProfile().getImageUrl());
+        return summary;
     }
 
     @Override
@@ -253,6 +260,13 @@ public class ProposalServiceImpl implements ProposalService {
         eventPublisher.publishEvent(new ProposalCompletedEvent(this, savedProposal));
 
         return savedProposal;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public boolean canMessage(UUID userId1, UUID userId2) {
+        if (userId1 == null || userId2 == null || userId1.equals(userId2)) return false;
+        return proposalRepository.existsAcceptedBetween(userId1, userId2);
     }
 
     // REMOVIDO: checkAutomaticVerification (movido para o Listener)

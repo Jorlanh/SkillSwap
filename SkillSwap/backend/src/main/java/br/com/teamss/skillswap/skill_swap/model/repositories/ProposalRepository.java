@@ -20,4 +20,10 @@ public interface ProposalRepository extends JpaRepository<Proposal, Long> {
     long countByStatusAndParticipant(@Param("status") String status, @Param("userId") UUID userId);
 
     long countByStatus(String status);
+
+    @Query("SELECT CASE WHEN COUNT(p) > 0 THEN true ELSE false END FROM Proposal p " +
+           "WHERE p.status IN ('ACCEPTED', 'COMPLETED') AND " +
+           "((p.sender.userId = :userId1 AND p.receiver.userId = :userId2) OR " +
+           "(p.sender.userId = :userId2 AND p.receiver.userId = :userId1))")
+    boolean existsAcceptedBetween(@Param("userId1") UUID userId1, @Param("userId2") UUID userId2);
 }

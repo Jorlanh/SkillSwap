@@ -167,9 +167,20 @@ public class PostServiceImpl implements PostService {
 
         if (repostRepository.existsByPost_PostIdAndUser_UserId(postId, userId)) {
             repostRepository.deleteByPost_PostIdAndUser_UserId(postId, userId);
+            postRepository.deleteAll(postRepository.findByRepostOfAndUserUserId(postId, userId));
             originalPost.setRepostsCount(Math.max(0, originalPost.getRepostsCount() - 1));
         } else {
             repostRepository.save(new Repost(originalPost, user));
+            Post repost = new Post();
+            repost.setUser(user);
+            repost.setProfile(ensureProfile(user));
+            repost.setTitle(originalPost.getTitle());
+            repost.setContent(originalPost.getContent());
+            repost.setImageUrl(originalPost.getImageUrl());
+            repost.setVideoUrl(originalPost.getVideoUrl());
+            repost.setRepostOf(originalPost.getPostId());
+            repost.setCreatedAt(Instant.now());
+            postRepository.save(repost);
             originalPost.setRepostsCount(originalPost.getRepostsCount() + 1);
             notificationService.createNotification(originalPost.getUser().getUserId(), "Seu post foi repostado por " + user.getUsername());
         }
@@ -311,8 +322,9 @@ public class PostServiceImpl implements PostService {
             String[] words = post.getContent().toLowerCase().split("\\W+");
             for (String word : words) {
                 if (word.length() > 3) {
-                    double score = (post.getLikesCount() + post.getRepostsCount() +
-                            post.getCommentsCount() + post.getSharesCount()) / 4.0;
+                    double score = post.getLikesCount() + post.getRepostsCount()
+                            + post.getCommentsCount() + post.getSharesCount()
+                            + post.getViewsCount();
                     // Correção de Null Safety no merge
                     topicScores.merge(word, score, Double::sum);
                 }

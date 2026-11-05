@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { MessageSquare, Repeat2, ArrowUp, Share, Send, Heart, Trash2, Reply } from 'lucide-react';
+import { MessageSquare, Repeat2, ArrowUp, Share, Send, Heart, Trash2, Reply, Eye } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useOutletContext, useNavigate } from 'react-router-dom';
@@ -285,10 +285,11 @@ const PostCard = ({ post }: PostCardProps) => {
       {(post.imageUrl || post.image) && <div className="rounded-xl overflow-hidden mb-3 border border-border bg-muted/20"><img src={post.imageUrl || post.image} alt="Imagem da publicação" className="w-full max-h-[500px] object-cover" /></div>}
       {post.videoUrl && <video controls className="w-full max-h-[500px] rounded-xl mb-3" src={post.videoUrl} />}
 
-      <div className="flex items-center gap-6 pt-2 border-t border-border">
+      <div className="flex flex-wrap items-center gap-4 pt-2 border-t border-border">
         <button type="button" onClick={() => setShowComments(!showComments)} className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground"><MessageSquare className="h-4 w-4" /><span>{formatNumber(commentsCount)}</span></button>
         <button type="button" onClick={handleRepost} className={`flex items-center gap-1.5 text-xs font-medium ${isReposted ? 'text-green-500' : 'text-muted-foreground hover:text-green-500'}`}><Repeat2 className="h-4 w-4" /><span>{formatNumber(repostsCount)}</span></button>
         <button type="button" onClick={handleLike} className={`flex items-center gap-1.5 text-xs font-medium ${isLiked ? 'text-red-500 font-bold' : 'text-muted-foreground hover:text-red-500'}`}><ArrowUp className={`h-4 w-4 ${isLiked ? 'fill-red-500' : ''}`} /><span>{formatNumber(likesCount)}</span></button>
+        <span className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground" title="Visualizações"><Eye className="h-4 w-4" /><span>{formatNumber(post.viewsCount)}</span></span>
         <button type="button" onClick={handleShare} className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground ml-auto" aria-label="Compartilhar publicação"><Share className="h-4 w-4" /></button>
       </div>
 

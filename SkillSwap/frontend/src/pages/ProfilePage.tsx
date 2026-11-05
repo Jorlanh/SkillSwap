@@ -58,6 +58,7 @@ const ProfilePage = () => {
 
   // Estados Dinâmicos de Interação
   const [isFollowing, setIsFollowing] = useState(false);
+  const [canMessage, setCanMessage] = useState(false);
 
   // Estados de Edição
   const [editName, setEditName] = useState("");
@@ -135,6 +136,17 @@ const ProfilePage = () => {
       const targetId = targetUser.userId || targetUser.id;
       const followingIds = Array.isArray(meData?.followingIds) ? meData.followingIds : [];
       setIsFollowing(followingIds.some((id: any) => String(id) === String(targetId)));
+      const viewingOwnProfile = !urlUsername || (meData && urlUsername === meData.username);
+      if (!viewingOwnProfile && targetId) {
+        try {
+          const permission = await ProposalService.canMessage(String(targetId));
+          setCanMessage(Boolean(permission.data?.allowed));
+        } catch {
+          setCanMessage(false);
+        }
+      } else {
+        setCanMessage(false);
+      }
 
       const tId = targetUser.userId || targetUser.id;
       if (tId) {
@@ -306,6 +318,10 @@ const ProfilePage = () => {
 
   // NAVEGAÇÃO PARA O CHAT
   const handleOpenChat = () => {
+    if (!canMessage) {
+      toast.info('A mensagem direta fica disponível depois que uma proposta for aceita.');
+      return;
+    }
     // Redireciona e passa o targetUser no state para que a página de chat já abra a conversa dele
     navigate('/mensagens', { state: { openChatWith: user } });
   };
@@ -443,9 +459,9 @@ const ProfilePage = () => {
                        {isFollowing ? "Deixar de seguir" : "Seguir"}
                     </Button>
                     {/* BOTÃO CHAT CORRIGIDO */}
-                    <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-muted hover:bg-skillswap-teal hover:text-white" onClick={handleOpenChat}>
+                    {canMessage && <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-muted hover:bg-skillswap-teal hover:text-white" onClick={handleOpenChat} aria-label="Enviar mensagem">
                        <Mail size={16} />
-                    </Button>
+                    </Button>}
                   </>
                 ) : (
                   <Button variant="outline" size="sm" onClick={() => setIsEditing(true)} className="rounded-full font-bold px-4 flex gap-2 border-skillswap-teal text-skillswap-teal">

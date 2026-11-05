@@ -18,6 +18,10 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import br.com.teamss.skillswap.skill_swap.model.entities.User;
 import br.com.teamss.skillswap.skill_swap.model.repositories.UserRepository;
+import br.com.teamss.skillswap.skill_swap.dto.ChatMessageRequestDTO;
+import br.com.teamss.skillswap.skill_swap.model.entities.ChatMessage;
+import br.com.teamss.skillswap.skill_swap.model.services.ChatService;
+import java.util.UUID;
 
 @Component
 public class ChatWebSocketHandler extends TextWebSocketHandler {
@@ -27,6 +31,7 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
     private final ObjectMapper objectMapper;
     private final JwtDecoder jwtDecoder;
     private final UserRepository userRepository;
+    private final ChatService chatService;
 
     // Chaves do Redis para mapear usuário -> sessão
     private static final String REDIS_KEY_USER_TO_SESSION = "skillswap:chat:user_sessions";
@@ -40,12 +45,14 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
                                 ChannelTopic chatTopic,
                                 ObjectMapper objectMapper,
                                 JwtDecoder jwtDecoder,
-                                UserRepository userRepository) {
+                                UserRepository userRepository,
+                                ChatService chatService) {
         this.redisTemplate = redisTemplate;
         this.chatTopic = chatTopic;
         this.objectMapper = objectMapper;
         this.jwtDecoder = jwtDecoder;
         this.userRepository = userRepository;
+        this.chatService = chatService;
     }
 
     @Override
@@ -90,10 +97,35 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
             ((com.fasterxml.jackson.databind.node.ObjectNode) jsonMessage).put("senderId", authenticatedUserId);
         }
 
-        // Publica a mensagem normalizada no Redis para que todos os servidores
-        // recebam também o senderId derivado da identidade autenticada.
-        // O subscriber (RedisMessageSubscriber) cuidará da distribuição
-        redisTemplate.convertAndSend(chatTopic.getTopic(), objectMapper.writeValueAsString(jsonMessage));
+        if (!jsonMessage.hasNonNull("receiverId") || !jsonMessage.hasNonNull("content")) {
+            session.sendMessage(new TextMessage("{\"type\":\"error\",\"message\":\"Mensagem inválida.\"}"));
+            return;
+        }
+
+        try {
+            com.fasterxml.jackson.databind.node.ObjectNode requestNode =
+                    ((com.fasterxml.jackson.databind.node.ObjectNode) jsonMessage).deepCopy();
+            requestNode.remove("type");
+            ChatMessageRequestDTO request = objectMapper.treeToValue(requestNode, ChatMessageRequestDTO.class);
+            request.setSenderId(UUID.fromString(authenticatedUserId));
+            ChatMessage saved = chatService.sendMessage(request);
+
+            // Persiste pelo mesmo serviço usado pelo endpoint HTTP e publica
+            // somente um payload enxuto, evitando serializar User e criar ciclos.
+            var persistedPayload = objectMapper.createObjectNode()
+                    .put("id", saved.getMessageId())
+                    .put("senderId", saved.getSender().getUserId().toString())
+                    .put("receiverId", saved.getReceiver().getUserId().toString())
+                    .put("content", saved.getContent() == null ? "" : saved.getContent())
+                    .put("sentAt", saved.getSentAt().toString())
+                    .put("type", "TEXT");
+            redisTemplate.convertAndSend(chatTopic.getTopic(), persistedPayload.toString());
+        } catch (Exception exception) {
+            session.sendMessage(new TextMessage(objectMapper.createObjectNode()
+                    .put("type", "error")
+                    .put("message", exception.getMessage() == null ? "Não foi possível enviar a mensagem." : exception.getMessage())
+                    .toString()));
+        }
     }
 
     /**

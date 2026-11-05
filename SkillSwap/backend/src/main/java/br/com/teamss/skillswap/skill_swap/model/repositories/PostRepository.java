@@ -13,7 +13,7 @@ import java.util.UUID;
 @Repository
 public interface PostRepository extends JpaRepository<Post, Long> {
     @Query("SELECT p FROM Post p WHERE p.createdAt >= :startTime " +
-           "ORDER BY (p.likesCount + p.repostsCount + p.commentsCount + p.sharesCount) DESC")
+           "ORDER BY (p.likesCount + p.repostsCount + p.commentsCount + p.sharesCount + p.viewsCount) DESC")
     List<Post> findTrendingPosts(@Param("startTime") Instant startTime);
 
     @Query("SELECT p FROM Post p WHERE p.createdAt >= :startTime " +
@@ -29,13 +29,15 @@ public interface PostRepository extends JpaRepository<Post, Long> {
     List<Post> findTop50ByContentContainingIgnoreCaseOrTitleContainingIgnoreCase(String content, String title);
 
     @Query("SELECT p FROM Post p WHERE p.community.communityId = :communityId AND p.createdAt >= :startTime " +
-           "ORDER BY (p.likesCount + p.repostsCount + p.commentsCount + p.sharesCount) DESC")
+           "ORDER BY (p.likesCount + p.repostsCount + p.commentsCount + p.sharesCount + p.viewsCount) DESC")
     List<Post> findByCommunity_CommunityId(@Param("communityId") UUID communityId, @Param("startTime") Instant startTime);
 
     List<Post> findByCommunity_CommunityId(UUID communityId);
 
     @Query("SELECT p FROM Post p WHERE p.repostOf IS NOT NULL AND p.user.userId = :userId")
     List<Post> findByRepostOfIsNotNullAndUserUserId(@Param("userId") UUID userId);
+
+    List<Post> findByRepostOfAndUserUserId(Long repostOf, UUID userId);
 
     @Query("SELECT p FROM Post p WHERE p.community.communityId IN :communityIds")
     List<Post> findByCommunity_CommunityIdIn(@Param("communityIds") List<UUID> communityIds);
