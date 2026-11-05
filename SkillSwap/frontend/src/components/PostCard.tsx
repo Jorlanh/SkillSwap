@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { MessageSquare, Repeat2, ArrowUp, Share, Send, Heart, Trash2, Reply, BadgeCheck } from 'lucide-react';
+import { MessageSquare, Repeat2, ArrowUp, Share, Send, Heart, Trash2, Reply } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useOutletContext, useNavigate } from 'react-router-dom';
@@ -8,6 +8,7 @@ import { HomeService, ProfileService, UserService } from '@/services/api';
 import { auth } from '@/lib/firebase';
 import { onIdTokenChanged } from 'firebase/auth';
 import { toast } from 'sonner';
+import VerifiedBadge from '@/components/VerifiedBadge';
 
 interface PostCardProps {
   post: any;
@@ -61,6 +62,7 @@ const PostCard = ({ post }: PostCardProps) => {
 
   const author = post.user || post.author || { username: 'Usuário', avatarUrl: '' };
   const postId = post.postId ?? post.id;
+  const communityId = post.communityId ?? post.community?.communityId ?? post.community?.id;
 
   useEffect(() => {
     if (!showComments || !postId) return;
@@ -185,14 +187,14 @@ const PostCard = ({ post }: PostCardProps) => {
           onClick={() => navigate(`/perfil/${author.username}`)}
         >
           <Avatar className="h-10 w-10 shrink-0 border border-border group-hover:border-skillswap-teal transition-colors">
-            <AvatarImage src={author.avatarUrl || author.imageUrl || author.avatar} />
+            <AvatarImage src={author.avatarUrl || author.imageUrl || author.avatar || author.profile?.imageUrl} />
             <AvatarFallback>{author.username?.[0]?.toUpperCase()}</AvatarFallback>
           </Avatar>
           
           <div className="min-w-0">
             <p className="text-sm font-bold text-foreground truncate group-hover:text-skillswap-teal transition-colors flex items-center gap-1">
               {author.name || author.username}
-              {author.verifiedBadge && <BadgeCheck className="h-4 w-4 text-skillswap-teal shrink-0" aria-label="Usuário verificado" />}
+              <VerifiedBadge user={author} size={18} />
             </p>
             <p className="text-xs text-muted-foreground truncate">@{author.username?.toLowerCase()}</p>
           </div>
@@ -211,7 +213,11 @@ const PostCard = ({ post }: PostCardProps) => {
       <div className="mb-3 space-y-2">
         {post.title && <h3 className="font-bold text-base">{post.title}</h3>}
         <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">{post.content}</p>
-        {(post.community || post.communityName) && <p className="text-xs text-muted-foreground">Publicado em {post.community || post.communityName}</p>}
+        {(post.community || post.communityName) && (
+          <button type="button" onClick={() => (communityId ? navigate(`/comunidades/${communityId}`) : undefined)} className="text-xs text-skillswap-teal hover:underline text-left">
+            Publicado em {post.communityName || post.community}
+          </button>
+        )}
         {post.createdAt && <time dateTime={post.createdAt} className="text-[11px] text-muted-foreground">{new Date(post.createdAt).toLocaleString('pt-BR')}</time>}
       </div>
 

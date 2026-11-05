@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import java.time.Instant;
+import java.util.Locale;
 
 @Service
 public class AccessLogServiceImpl implements AccessLogService {
@@ -52,5 +53,17 @@ public class AccessLogServiceImpl implements AccessLogService {
                     log.getCountry()
                 ))
                 .collect(Collectors.toList());
+    }
+
+    @Override
+    public void updateLatestLocation(UUID userId, double latitude, double longitude) {
+        if (latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
+            throw new IllegalArgumentException("Coordenadas inválidas.");
+        }
+        accessLogRepository.findTopByUserIdOrderByAccessTimeDesc(userId).ifPresent(log -> {
+            log.setLocation(String.format(Locale.US, "%.6f, %.6f", latitude, longitude));
+            log.setCity("Localização do dispositivo");
+            accessLogRepository.save(log);
+        });
     }
 }

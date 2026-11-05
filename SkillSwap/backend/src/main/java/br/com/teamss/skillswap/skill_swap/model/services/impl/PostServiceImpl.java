@@ -229,7 +229,17 @@ public class PostServiceImpl implements PostService {
             }
             dto.setTitle(post.getTitle());
             dto.setContent(post.getContent());
-            dto.setUser(new UserSummaryDTO(post.getUser().getUsername(), post.getUser().getName()));
+            UserSummaryDTO summary = new UserSummaryDTO(post.getUser().getUsername(), post.getUser().getName(), post.getUser().isVerifiedBadge());
+            summary.setUserId(post.getUser().getUserId());
+            Profile currentProfile = post.getUser().getProfile() != null ? post.getUser().getProfile() : post.getProfile();
+            summary.setAvatarUrl(currentProfile == null ? null : currentProfile.getImageUrl());
+            dto.setUser(summary);
+            if (post.getCommunity() != null) {
+                dto.setCommunity(post.getCommunity().getName());
+                dto.setCommunityId(post.getCommunity().getCommunityId());
+                dto.setCommunityName(post.getCommunity().getName());
+                dto.setCommunityImageUrl(post.getCommunity().getImageUrl());
+            }
             dto.setImageUrl(post.getImageUrl());
             dto.setVideoUrl(post.getVideoUrl());
             dto.setCreatedAt(post.getCreatedAt());

@@ -21,6 +21,9 @@ public class PostResponseDTO {
     // Se o seu sistema retorna um objeto para a comunidade, 
     // o Frontend deve acessar community.name
     private Object community; 
+    private UUID communityId;
+    private String communityName;
+    private String communityImageUrl;
     
     private String imageUrl;
     private String videoUrl;
@@ -48,6 +51,12 @@ public class PostResponseDTO {
     public void setUser(UserSummaryDTO user) { this.user = user; }
     public Object getCommunity() { return community; }
     public void setCommunity(Object community) { this.community = community; }
+    public UUID getCommunityId() { return communityId; }
+    public void setCommunityId(UUID communityId) { this.communityId = communityId; }
+    public String getCommunityName() { return communityName; }
+    public void setCommunityName(String communityName) { this.communityName = communityName; }
+    public String getCommunityImageUrl() { return communityImageUrl; }
+    public void setCommunityImageUrl(String communityImageUrl) { this.communityImageUrl = communityImageUrl; }
     public String getImageUrl() { return imageUrl; }
     public void setImageUrl(String imageUrl) { this.imageUrl = imageUrl; }
     public String getVideoUrl() { return videoUrl; }

@@ -2,6 +2,7 @@ package br.com.teamss.skillswap.skill_swap.controllers;
 
 import br.com.teamss.skillswap.skill_swap.dto.AccessLogDTO;
 import br.com.teamss.skillswap.skill_swap.dto.UserDTO;
+import br.com.teamss.skillswap.skill_swap.dto.AccessLocationRequest;
 import br.com.teamss.skillswap.skill_swap.model.services.AccessLogService;
 import br.com.teamss.skillswap.skill_swap.model.services.UserServiceDTO;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -28,5 +29,12 @@ public class AccessLogController {
         UserDTO authenticatedUser = userServiceDTO.getAuthenticatedUser();
         List<AccessLogDTO> history = accessLogService.getAccessHistory(authenticatedUser.getUserId());
         return ResponseEntity.ok(history);
+    }
+
+    @PostMapping("/me/location")
+    public ResponseEntity<Void> updateMyLocation(@jakarta.validation.Valid @RequestBody AccessLocationRequest request) {
+        UserDTO authenticatedUser = userServiceDTO.getAuthenticatedUser();
+        accessLogService.updateLatestLocation(authenticatedUser.getUserId(), request.latitude(), request.longitude());
+        return ResponseEntity.noContent().build();
     }
 }

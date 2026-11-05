@@ -24,6 +24,9 @@ const SearchPage = () => {
     const filter = activeFilter === 'Pessoas' ? 'USER' : activeFilter === 'Comunidade' ? 'COMMUNITY' : activeFilter === 'Palavra-chave' ? 'POST' : 'ALL';
     const timer = window.setTimeout(() => {
       setIsLoading(true);
+      const previous = JSON.parse(window.localStorage.getItem('skillswap.searches') || '[]');
+      const searches = [normalizedQuery.toLowerCase(), ...(Array.isArray(previous) ? previous : [])].filter((value, index, values) => values.indexOf(value) === index).slice(0, 20);
+      window.localStorage.setItem('skillswap.searches', JSON.stringify(searches));
       SearchService.search(normalizedQuery, filter)
         .then(({ data }) => setSearchResults(Array.isArray(data) ? data : []))
         .catch(() => { setSearchResults([]); setError(true); })

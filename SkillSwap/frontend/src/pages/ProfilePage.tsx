@@ -8,7 +8,6 @@ import SkillBadge from '@/components/SkillBadge';
 import PostCard from '@/components/PostCard';
 import RightSidebar from '@/components/RightSidebar';
 import VerifiedBadge from '@/components/VerifiedBadge';
-import StoriesBar from '@/components/StoriesBar';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent } from '@/components/ui/card';
 import { toast } from 'sonner';
@@ -379,7 +378,6 @@ const ProfilePage = () => {
     <div className="flex w-full gap-6 max-w-[1200px] mx-auto p-4">
       {/* CORREÇÃO VISUAL DA LARGURA: Expansão do max-w para dar espaço ao Card de Reputação */}
       <div className="flex-1 min-w-0">
-        <StoriesBar />
         
         {/* CABEÇALHO */}
         <div className="flex flex-col md:flex-row items-start gap-6 mb-6 bg-card p-6 rounded-2xl border border-border shadow-sm">

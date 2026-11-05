@@ -11,6 +11,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -29,8 +30,11 @@ public class ChatbotServiceImpl implements ChatbotService {
     @Value("${gemini.api.key}")
     private String apiKey;
 
-    @Value("${gemini.api.model:gemini-2.0-flash}")
+    @Value("${gemini.api.model:gemini-2.5-flash}")
     private String model;
+
+    @Value("${gemini.api.fallback-model:gemini-2.5-flash-lite}")
+    private String fallbackModel;
 
     public ChatbotServiceImpl(TranslationService translationService, WebClient.Builder webClientBuilder) {
         this.translationService = translationService;
@@ -56,16 +60,13 @@ public class ChatbotServiceImpl implements ChatbotService {
             requestBody.put("system_instruction", Map.of("parts", List.of(Map.of("text", systemPrompt))));
             requestBody.put("contents", List.of(Map.of("parts", List.of(Map.of("text", requestDTO.getMessage())))));
 
-            String url = "https://generativelanguage.googleapis.com/v1beta/models/" + model + ":generateContent";
-
-            String responseJson = webClient.post()
-                    .uri(url)
-                    .header("x-goog-api-key", apiKey)
-                    .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
-                    .bodyValue(requestBody)
-                    .retrieve()
-                    .bodyToMono(String.class)
-                    .block();
+            String responseJson;
+            try {
+                responseJson = callGemini(model, requestBody);
+            } catch (WebClientResponseException.NotFound notFound) {
+                logger.warn("O modelo Gemini '{}' não foi encontrado. Tentando '{}'.", model, fallbackModel);
+                responseJson = callGemini(fallbackModel, requestBody);
+            }
 
             JsonNode rootNode = objectMapper.readTree(responseJson);
             JsonNode candidatesNode = rootNode.path("candidates");
@@ -94,5 +95,17 @@ public class ChatbotServiceImpl implements ChatbotService {
             logger.error("Erro ao comunicar com a API do Google AI Studio: {}", e.getMessage(), e);
             return new ChatbotResponseDTO("Tive um problema para responder agora. Tente novamente em alguns instantes.", null, false);
         }
+    }
+
+    private String callGemini(String selectedModel, Map<String, Object> requestBody) {
+        String url = "https://generativelanguage.googleapis.com/v1beta/models/" + selectedModel + ":generateContent";
+        return webClient.post()
+                .uri(url)
+                .header("x-goog-api-key", apiKey)
+                .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+                .bodyValue(requestBody)
+                .retrieve()
+                .bodyToMono(String.class)
+                .block();
     }
 }

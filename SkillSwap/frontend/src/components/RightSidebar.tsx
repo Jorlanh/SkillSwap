@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Button } from '@/components/ui/button';
 import { HomeService } from '@/services/api';
-import { Link, useOutletContext } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 
 type ApiCommunity = {
   communityId?: string;
   id?: string;
   name?: string;
+  description?: string;
   members?: unknown[] | number;
   memberCount?: number;
   imageUrl?: string;
@@ -16,17 +16,24 @@ type ApiCommunity = {
 const communityId = (community: ApiCommunity) => String(community.communityId ?? community.id ?? '');
 
 const RightSidebar = () => {
-  const { requireAuth } = useOutletContext<{ requireAuth: (action: () => void) => void }>();
   const [communities, setCommunities] = useState<ApiCommunity[]>([]);
   const [topics, setTopics] = useState<string[]>([]);
-  const [joined, setJoined] = useState<string[]>([]);
 
   useEffect(() => {
     let active = true;
-    Promise.allSettled([HomeService.getCommunities(3), HomeService.getTrendingTopics()]).then(([communitiesResult, topicsResult]) => {
+    Promise.allSettled([HomeService.getCommunities(50), HomeService.getTrendingTopics()]).then(([communitiesResult, topicsResult]) => {
       if (!active) return;
       if (communitiesResult.status === 'fulfilled' && Array.isArray(communitiesResult.value.data)) {
-        setCommunities(communitiesResult.value.data);
+        let searches: string[] = [];
+        try {
+          const stored = JSON.parse(window.localStorage.getItem('skillswap.searches') || '[]');
+          searches = Array.isArray(stored) ? stored.map((value) => String(value).toLowerCase()) : [];
+        } catch { searches = []; }
+        const ranked = [...communitiesResult.value.data].sort((left, right) => {
+          const score = (community: ApiCommunity) => searches.reduce((total, term) => total + (String(community.name || '').toLowerCase().includes(term) || String(community.description || '').toLowerCase().includes(term) ? 1 : 0), 0);
+          return score(right) - score(left);
+        });
+        setCommunities(ranked.slice(0, 3));
       }
       if (topicsResult.status === 'fulfilled' && Array.isArray(topicsResult.value.data)) {
         setTopics(topicsResult.value.data);
@@ -34,13 +41,6 @@ const RightSidebar = () => {
     });
     return () => { active = false; };
   }, []);
-
-  const join = (id: string) => {
-    if (!id) return;
-    requireAuth(() => {
-      HomeService.joinCommunity(id).then(() => setJoined((current) => [...new Set([...current, id])]));
-    });
-  };
 
   return (
     <aside className="hidden xl:block w-64 shrink-0 space-y-6">
@@ -55,9 +55,7 @@ const RightSidebar = () => {
                 <AvatarFallback>{c.name?.slice(0, 1).toUpperCase() || 'C'}</AvatarFallback>
               </Avatar>
               <Link to={`/comunidades/${communityId(c)}`} className="text-sm text-foreground flex-1 truncate hover:text-skillswap-teal" title={c.name}>{c.name}</Link>
-              <Button size="sm" disabled={joined.includes(communityId(c))} onClick={() => join(communityId(c))} className="bg-skillswap-teal text-primary-foreground text-xs h-6 px-2 hover:opacity-90 shrink-0">
-                {joined.includes(communityId(c)) ? 'Membro' : 'Juntar-se'}
-              </Button>
+              <span className="text-[10px] text-muted-foreground shrink-0">Recomendação</span>
             </div>
           ))}
         </div> : <p className="text-sm text-muted-foreground">Nenhuma comunidade disponível no momento.</p>}

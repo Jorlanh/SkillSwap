@@ -9,6 +9,7 @@ import br.com.teamss.skillswap.skill_swap.model.entities.Repost;
 import br.com.teamss.skillswap.skill_swap.model.entities.ShareLink;
 import br.com.teamss.skillswap.skill_swap.dto.CommentDTO;
 import br.com.teamss.skillswap.skill_swap.dto.CreateCommunityRequest;
+import br.com.teamss.skillswap.skill_swap.dto.UpdateCommunityRequest;
 import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 import java.util.List;
@@ -19,6 +20,7 @@ public interface CommunityService {
     List<CommunitySummaryDTO> getCommunities(int limit);
     CommunitySummaryDTO createCommunity(CreateCommunityRequest request, UUID creatorId);
     CommunitySummaryDTO getCommunity(UUID communityId);
+    CommunitySummaryDTO updateCommunity(UUID communityId, UUID userId, UpdateCommunityRequest request);
     void updateCommunityImage(UUID communityId, UUID userId, MultipartFile image) throws IOException;
     Community joinCommunity(UUID communityId, UUID userId);
     List<Post> getCommunityPosts(UUID communityId);

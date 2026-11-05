@@ -72,7 +72,14 @@ const SettingsPage = () => {
       return;
     }
     navigator.geolocation.getCurrentPosition(
-      () => { setPermissions((current) => ({ ...current, localizacao: true })); toast.success('Localização autorizada neste navegador.'); },
+      ({ coords }) => {
+        setPermissions((current) => ({ ...current, localizacao: true }));
+        AccessLogService.updateMyLocation(coords.latitude, coords.longitude)
+          .then(() => AccessLogService.getMyAccessHistory())
+          .then(({ data }) => setAccessLogs(Array.isArray(data) ? data : []))
+          .catch(() => undefined);
+        toast.success('Localização autorizada neste navegador e registrada no último acesso.');
+      },
       () => { setPermissions((current) => ({ ...current, localizacao: false })); toast.error('A localização não foi autorizada. Revise o bloqueio nas configurações do navegador.'); },
       { enableHighAccuracy: false, timeout: 10000, maximumAge: 0 },
     );

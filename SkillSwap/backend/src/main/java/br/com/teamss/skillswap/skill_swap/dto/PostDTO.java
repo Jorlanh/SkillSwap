@@ -9,6 +9,7 @@ public class PostDTO {
     private String title;
     private UUID userId;
     private String username;
+    private UserSummaryDTO user;
     private Long profileId;
     private UUID communityId;
     private String communityName;
@@ -32,6 +33,8 @@ public class PostDTO {
     public void setUserId(UUID userId) { this.userId = userId; }
     public String getUsername() { return username; }
     public void setUsername(String username) { this.username = username; }
+    public UserSummaryDTO getUser() { return user; }
+    public void setUser(UserSummaryDTO user) { this.user = user; }
     public Long getProfileId() { return profileId; }
     public void setProfileId(Long profileId) { this.profileId = profileId; }
     public UUID getCommunityId() { return communityId; }

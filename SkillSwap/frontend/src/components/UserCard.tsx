@@ -22,7 +22,7 @@ const UserCard = ({ user, onClick }: UserCardProps) => {
         <div>
           <div className="flex items-center gap-1.5">
             <h3 className="font-display font-bold text-foreground">{user.username}</h3>
-            {user.isVerified && <VerifiedBadge size={16} />}
+            <VerifiedBadge user={user} size={16} />
           </div>
           {user.helpedCount !== undefined && (
             <p className="text-sm text-muted-foreground">

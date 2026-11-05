@@ -4,6 +4,7 @@ import br.com.teamss.skillswap.skill_swap.dto.UserDTO;
 import br.com.teamss.skillswap.skill_swap.dto.PostResponseDTO;
 import br.com.teamss.skillswap.skill_swap.dto.UserSummaryDTO;
 import br.com.teamss.skillswap.skill_swap.model.entities.Post;
+import br.com.teamss.skillswap.skill_swap.model.entities.Profile;
 import br.com.teamss.skillswap.skill_swap.model.services.PostService;
 import br.com.teamss.skillswap.skill_swap.model.services.UserServiceDTO;
 import org.springframework.http.ResponseEntity;
@@ -109,10 +110,18 @@ public class PostController {
         response.setViewsCount(post.getViewsCount());
         if (post.getUser() != null) {
             UserSummaryDTO summary = new UserSummaryDTO(post.getUser().getUsername(), post.getUser().getName());
+            summary.setUserId(post.getUser().getUserId());
             summary.setVerifiedBadge(post.getUser().isVerifiedBadge());
+            Profile currentProfile = post.getUser().getProfile() != null ? post.getUser().getProfile() : post.getProfile();
+            summary.setAvatarUrl(currentProfile == null ? null : currentProfile.getImageUrl());
             response.setUser(summary);
         }
-        if (post.getCommunity() != null) response.setCommunity(post.getCommunity().getName());
+        if (post.getCommunity() != null) {
+            response.setCommunity(post.getCommunity().getName());
+            response.setCommunityId(post.getCommunity().getCommunityId());
+            response.setCommunityName(post.getCommunity().getName());
+            response.setCommunityImageUrl(post.getCommunity().getImageUrl());
+        }
         return response;
     }
 }

@@ -132,6 +132,7 @@ export const CommunityService = {
   getById: (communityId: string) => api.get(`/communities/${communityId}`),
   join: (communityId: string) => api.post(`/communities/${communityId}/join`),
   getMembership: (communityId: string) => api.get(`/communities/${communityId}/membership`),
+  update: (communityId: string, data: { name?: string; description?: string; privateCommunity?: boolean }) => api.put(`/communities/${communityId}`, data),
   getMembers: (communityId: string, search = '') => api.get(`/communities/${communityId}/members`, { params: { search } }),
   getPendingMembers: (communityId: string, search = '') => api.get(`/communities/${communityId}/members/pending`, { params: { search } }),
   removeMember: (communityId: string, memberId: string) => api.delete(`/communities/${communityId}/members/${memberId}`),
@@ -280,6 +281,7 @@ export const AchievementService = {
 // ==========================================
 export const AccessLogService = {
   getMyAccessHistory: () => api.get('/access-logs/me'),
+  updateMyLocation: (latitude: number, longitude: number) => api.post('/access-logs/me/location', { latitude, longitude }),
 };
 
 // ==========================================

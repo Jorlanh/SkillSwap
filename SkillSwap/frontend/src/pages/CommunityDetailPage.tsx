@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useOutletContext, useParams } from 'react-router-dom';
 import { onIdTokenChanged } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
-import { ArrowLeft, Camera, ImagePlus, Send, Video, Search, UserMinus, ShieldCheck } from 'lucide-react';
+import { ArrowLeft, Camera, ImagePlus, Send, Video, Search, UserMinus, ShieldCheck, Pencil } from 'lucide-react';
 import { CommunityService, UserService } from '@/services/api';
 import PostCard from '@/components/PostCard';
 import { Button } from '@/components/ui/button';
@@ -25,6 +25,11 @@ const CommunityDetailPage = () => {
   const [members, setMembers] = useState<any[]>([]);
   const [pendingMembers, setPendingMembers] = useState<any[]>([]);
   const [memberSearch, setMemberSearch] = useState('');
+  const [editing, setEditing] = useState(false);
+  const [editName, setEditName] = useState('');
+  const [editDescription, setEditDescription] = useState('');
+  const [editPrivate, setEditPrivate] = useState(false);
+  const [savingCommunity, setSavingCommunity] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const load = async () => {
@@ -36,6 +41,9 @@ const CommunityDetailPage = () => {
         CommunityService.getPosts(communityId),
       ]);
       setCommunity(communityResponse.data);
+      setEditName(communityResponse.data?.name || '');
+      setEditDescription(communityResponse.data?.description || '');
+      setEditPrivate(Boolean(communityResponse.data?.privateCommunity));
       setPosts(Array.isArray(postsResponse.data) ? postsResponse.data : []);
       if (auth.currentUser) {
         try {
@@ -119,6 +127,19 @@ const CommunityDetailPage = () => {
     } catch { toast.error('Somente quem criou a comunidade pode alterar a foto.'); }
   });
 
+  const saveCommunity = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!communityId || !editName.trim()) return;
+    setSavingCommunity(true);
+    try {
+      await CommunityService.update(communityId, { name: editName.trim(), description: editDescription.trim(), privateCommunity: editPrivate });
+      setEditing(false);
+      toast.success('Perfil da comunidade atualizado.');
+      await load();
+    } catch { toast.error('Somente o criador pode editar o perfil da comunidade.'); }
+    finally { setSavingCommunity(false); }
+  };
+
   if (loading) return <main className="max-w-4xl mx-auto p-6 text-muted-foreground">Carregando comunidade...</main>;
   if (!community) return <main className="max-w-4xl mx-auto p-6">Comunidade não encontrada.</main>;
 
@@ -137,10 +158,19 @@ const CommunityDetailPage = () => {
             {isOwner && <button type="button" aria-label="Alterar foto da comunidade" onClick={() => fileRef.current?.click()} className="absolute -bottom-2 -right-2 rounded-full bg-skillswap-teal p-2 text-white"><Camera className="h-4 w-4" /></button>}
             {isOwner && <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && updateAvatar(e.target.files[0])} />}
           </div>
-          <div className="min-w-0 flex-1"><h1 className="text-2xl font-bold break-words">{community.name}</h1><p className="mt-2 text-muted-foreground break-words">{community.description || 'Um espaço para aprender e compartilhar.'}</p><p className="mt-2 text-sm text-muted-foreground">{community.memberCount ?? 0} membros</p></div>
+          <div className="min-w-0 flex-1"><h1 className="text-2xl font-bold break-words">{community.name}</h1><p className="mt-2 text-muted-foreground break-words">{community.description || 'Um espaço para aprender e compartilhar.'}</p><p className="mt-2 text-sm text-muted-foreground">{community.memberCount ?? 0} membros</p>{isOwner && <Button type="button" variant="outline" className="mt-3" onClick={() => setEditing((current) => !current)}><Pencil className="mr-2 h-4 w-4" /> Editar perfil da comunidade</Button>}</div>
           {isOwner ? <span className="rounded-full bg-skillswap-teal/10 px-4 py-2 text-sm font-semibold text-skillswap-teal">Criador da comunidade</span> : isApprovedMember ? <span className="rounded-full bg-skillswap-teal/10 px-4 py-2 text-sm font-semibold text-skillswap-teal">Membro</span> : membershipStatus === 'PENDING' ? <span className="rounded-full bg-amber-100 px-4 py-2 text-sm font-semibold text-amber-800">Aguardando aprovação</span> : <Button type="button" onClick={join} className="bg-skillswap-teal text-white">Entrar</Button>}
         </div>
       </section>
+      {editing && isOwner && <section className="rounded-2xl border border-border bg-card p-4 sm:p-6">
+        <h2 className="font-bold text-lg mb-3">Editar perfil da comunidade</h2>
+        <form onSubmit={saveCommunity} className="space-y-3">
+          <label className="block text-sm font-medium">Nome<input value={editName} onChange={(event) => setEditName(event.target.value)} maxLength={120} required className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2" /></label>
+          <label className="block text-sm font-medium">Descrição<textarea value={editDescription} onChange={(event) => setEditDescription(event.target.value)} maxLength={1000} rows={3} className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2" /></label>
+          <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={editPrivate} onChange={(event) => setEditPrivate(event.target.checked)} /> Comunidade privada</label>
+          <div className="flex flex-wrap gap-2"><Button type="submit" disabled={savingCommunity} className="bg-skillswap-teal text-white">{savingCommunity ? 'Salvando...' : 'Salvar alterações'}</Button><Button type="button" variant="outline" onClick={() => setEditing(false)}>Cancelar</Button></div>
+        </form>
+      </section>}
       {isApprovedMember && <section className="rounded-2xl border border-border bg-card p-4 sm:p-6">
         <h2 className="font-bold text-lg mb-3">Publicar na comunidade</h2>
         <form onSubmit={publish} className="space-y-3">

@@ -48,7 +48,7 @@ const RatingModal = ({ open, onOpenChange, user, proposalId, onSubmit }: RatingM
           
           <div className="flex items-center gap-1.5">
             <h3 className="font-display font-bold text-lg text-foreground">{user.username}</h3>
-            {user.isVerified && <VerifiedBadge size={16} />}
+            <VerifiedBadge user={user} size={16} />
           </div>
 
           <div className="py-2">

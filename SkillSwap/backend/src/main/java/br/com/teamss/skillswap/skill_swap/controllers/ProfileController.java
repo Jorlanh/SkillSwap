@@ -6,6 +6,8 @@ import java.util.UUID;
 import java.util.Map;
 import br.com.teamss.skillswap.skill_swap.dto.UserDTO;
 import br.com.teamss.skillswap.skill_swap.dto.UserPublicProfileDTO;
+import br.com.teamss.skillswap.skill_swap.dto.PostDTO;
+import br.com.teamss.skillswap.skill_swap.dto.UserSummaryDTO;
 import br.com.teamss.skillswap.skill_swap.model.services.UserServiceDTO;
 import br.com.teamss.skillswap.skill_swap.model.services.UserService;
 import br.com.teamss.skillswap.skill_swap.model.services.FileUploadService;
@@ -131,15 +133,19 @@ public class ProfileController {
     }
 
     @GetMapping("/me/feed")
-    public ResponseEntity<List<Post>> getMyFeed() {
+    public ResponseEntity<List<PostDTO>> getMyFeed() {
         UserDTO authenticatedUser = userServiceDTO.getAuthenticatedUser();
-        return ResponseEntity.ok(profileService.getFeed(authenticatedUser.getUserId()));
+        return ResponseEntity.ok(profileService.getFeed(authenticatedUser.getUserId()).stream()
+                .map(this::toPostDTO)
+                .toList());
     }
 
     @GetMapping("/me/community-posts")
-    public ResponseEntity<List<Post>> getMyCommunityPosts() {
+    public ResponseEntity<List<PostDTO>> getMyCommunityPosts() {
         UserDTO authenticatedUser = userServiceDTO.getAuthenticatedUser();
-        return ResponseEntity.ok(profileService.getCommunityPosts(authenticatedUser.getUserId()));
+        return ResponseEntity.ok(profileService.getCommunityPosts(authenticatedUser.getUserId()).stream()
+                .map(this::toPostDTO)
+                .toList());
     }
 
     @PostMapping("/me/posts")
@@ -167,6 +173,40 @@ public class ProfileController {
     public ResponseEntity<Post> commentOnPost(@PathVariable Long postId, @RequestParam String content) {
         UserDTO authenticatedUser = userServiceDTO.getAuthenticatedUser();
         return ResponseEntity.ok(profileService.commentOnPost(postId, authenticatedUser.getUserId(), content));
+    }
+
+    private PostDTO toPostDTO(Post post) {
+        PostDTO dto = new PostDTO();
+        dto.setPostId(post.getPostId());
+        dto.setContent(post.getContent());
+        dto.setTitle(post.getTitle());
+        dto.setCreatedAt(post.getCreatedAt());
+        dto.setImageUrl(post.getImageUrl());
+        dto.setVideoUrl(post.getVideoUrl());
+        dto.setLikesCount(post.getLikesCount());
+        dto.setRepostsCount(post.getRepostsCount());
+        dto.setCommentsCount(post.getCommentsCount());
+        dto.setSharesCount(post.getSharesCount());
+        dto.setViewsCount(post.getViewsCount());
+
+        if (post.getUser() != null) {
+            dto.setUserId(post.getUser().getUserId());
+            dto.setUsername(post.getUser().getUsername());
+            UserSummaryDTO summary = new UserSummaryDTO(
+                    post.getUser().getUsername(),
+                    post.getUser().getName(),
+                    post.getUser().isVerifiedBadge());
+            summary.setUserId(post.getUser().getUserId());
+            Profile currentProfile = post.getUser().getProfile() != null ? post.getUser().getProfile() : post.getProfile();
+            summary.setAvatarUrl(currentProfile == null ? null : currentProfile.getImageUrl());
+            dto.setUser(summary);
+        }
+
+        if (post.getCommunity() != null) {
+            dto.setCommunityId(post.getCommunity().getCommunityId());
+            dto.setCommunityName(post.getCommunity().getName());
+        }
+        return dto;
     }
 
     @PostMapping("/me/follow/{targetUserId}")

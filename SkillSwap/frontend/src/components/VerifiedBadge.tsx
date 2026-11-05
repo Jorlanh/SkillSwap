@@ -3,6 +3,7 @@ import verifiedImg from '/SKILLSWAP VERIFICADO.png';
 interface VerifiedBadgeProps {
   user?: { // Tornado opcional para evitar crash
     isVerified?: boolean;
+    verifiedBadge?: boolean;
     completedSwaps?: number;
   } | null;
   className?: string;
@@ -14,7 +15,7 @@ const VerifiedBadge = ({ user, className = '', size = 18 }: VerifiedBadgeProps) 
   if (!user) return null;
 
   // Regra de negócio com fallback para falso/zero
-  const isEligible = (user.isVerified || (user.completedSwaps ?? 0) >= 10);
+  const isEligible = Boolean(user.isVerified || user.verifiedBadge || (user.completedSwaps ?? 0) >= 10);
 
   if (!isEligible) return null;
 

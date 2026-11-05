@@ -93,6 +93,14 @@ public class CommunityController {
         return ResponseEntity.ok().build();
     }
 
+    @PutMapping("/{communityId}")
+    public ResponseEntity<CommunitySummaryDTO> updateCommunity(
+            @PathVariable UUID communityId,
+            @Valid @RequestBody UpdateCommunityRequest request) {
+        UserDTO authenticatedUser = userServiceDTO.getAuthenticatedUser();
+        return ResponseEntity.ok(communityService.updateCommunity(communityId, authenticatedUser.getUserId(), request));
+    }
+
     @GetMapping("/{communityId}/posts")
     public ResponseEntity<List<PostDTO>> getCommunityPosts(@PathVariable UUID communityId) {
         List<Post> posts = communityService.getCommunityPosts(communityId);
@@ -168,8 +176,14 @@ public class CommunityController {
         if (post.getUser() != null) {
             dto.setUserId(post.getUser().getUserId());
             dto.setUsername(post.getUser().getUsername());
+            UserSummaryDTO user = new UserSummaryDTO(post.getUser().getUsername(), post.getUser().getName(), post.getUser().isVerifiedBadge());
+            user.setUserId(post.getUser().getUserId());
+            Profile currentProfile = post.getUser().getProfile() != null ? post.getUser().getProfile() : post.getProfile();
+            user.setAvatarUrl(currentProfile == null ? null : currentProfile.getImageUrl());
+            dto.setUser(user);
         }
         if (post.getCommunity() != null) {
+            dto.setCommunityId(post.getCommunity().getCommunityId());
             dto.setCommunityName(post.getCommunity().getName());
         }
         dto.setImageUrl(post.getImageUrl());

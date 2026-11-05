@@ -3,6 +3,7 @@ package br.com.teamss.skillswap.skill_swap.model.services.impl;
 import br.com.teamss.skillswap.skill_swap.dto.CommentDTO;
 import br.com.teamss.skillswap.skill_swap.dto.CommunitySummaryDTO;
 import br.com.teamss.skillswap.skill_swap.dto.CreateCommunityRequest;
+import br.com.teamss.skillswap.skill_swap.dto.UpdateCommunityRequest;
 import br.com.teamss.skillswap.skill_swap.model.entities.*;
 import br.com.teamss.skillswap.skill_swap.model.exception.InappropriateContentException;
 import br.com.teamss.skillswap.skill_swap.model.repositories.*;
@@ -171,6 +172,24 @@ public class CommunityServiceImpl implements CommunityService {
         return new CommunitySummaryDTO(community.getCommunityId(), community.getName(), community.getDescription(),
             memberCount, community.getImageUrl(), community.getOwner() == null ? null : community.getOwner().getUserId(),
             community.isPrivateCommunity(), false, null);
+    }
+
+    @Override
+    @Transactional
+    public CommunitySummaryDTO updateCommunity(UUID communityId, UUID userId, UpdateCommunityRequest request) {
+        Community community = communityRepository.findById(communityId)
+                .orElseThrow(() -> new RuntimeException("Comunidade não encontrada!"));
+        if (community.getOwner() == null || !community.getOwner().getUserId().equals(userId)) {
+            throw new org.springframework.security.access.AccessDeniedException("Somente o criador pode editar o perfil da comunidade.");
+        }
+        if (request.name() != null && !request.name().isBlank()) community.setName(request.name().trim());
+        if (request.description() != null) community.setDescription(request.description().trim());
+        if (request.privateCommunity() != null) community.setPrivateCommunity(request.privateCommunity());
+        Community saved = communityRepository.save(community);
+        int memberCount = (int) communityMemberRepository.countById_CommunityIdAndMembershipStatus(communityId, "APPROVED");
+        return new CommunitySummaryDTO(saved.getCommunityId(), saved.getName(), saved.getDescription(), memberCount,
+                saved.getImageUrl(), saved.getOwner() == null ? null : saved.getOwner().getUserId(),
+                saved.isPrivateCommunity(), true, "OWNER");
     }
 
     @Override

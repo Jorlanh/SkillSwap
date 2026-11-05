@@ -1,0 +1,5 @@
+#NOTE: This is a Maven Resolver internal implementation file, its format can be changed without prior notice.
+#Thu Nov 05 01:18:39 BRT 2026
+@default-jitpack.io-https\://jitpack.io/.lastUpdated=1793852319404
+https\://jitpack.io/.error=Could not transfer artifact com.twilio.sdk\:twilio\:pom\:10.9.0 from/to jitpack.io (https\://jitpack.io)\: status code\: 401, reason phrase\: Unauthorized (401)
+https\://repo.maven.apache.org/maven2/.lastUpdated=1793852319546

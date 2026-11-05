@@ -109,7 +109,12 @@ public class UserServiceDTOImpl implements UserServiceDTO {
     @Transactional(readOnly = true)
     public List<UserSummaryDTO> findAllSummaries() {
         return userRepository.findAll().stream()
-                .map(user -> new UserSummaryDTO(user.getUsername(), user.getName(), user.isVerifiedBadge()))
+                .map(user -> {
+                    UserSummaryDTO summary = new UserSummaryDTO(user.getUsername(), user.getName(), user.isVerifiedBadge());
+                    summary.setUserId(user.getUserId());
+                    summary.setAvatarUrl(user.getProfile() == null ? null : user.getProfile().getImageUrl());
+                    return summary;
+                })
                 .collect(Collectors.toList());
     }
 
@@ -124,7 +129,10 @@ public class UserServiceDTOImpl implements UserServiceDTO {
     @Transactional(readOnly = true)
     public UserSummaryDTO findSummaryByIdDTO(UUID id) {
         User user = userService.findById(id);
-        return new UserSummaryDTO(user.getUsername(), user.getName(), user.isVerifiedBadge());
+        UserSummaryDTO summary = new UserSummaryDTO(user.getUsername(), user.getName(), user.isVerifiedBadge());
+        summary.setUserId(user.getUserId());
+        summary.setAvatarUrl(user.getProfile() == null ? null : user.getProfile().getImageUrl());
+        return summary;
     }
 
     @Override
