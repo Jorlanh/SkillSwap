@@ -78,7 +78,10 @@ const Header = () => {
 
           {user ? (
             <div className="flex items-center gap-4 animate-in fade-in slide-in-from-right-2 ml-2">
-              {user.roles?.some((role: string) => role.toUpperCase() === 'ADMIN') && (
+              {user.roles?.some((role: string) => {
+                const normalized = role.toUpperCase();
+                return normalized === 'ADMIN' || normalized === 'ROLE_ADMIN';
+              }) && (
                 <Link to="/admin" title="Painel do administrador" className="text-red-500 hover:text-red-400 transition-colors">
                   <ShieldCheck className="h-6 w-6" />
                 </Link>

@@ -76,7 +76,7 @@ public class AccessController {
     }
 
     @PostMapping("/opportunities")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("@platformAdminAuthorization.isAdmin(authentication)")
     public ResponseEntity<AccessOpportunity> create(@Valid @RequestBody OpportunityRequest request) {
         AccessOpportunity opportunity = new AccessOpportunity();
         opportunity.setOrganizationName(request.organizationName());
@@ -92,7 +92,7 @@ public class AccessController {
     }
 
     @DeleteMapping("/opportunities/{opportunityId}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("@platformAdminAuthorization.isAdmin(authentication)")
     @Transactional
     public ResponseEntity<Void> delete(@PathVariable UUID opportunityId) {
         if (!opportunityRepository.existsById(opportunityId)) return ResponseEntity.notFound().build();

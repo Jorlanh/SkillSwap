@@ -69,7 +69,7 @@ export const AdminService = {
 
 export const AdminReportService = {
   getPending: () => api.get('/reports/pending'),
-  review: (reportId: number, status: 'REVIEWED' | 'DISMISSED' | 'ACTION_TAKEN') => api.post(`/reports/${reportId}/review`, null, { params: { status } }),
+  review: (reportId: number, status: 'REVIEWED' | 'DISMISSED' | 'ACTION_TAKEN', responseMessage = '') => api.post(`/reports/${reportId}/review`, null, { params: { status, responseMessage } }),
 };
 
 // ==========================================

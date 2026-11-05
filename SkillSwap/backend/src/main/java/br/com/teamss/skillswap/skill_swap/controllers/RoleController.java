@@ -41,7 +41,7 @@ public class RoleController {
     }
 
     @PostMapping
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("@platformAdminAuthorization.isAdmin(authentication)")
     public ResponseEntity<RoleDTO> createRole(@RequestBody Role role) {
         Role savedRole = roleService.save(role);
         RoleDTO roleDTO = roleServiceDTO.toRoleDTO(savedRole);
@@ -49,7 +49,7 @@ public class RoleController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("@platformAdminAuthorization.isAdmin(authentication)")
     public ResponseEntity<RoleDTO> updateRole(@PathVariable Long id, @RequestBody Role role) {
         role.setRoleId(id);
         Role updatedRole = roleService.save(role);
@@ -58,7 +58,7 @@ public class RoleController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("@platformAdminAuthorization.isAdmin(authentication)")
     public ResponseEntity<Void> deleteRole(@PathVariable Long id) {
         roleService.delete(id);
         return ResponseEntity.noContent().build();

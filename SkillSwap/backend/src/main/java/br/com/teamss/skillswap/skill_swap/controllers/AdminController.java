@@ -27,7 +27,7 @@ import org.springframework.data.domain.Sort;
 @RequestMapping("/api/console-management")
 // ALTERAÇÃO PRINCIPAL: Protege todos os endpoints neste controller.
 // Apenas usuários com o papel persistido ADMIN podem acessar o console.
-@PreAuthorize("hasRole('ADMIN')")
+@PreAuthorize("@platformAdminAuthorization.isAdmin(authentication)")
 public class AdminController {
 
     private final AdminService adminService;

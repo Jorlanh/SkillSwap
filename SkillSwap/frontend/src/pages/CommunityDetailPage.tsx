@@ -3,7 +3,7 @@ import { Link, useNavigate, useOutletContext, useParams } from 'react-router-dom
 import { onIdTokenChanged } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { ArrowLeft, Camera, ImagePlus, Send, Video, Search, UserMinus, ShieldCheck, Pencil, Trash2, Crown } from 'lucide-react';
-import { CommunityService, UserService } from '@/services/api';
+import { AdminService, CommunityService, UserService } from '@/services/api';
 import PostCard from '@/components/PostCard';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -125,7 +125,10 @@ const CommunityDetailPage = () => {
       await CommunityService.updateAvatar(communityId!, file);
       toast.success('Foto da comunidade atualizada.');
       await load();
-    } catch { toast.error('Você não tem permissão para alterar a foto desta comunidade.'); }
+    } catch (error: any) {
+      const message = error?.response?.data?.message || error?.response?.data?.error;
+      toast.error(message || 'Não foi possível alterar a foto desta comunidade.');
+    }
   });
 
   const saveCommunity = async (event: React.FormEvent) => {
@@ -137,17 +140,27 @@ const CommunityDetailPage = () => {
       setEditing(false);
       toast.success('Perfil da comunidade atualizado.');
       await load();
-    } catch { toast.error('Você não tem permissão para editar esta comunidade.'); }
+    } catch (error: any) {
+      const message = error?.response?.data?.message || error?.response?.data?.error;
+      toast.error(message || 'Não foi possível editar esta comunidade.');
+    }
     finally { setSavingCommunity(false); }
   };
 
   const deleteCommunity = async () => {
     if (!communityId || !window.confirm('Excluir esta comunidade? Essa ação não pode ser desfeita.')) return;
     try {
-      await CommunityService.delete(communityId);
+      if (isPlatformAdmin) {
+        await AdminService.deleteCommunity(communityId);
+      } else {
+        await CommunityService.delete(communityId);
+      }
       toast.success('Comunidade excluída.');
       navigate('/comunidades');
-    } catch { toast.error('Não foi possível excluir a comunidade.'); }
+    } catch (error: any) {
+      const message = error?.response?.data?.message || error?.response?.data?.error;
+      toast.error(message || 'Não foi possível excluir a comunidade.');
+    }
   };
 
   const transferOwnership = async (memberId: string) => {
@@ -165,9 +178,10 @@ const CommunityDetailPage = () => {
 
   const currentUserId = me?.userId ?? me?.id;
   const ownerId = community.ownerId ?? community.owner?.userId ?? community.owner?.id;
+  const isPlatformAdmin = Array.isArray(me?.roles) && me.roles.some((role: string) => role.toUpperCase() === 'ADMIN' || role.toUpperCase() === 'ROLE_ADMIN');
   const isOwner = membershipStatus === 'OWNER'
     || Boolean(currentUserId && ownerId && String(currentUserId) === String(ownerId));
-  const isAdmin = membershipStatus === 'ADMIN';
+  const isAdmin = membershipStatus === 'ADMIN' || isPlatformAdmin;
   const isCommunityManager = isOwner || isAdmin;
   const isModerator = isCommunityManager || membershipStatus === 'MODERATOR';
   const isApprovedMember = isOwner || membershipStatus === 'APPROVED' || membershipStatus === 'OWNER' || membershipStatus === 'ADMIN' || membershipStatus === 'MODERATOR';
@@ -181,7 +195,7 @@ const CommunityDetailPage = () => {
             {isCommunityManager && <button type="button" aria-label="Alterar foto da comunidade" onClick={() => fileRef.current?.click()} className="absolute -bottom-2 -right-2 rounded-full bg-skillswap-teal p-2 text-white"><Camera className="h-4 w-4" /></button>}
             {isCommunityManager && <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && updateAvatar(e.target.files[0])} />}
           </div>
-          <div className="min-w-0 flex-1"><h1 className="text-2xl font-bold break-words">{community.name}</h1><p className="mt-2 text-muted-foreground break-words">{community.description || 'Um espaço para aprender e compartilhar.'}</p><p className="mt-2 text-sm text-muted-foreground">{community.memberCount ?? 0} membros</p><div className="mt-3 flex flex-wrap gap-2">{isCommunityManager && <><Button type="button" variant="outline" onClick={() => setEditing((current) => !current)}><Pencil className="mr-2 h-4 w-4" /> Editar perfil da comunidade</Button>{isOwner && <Button type="button" variant="outline" className="text-red-600" onClick={() => void deleteCommunity()}><Trash2 className="mr-2 h-4 w-4" /> Excluir comunidade</Button>}</>}<ReportButton reportedUserId={ownerId} targetType="COMMUNITY" targetId={communityId} /></div></div>
+          <div className="min-w-0 flex-1"><h1 className="text-2xl font-bold break-words">{community.name}</h1><p className="mt-2 text-muted-foreground break-words">{community.description || 'Um espaço para aprender e compartilhar.'}</p><p className="mt-2 text-sm text-muted-foreground">{community.memberCount ?? 0} membros</p><div className="mt-3 flex flex-wrap gap-2">{isCommunityManager && <><Button type="button" variant="outline" onClick={() => setEditing((current) => !current)}><Pencil className="mr-2 h-4 w-4" /> Editar perfil da comunidade</Button>{(isOwner || isPlatformAdmin) && <Button type="button" variant="outline" className="text-red-600" onClick={() => void deleteCommunity()}><Trash2 className="mr-2 h-4 w-4" /> Excluir comunidade</Button>}</>}<ReportButton reportedUserId={ownerId} targetType="COMMUNITY" targetId={communityId} /></div></div>
           {isOwner ? <span className="rounded-full bg-skillswap-teal/10 px-4 py-2 text-sm font-semibold text-skillswap-teal">Criador da comunidade</span> : isApprovedMember ? <span className="rounded-full bg-skillswap-teal/10 px-4 py-2 text-sm font-semibold text-skillswap-teal">Membro</span> : membershipStatus === 'PENDING' ? <span className="rounded-full bg-amber-100 px-4 py-2 text-sm font-semibold text-amber-800">Aguardando aprovação</span> : <Button type="button" onClick={join} className="bg-skillswap-teal text-white">Entrar</Button>}
         </div>
       </section>

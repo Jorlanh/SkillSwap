@@ -8,6 +8,6 @@ import java.util.List;
 public interface ReportService {
     Report createReport(ReportDTO reportDTO);
     List<Report> getPendingReports();
-    void reviewReport(Long reportId, ReportStatus status);
+    void reviewReport(Long reportId, ReportStatus status, String responseMessage);
     void processReports();
 }

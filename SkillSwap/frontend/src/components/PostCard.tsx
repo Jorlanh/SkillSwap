@@ -28,7 +28,12 @@ const getCommentId = (comment: any): number | null => {
 const getAvatar = (person: any) => person?.avatarUrl || person?.imageUrl || person?.avatar || person?.profile?.imageUrl || '';
 
 const buildCommentTree = (comments: any[]) => {
-  const nodes = comments.map((comment) => ({ ...comment, replies: [] as any[] }));
+  const nodes = comments.map((comment) => ({
+    ...comment,
+    // O backend envia a lista plana. Mantemos também uma lista já aninhada
+    // caso uma versão antiga da API a devolva dessa forma.
+    replies: Array.isArray(comment.replies) ? comment.replies : [] as any[],
+  }));
   const byId = new Map<number, any>();
   nodes.forEach((node) => {
     const id = getCommentId(node);
@@ -36,9 +41,17 @@ const buildCommentTree = (comments: any[]) => {
   });
   const roots: any[] = [];
   nodes.forEach((node) => {
-    const parentId = getCommentId({ id: node.parentCommentId });
+    const parentId = getCommentId({
+      id: node.parentCommentId ?? node.parentId ?? node.parentComment?.commentId ?? node.parentComment?.id,
+    });
     const parent = parentId ? byId.get(parentId) : undefined;
-    if (parent && parent !== node) parent.replies.push(node);
+    if (parent && parent !== node) {
+      node.replyingToUsername = parent.user?.username || parent.username || 'usuário';
+      // Evita duplicar a resposta quando a API já devolve replies aninhadas.
+      if (!parent.replies.some((reply: any) => getCommentId(reply) === getCommentId(node))) {
+        parent.replies.push(node);
+      }
+    }
     else roots.push(node);
   });
   return roots;
@@ -57,6 +70,7 @@ const PostCard = ({ post }: PostCardProps) => {
   const [commentsList, setCommentsList] = useState<any[]>(post.comments || []);
   const [commentsCount, setCommentsCount] = useState(post.commentsCount || 0);
   const [replyTo, setReplyTo] = useState<number | null>(null);
+  const [expandedReplies, setExpandedReplies] = useState<Record<number, boolean>>({});
   const [commentLikes, setCommentLikes] = useState<Record<number, number>>({});
   const [commentLiked, setCommentLiked] = useState<Record<number, boolean>>({});
 
@@ -189,17 +203,21 @@ const PostCard = ({ post }: PostCardProps) => {
           <div className="flex-1 min-w-0">
             <div className="bg-muted/40 p-2 px-3 rounded-2xl rounded-tl-sm relative">
               <p className="text-[11px] font-bold text-skillswap-teal mb-0.5 flex items-center gap-1">@{username}<VerifiedBadge user={commentUser} size={13} /></p>
-              <p className="text-xs text-foreground/90 whitespace-pre-wrap">{comment.content}</p>
+              <p className="text-xs text-foreground/90 whitespace-pre-wrap">
+                {comment.replyingToUsername && <span className="mr-1 font-semibold text-skillswap-teal">@{comment.replyingToUsername}</span>}
+                {comment.content}
+              </p>
               <button type="button" onClick={() => handleLikeComment(commentId)} disabled={!commentId} aria-label="Curtir comentário" className={`absolute -right-2 -bottom-2 bg-card border border-border rounded-full px-1.5 py-1 shadow-sm hover:scale-110 transition-transform disabled:opacity-50 ${commentId && commentLiked[commentId] ? 'text-red-500' : 'text-muted-foreground hover:text-red-500'}`}><Heart size={10} className="inline fill-current" /> <span className="text-[10px] ml-0.5">{commentId ? (commentLikes[commentId] ?? comment.likesCount ?? 0) : 0}</span></button>
             </div>
             <div className="flex items-center gap-3 mt-1 ml-1">
               <button type="button" disabled={!commentId} onClick={() => setReplyTo(commentId)} className="text-[10px] font-bold text-muted-foreground hover:text-foreground flex items-center gap-1 disabled:opacity-50"><Reply size={10} /> Responder</button>
               {username === loggedUser.username && commentId && <button type="button" onClick={() => handleDeleteComment(commentId)} className="text-[10px] font-bold text-muted-foreground hover:text-red-500">Excluir</button>}
               {commentId && <ReportButton reportedUserId={comment.userId || comment.user?.userId} targetType="COMMENT" targetId={commentId} label="" />}
+              {comment.replies?.length > 0 && commentId && <button type="button" onClick={() => setExpandedReplies((current) => ({ ...current, [commentId]: !current[commentId] }))} className="text-[10px] font-bold text-skillswap-teal hover:underline">{expandedReplies[commentId] ? 'Ocultar respostas' : `Ver mais ${comment.replies.length === 1 ? 'resposta' : `respostas (${comment.replies.length})`}`}</button>}
             </div>
           </div>
         </div>
-        {comment.replies?.length > 0 && <div className="mt-3 space-y-3">{comment.replies.map((reply: any) => renderComment(reply, depth + 1))}</div>}
+        {comment.replies?.length > 0 && commentId && expandedReplies[commentId] && <div className="mt-3 space-y-3">{comment.replies.map((reply: any) => renderComment(reply, depth + 1))}</div>}
       </div>
     );
   };

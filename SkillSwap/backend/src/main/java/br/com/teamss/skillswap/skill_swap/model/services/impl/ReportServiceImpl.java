@@ -8,6 +8,7 @@ import br.com.teamss.skillswap.skill_swap.model.repositories.ReportRepository;
 import br.com.teamss.skillswap.skill_swap.model.repositories.UserRepository;
 import br.com.teamss.skillswap.skill_swap.model.services.AdminService;
 import br.com.teamss.skillswap.skill_swap.model.services.ContentModerationService;
+import br.com.teamss.skillswap.skill_swap.model.services.NotificationService;
 import br.com.teamss.skillswap.skill_swap.model.services.ReportService;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -23,13 +24,16 @@ public class ReportServiceImpl implements ReportService {
     private final UserRepository userRepository;
     private final ContentModerationService contentModerationService;
     private final AdminService adminService;
+    private final NotificationService notificationService;
 
     public ReportServiceImpl(ReportRepository reportRepository, UserRepository userRepository,
-                             ContentModerationService contentModerationService, AdminService adminService) {
+                             ContentModerationService contentModerationService, AdminService adminService,
+                             NotificationService notificationService) {
         this.reportRepository = reportRepository;
         this.userRepository = userRepository;
         this.contentModerationService = contentModerationService;
         this.adminService = adminService;
+        this.notificationService = notificationService;
     }
 
     @Override
@@ -57,7 +61,7 @@ public class ReportServiceImpl implements ReportService {
 
     @Override
     @org.springframework.transaction.annotation.Transactional
-    public void reviewReport(Long reportId, ReportStatus status) {
+    public void reviewReport(Long reportId, ReportStatus status, String responseMessage) {
         Report report = reportRepository.findById(reportId)
                 .orElseThrow(() -> new EntityNotFoundException("Denúncia não encontrada."));
         if (status == null || status == ReportStatus.PENDING) {
@@ -65,6 +69,9 @@ public class ReportServiceImpl implements ReportService {
         }
         report.setStatus(status);
         reportRepository.save(report);
+        if (responseMessage != null && !responseMessage.isBlank() && report.getReportedUser() != null) {
+            notificationService.createNotification(report.getReportedUser().getUserId(), responseMessage.trim());
+        }
     }
 
     @Override

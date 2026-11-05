@@ -34,7 +34,7 @@ public class SkillController {
     }
 
     @PostMapping
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("@platformAdminAuthorization.isAdmin(authentication)")
     public ResponseEntity<SkillDTO> createSkill(@RequestBody Skill skill) {
         Skill savedSkill = skillService.save(skill);
         SkillDTO skillDTO = skillServiceDTO.toSkillDTO(savedSkill);
@@ -42,7 +42,7 @@ public class SkillController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("@platformAdminAuthorization.isAdmin(authentication)")
     public ResponseEntity<SkillDTO> updateSkill(@PathVariable Long id, @RequestBody Skill skill) {
         skill.setSkillId(id);
         Skill updatedSkill = skillService.save(skill);
@@ -51,7 +51,7 @@ public class SkillController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("@platformAdminAuthorization.isAdmin(authentication)")
     public ResponseEntity<Void> deleteSkill(@PathVariable Long id) {
         skillService.delete(id);
         return ResponseEntity.noContent().build();

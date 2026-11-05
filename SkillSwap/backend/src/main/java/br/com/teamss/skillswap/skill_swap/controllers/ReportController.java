@@ -35,7 +35,7 @@ public class ReportController {
     }
 
     @GetMapping("/pending")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("@platformAdminAuthorization.isAdmin(authentication)")
     public ResponseEntity<List<AdminReportDTO>> pendingReports() {
         return ResponseEntity.ok(reportService.getPendingReports().stream().map(report ->
                 new AdminReportDTO(report.getId(), report.getReporter().getUserId(), report.getReporter().getUsername(),
@@ -44,10 +44,11 @@ public class ReportController {
     }
 
     @PostMapping("/{reportId}/review")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("@platformAdminAuthorization.isAdmin(authentication)")
     public ResponseEntity<Void> reviewReport(@PathVariable Long reportId,
-                                             @RequestParam ReportStatus status) {
-        reportService.reviewReport(reportId, status);
+                                             @RequestParam ReportStatus status,
+                                             @RequestParam(defaultValue = "") String responseMessage) {
+        reportService.reviewReport(reportId, status, responseMessage);
         return ResponseEntity.noContent().build();
     }
 }
