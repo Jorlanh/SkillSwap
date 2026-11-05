@@ -16,6 +16,7 @@ public interface PostService {
     Post commentOnPost(Long postId, UUID userId, String content);
     String generateShareLink(Long postId);
     List<PostResponseDTO> getPosts(String sortBy, String period);
+    List<PostResponseDTO> getPosts(String sortBy, String period, UUID authenticatedUserId);
     List<Post> findAll(); // Para busca geral no PostController
     List<String> getTrendingTopics(String period);
     void incrementViewCount(Long postId);

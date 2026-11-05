@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { AccessService, AdminService } from '@/services/api';
+import { AccessService, AdminReportService, AdminService } from '@/services/api';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -20,32 +20,39 @@ type ManagedUser = {
   createdAt: string;
 };
 type ActiveBan = { id: number; userId: string; username: string; reason: string; scope: string; createdAt?: string; expiresAt?: string };
+type AdminReport = { id: number; reporterUsername: string; reportedUserId: string; reportedUsername: string; reason: string; status: string; createdAt?: string };
 type Opportunity = { opportunityId: string; organizationName: string; title: string; description: string; requiredSkills: string; participationMode?: string; location?: string; contactUrl?: string; };
 
 const AdminConsole = () => {
   const [stats, setStats] = useState<Stats | null>(null);
   const [users, setUsers] = useState<ManagedUser[]>([]);
   const [activeBans, setActiveBans] = useState<ActiveBan[]>([]);
+  const [reports, setReports] = useState<AdminReport[]>([]);
   const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
   const [opportunityForm, setOpportunityForm] = useState({ organizationName: '', title: '', description: '', requiredSkills: '', participationMode: 'REMOTE', location: '', contactUrl: '', accessibleSupport: true });
-  const [banHours, setBanHours] = useState('24');
+  const [banDuration, setBanDuration] = useState('24');
+  const [banUnit, setBanUnit] = useState('HOURS');
   const [banScope, setBanScope] = useState('GENERAL');
+  const [banIp, setBanIp] = useState('');
+  const [userSearch, setUserSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
   const loadAdminData = useCallback(async () => {
     setLoading(true);
     try {
-      const [statsRes, usersRes, bansRes, opportunitiesRes] = await Promise.all([
+      const [statsRes, usersRes, bansRes, opportunitiesRes, reportsRes] = await Promise.all([
         AdminService.getStats(),
         AdminService.getUsers(),
         AdminService.getActiveBans(),
         AccessService.getOpportunities(),
+        AdminReportService.getPending(),
       ]);
       setStats(statsRes.data);
       setUsers(usersRes.data);
       setActiveBans(Array.isArray(bansRes.data) ? bansRes.data : []);
       setOpportunities(Array.isArray(opportunitiesRes.data) ? opportunitiesRes.data : []);
+      setReports(Array.isArray(reportsRes.data) ? reportsRes.data : []);
     } catch {
       toast({ title: 'Acesso negado', description: 'Sua conta não possui a função ADMIN.', variant: 'destructive' });
     } finally {
@@ -91,9 +98,10 @@ const AdminConsole = () => {
       if (banned) {
         await AdminService.unbanUser(userId);
       } else {
-        const hours = Number(banHours);
-        const expiresAt = Number.isFinite(hours) && hours > 0 ? new Date(Date.now() + hours * 60 * 60 * 1000).toISOString() : null;
-        await AdminService.banUser(userId, { reason: 'Ação administrativa pela plataforma', expiresAt, scope: banScope, ipAddress: null });
+        const amount = Number(banDuration);
+        const multiplier = banUnit === 'MINUTES' ? 60_000 : banUnit === 'HOURS' ? 3_600_000 : banUnit === 'DAYS' ? 86_400_000 : banUnit === 'MONTHS' ? 2_592_000_000 : banUnit === 'YEARS' ? 31_536_000_000 : 0;
+        const expiresAt = multiplier && Number.isFinite(amount) && amount > 0 ? new Date(Date.now() + amount * multiplier).toISOString() : null;
+        await AdminService.banUser(userId, { reason: 'Ação administrativa pela plataforma', expiresAt, scope: banScope, ipAddress: banIp.trim() || null });
       }
       toast({ title: banned ? 'Usuário reativado' : 'Usuário banido' });
       loadAdminData();
@@ -101,6 +109,13 @@ const AdminConsole = () => {
       toast({ title: 'Erro', description: 'Não foi possível atualizar o banimento.', variant: 'destructive' });
     }
   };
+
+  const reviewReport = async (reportId: number, status: 'REVIEWED' | 'DISMISSED') => {
+    try { await AdminReportService.review(reportId, status); setReports((current) => current.filter((report) => report.id !== reportId)); toast({ title: status === 'DISMISSED' ? 'Denúncia arquivada' : 'Denúncia revisada' }); }
+    catch { toast({ title: 'Erro', description: 'Não foi possível atualizar a denúncia.', variant: 'destructive' }); }
+  };
+
+  const filteredUsers = users.filter((user) => `${user.name} ${user.username} ${user.email}`.toLowerCase().includes(userSearch.toLowerCase().trim()));
 
   const handleRole = async (user: ManagedUser) => {
     const enabled = !user.roles.some((role) => role.toUpperCase() === 'ADMIN');
@@ -134,12 +149,12 @@ const AdminConsole = () => {
       </div>
 
       <Card className="bg-white border-slate-200 text-slate-900 shadow-sm">
-        <CardHeader><CardTitle>Gestão de usuários, selos e segurança</CardTitle><p className="text-sm text-slate-500">Defina a duração e o alcance da suspensão antes de clicar em Banir.</p><div className="flex flex-wrap gap-3"><label className="text-sm">Duração (horas)<input type="number" min="1" value={banHours} onChange={(event) => setBanHours(event.target.value)} className="ml-2 w-24 rounded border px-2 py-1" /></label><label className="text-sm">Ação<select value={banScope} onChange={(event) => setBanScope(event.target.value)} className="ml-2 rounded border px-2 py-1"><option value="GENERAL">Conta inteira</option><option value="POSTS">Publicações</option><option value="COMMENTS">Comentários</option></select></label></div></CardHeader>
+        <CardHeader><CardTitle>Gestão de usuários, selos e segurança</CardTitle><p className="text-sm text-slate-500">Escolha a duração e o alcance da suspensão antes de aplicar.</p><div className="flex flex-wrap gap-3"><label className="text-sm">Tempo<input type="number" min="1" value={banDuration} onChange={(event) => setBanDuration(event.target.value)} className="ml-2 w-20 rounded border px-2 py-1" /></label><label className="text-sm">Unidade<select value={banUnit} onChange={(event) => setBanUnit(event.target.value)} className="ml-2 rounded border px-2 py-1"><option value="MINUTES">Minutos</option><option value="HOURS">Horas</option><option value="DAYS">Dias</option><option value="MONTHS">Meses</option><option value="YEARS">Anos</option><option value="PERMANENT">Permanente</option></select></label><label className="text-sm">Ação<select value={banScope} onChange={(event) => setBanScope(event.target.value)} className="ml-2 rounded border px-2 py-1"><option value="GENERAL">Conta inteira</option><option value="POSTS">Publicações</option><option value="COMMENTS">Comentários</option></select></label><label className="text-sm">IP do dispositivo<input value={banIp} onChange={(event) => setBanIp(event.target.value)} placeholder="opcional" className="ml-2 w-40 rounded border px-2 py-1" /></label></div><input value={userSearch} onChange={(event) => setUserSearch(event.target.value)} placeholder="Pesquisar usuário por nome, @usuário ou e-mail" className="mt-3 w-full max-w-xl rounded border px-3 py-2" /></CardHeader>
         <CardContent>
           {loading ? <p className="text-slate-500 py-8">Carregando dados protegidos...</p> : (
             <Table>
               <TableHeader><TableRow className="border-zinc-800"><TableHead className="text-zinc-400">Usuário</TableHead><TableHead className="text-zinc-400">Papéis</TableHead><TableHead className="text-zinc-400">Verificação</TableHead><TableHead className="text-zinc-400 text-right">Ações</TableHead></TableRow></TableHeader>
-              <TableBody>{users.map((user) => {
+              <TableBody>{filteredUsers.map((user) => {
                 const isAdmin = user.roles.some((role) => role.toUpperCase() === 'ADMIN');
                 return <TableRow key={user.userId} className="border-zinc-800">
                   <TableCell><p className="font-medium">{user.name || user.username}</p><p className="text-xs text-zinc-500">{user.email}</p></TableCell>
@@ -158,7 +173,11 @@ const AdminConsole = () => {
       </Card>
       <Card className="bg-white border-slate-200 text-slate-900 shadow-sm">
         <CardHeader><CardTitle>Suspensões ativas e ações automáticas</CardTitle><p className="text-sm text-slate-500">Aqui aparecem os bloqueios registrados pela moderação e pelo painel.</p></CardHeader>
-        <CardContent>{activeBans.length ? <div className="space-y-2">{activeBans.map((ban) => <div key={ban.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 p-3"><div><p className="font-semibold">@{ban.username} <Badge variant="outline" className="ml-2">{ban.scope}</Badge></p><p className="text-sm text-slate-600">{ban.reason}</p></div><p className="text-sm text-slate-500">{ban.expiresAt ? `até ${new Date(ban.expiresAt).toLocaleString('pt-BR')}` : 'permanente'}</p></div>)}</div> : <p className="text-sm text-slate-500">Nenhuma suspensão ativa.</p>}</CardContent>
+        <CardContent>{activeBans.length ? <div className="space-y-2">{activeBans.map((ban) => <div key={ban.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 p-3"><div><p className="font-semibold">@{ban.username} <Badge variant="outline" className="ml-2">{ban.scope}</Badge></p><p className="text-sm text-slate-600">{ban.reason}</p></div><p className="text-sm text-slate-500">{ban.expiresAt ? `até ${new Date(ban.expiresAt).toLocaleString('pt-BR')}` : 'permanente'}</p><Button size="sm" variant="outline" onClick={() => void handleBan(ban.userId, true)}>Remover suspensão</Button></div>)}</div> : <p className="text-sm text-slate-500">Nenhuma suspensão ativa.</p>}</CardContent>
+      </Card>
+      <Card className="bg-white border-slate-200 text-slate-900 shadow-sm">
+        <CardHeader><CardTitle>Denúncias para revisão</CardTitle><p className="text-sm text-slate-500">A IA classifica o conteúdo; a decisão administrativa fica registrada nesta fila.</p></CardHeader>
+        <CardContent>{reports.length ? <div className="space-y-3">{reports.map((report) => <div key={report.id} className="rounded-lg border border-slate-200 p-3"><p className="font-semibold">@{report.reportedUsername}</p><p className="text-sm text-slate-600">Denunciado por @{report.reporterUsername}</p><p className="mt-1 text-sm">{report.reason || 'Motivo não informado.'}</p><div className="mt-3 flex gap-2"><Button size="sm" variant="outline" onClick={() => void reviewReport(report.id, 'DISMISSED')}>Arquivar</Button><Button size="sm" onClick={() => void reviewReport(report.id, 'REVIEWED')}>Marcar revisada</Button></div></div>)}</div> : <p className="text-sm text-slate-500">Nenhuma denúncia pendente.</p>}</CardContent>
       </Card>
       <Card className="bg-white border-slate-200 text-slate-900 shadow-sm">
         <CardHeader><CardTitle className="flex items-center gap-2"><BriefcaseBusiness className="h-5 w-5 text-skillswap-teal" /> Projetos e oportunidades</CardTitle><p className="text-sm text-slate-500">Cadastre o que deve aparecer em Minha Jornada. O acesso continua gratuito.</p></CardHeader>

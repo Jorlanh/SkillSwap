@@ -37,4 +37,11 @@ public class AccessLogController {
         accessLogService.updateLatestLocation(authenticatedUser.getUserId(), request.latitude(), request.longitude());
         return ResponseEntity.noContent().build();
     }
+
+    @DeleteMapping("/me/{accessId}")
+    public ResponseEntity<Void> revokeMyAccess(@PathVariable Long accessId) {
+        UserDTO authenticatedUser = userServiceDTO.getAuthenticatedUser();
+        accessLogService.revokeAccess(authenticatedUser.getUserId(), accessId);
+        return ResponseEntity.noContent().build();
+    }
 }

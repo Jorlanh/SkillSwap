@@ -4,22 +4,28 @@ import java.sql.Timestamp;
 import java.time.Instant;
 
 public class AccessLogDTO {
+    private Long accessId;
     private Instant  accessTime;
     private String ipAddress;
     private String location;
     private String city;
     private String subdivision;
     private String country;
+    private String deviceInfo;
 
-    public AccessLogDTO(Instant  accessTime, String ipAddress, String location, String city, String subdivision, String country) {
+    public AccessLogDTO(Long accessId, Instant accessTime, String ipAddress, String location, String city, String subdivision, String country, String deviceInfo) {
+        this.accessId = accessId;
         this.accessTime = accessTime;
         this.ipAddress = ipAddress;
         this.location = location;
         this.city = city;
         this.subdivision = subdivision;
         this.country = country;
+        this.deviceInfo = deviceInfo;
     }
 
+    public Long getAccessId() { return accessId; }
+    public void setAccessId(Long accessId) { this.accessId = accessId; }
     public Instant  getAccessTime() { return accessTime; }
     public void setAccessTime(Instant  accessTime) { this.accessTime = accessTime; }
     public String getIpAddress() { return ipAddress; }
@@ -32,4 +38,6 @@ public class AccessLogDTO {
     public void setSubdivision(String subdivision) { this.subdivision = subdivision; }
     public String getCountry() { return country; }
     public void setCountry(String country) { this.country = country; }
+    public String getDeviceInfo() { return deviceInfo; }
+    public void setDeviceInfo(String deviceInfo) { this.deviceInfo = deviceInfo; }
 }

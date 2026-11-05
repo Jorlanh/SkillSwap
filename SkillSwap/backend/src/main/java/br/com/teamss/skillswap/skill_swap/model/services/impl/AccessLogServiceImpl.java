@@ -12,7 +12,10 @@ import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import java.time.Instant;
+import java.time.Duration;
 import java.util.Locale;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 
 @Service
 public class AccessLogServiceImpl implements AccessLogService {
@@ -27,7 +30,17 @@ public class AccessLogServiceImpl implements AccessLogService {
             ? request.getRemoteAddr()
             : forwarded.split(",")[0].trim();
 
-        // Cria e salva o registro de acesso sem informações de localização.
+        String userAgent = request.getHeader("User-Agent");
+        String deviceInfo = describeDevice(userAgent);
+        String tokenHash = hashBearerToken(request.getHeader("Authorization"));
+        Instant now = Instant.now();
+        var recent = accessLogRepository.findByUserIdOrderByAccessTimeDesc(userId).stream()
+            .filter(log -> !log.isRevoked())
+            .filter(log -> tokenHash != null && tokenHash.equals(log.getTokenHash()))
+            .filter(log -> log.getAccessTime() != null && Duration.between(log.getAccessTime(), now).toMinutes() < 30)
+            .findFirst();
+        if (recent.isPresent()) return;
+
         AccessLog accessLog = new AccessLog(
             userId,
             ipAddress,
@@ -36,21 +49,25 @@ public class AccessLogServiceImpl implements AccessLogService {
             null,
             null
         );
-        accessLog.setAccessTime(Instant.now());
+        accessLog.setDeviceInfo(deviceInfo);
+        accessLog.setTokenHash(tokenHash);
+        accessLog.setAccessTime(now);
         accessLogRepository.save(accessLog);
     }
 
     @Override
     public List<AccessLogDTO> getAccessHistory(UUID userId) {
         List<AccessLog> accessLogs = accessLogRepository.findByUserIdOrderByAccessTimeDesc(userId);
-        return accessLogs.stream()
+        return accessLogs.stream().filter(log -> !log.isRevoked())
                 .map(log -> new AccessLogDTO(
+                    log.getAccessId(),
                     log.getAccessTime(),
                     log.getIpAddress(),
                     log.getLocation(),
                     log.getCity(),
                     log.getSubdivision(),
-                    log.getCountry()
+                    log.getCountry(),
+                    log.getDeviceInfo()
                 ))
                 .collect(Collectors.toList());
     }
@@ -65,5 +82,36 @@ public class AccessLogServiceImpl implements AccessLogService {
             log.setCity("Localização do dispositivo");
             accessLogRepository.save(log);
         });
+    }
+
+    @Override
+    @org.springframework.transaction.annotation.Transactional
+    public void revokeAccess(UUID userId, Long accessId) {
+        accessLogRepository.findById(accessId).ifPresent(log -> {
+            if (!userId.equals(log.getUserId())) {
+                throw new org.springframework.security.access.AccessDeniedException("Acesso não pertence ao usuário.");
+            }
+            log.setRevoked(true);
+            accessLogRepository.save(log);
+        });
+    }
+
+    private String hashBearerToken(String authorization) {
+        if (authorization == null || !authorization.startsWith("Bearer ")) return null;
+        try {
+            byte[] digest = MessageDigest.getInstance("SHA-256").digest(authorization.substring(7).getBytes(StandardCharsets.UTF_8));
+            StringBuilder result = new StringBuilder();
+            for (byte value : digest) result.append(String.format("%02x", value));
+            return result.toString();
+        } catch (Exception exception) {
+            return null;
+        }
+    }
+
+    private String describeDevice(String userAgent) {
+        if (userAgent == null || userAgent.isBlank()) return "Navegador não identificado";
+        String browser = userAgent.contains("Edg/") ? "Microsoft Edge" : userAgent.contains("Chrome/") ? "Google Chrome" : userAgent.contains("Firefox/") ? "Mozilla Firefox" : userAgent.contains("Safari/") ? "Safari" : "Navegador";
+        String platform = userAgent.contains("Android") ? "Android" : userAgent.contains("iPhone") || userAgent.contains("iPad") ? "iOS" : userAgent.contains("Windows") ? "Windows" : userAgent.contains("Mac OS") ? "macOS" : userAgent.contains("Linux") ? "Linux" : "dispositivo desconhecido";
+        return browser + " · " + platform;
     }
 }

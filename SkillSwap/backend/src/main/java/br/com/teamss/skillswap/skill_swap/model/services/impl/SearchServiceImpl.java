@@ -18,27 +18,53 @@ import org.opensearch.client.opensearch.core.SearchResponse;
 import org.opensearch.client.opensearch.core.search.Hit;
 import org.opensearch.client.opensearch.core.search.TotalHits;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.fasterxml.jackson.databind.JsonNode;
 
 import br.com.teamss.skillswap.skill_swap.dto.SearchResultDTO;
 import br.com.teamss.skillswap.skill_swap.model.services.SearchService;
+import br.com.teamss.skillswap.skill_swap.model.entities.Community;
+import br.com.teamss.skillswap.skill_swap.model.entities.Post;
+import br.com.teamss.skillswap.skill_swap.model.entities.User;
+import br.com.teamss.skillswap.skill_swap.model.repositories.CommunityRepository;
+import br.com.teamss.skillswap.skill_swap.model.repositories.PostRepository;
+import br.com.teamss.skillswap.skill_swap.model.repositories.UserRepository;
 
 @Service
 public class SearchServiceImpl implements SearchService {
 
     private final OpenSearchClient client;
+    private final UserRepository userRepository;
+    private final PostRepository postRepository;
+    private final CommunityRepository communityRepository;
 
     public static final String USER_INDEX = "users";
     public static final String POST_INDEX = "posts";
     public static final String COMMUNITY_INDEX = "communities";
 
-    public SearchServiceImpl(OpenSearchClient client) {
+    public SearchServiceImpl(OpenSearchClient client, UserRepository userRepository,
+                             PostRepository postRepository, CommunityRepository communityRepository) {
         this.client = client;
+        this.userRepository = userRepository;
+        this.postRepository = postRepository;
+        this.communityRepository = communityRepository;
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<SearchResultDTO> search(String query, String filter, String sortBy) throws IOException {
+        if (query == null || query.isBlank()) return List.of();
+        try {
+            List<SearchResultDTO> indexed = searchOpenSearch(query, filter, sortBy);
+            if (!indexed.isEmpty()) return indexed;
+        } catch (Exception ignored) {
+            // A busca principal não deve quebrar se o OpenSearch estiver fora do ar.
+        }
+        return searchDatabase(query, filter);
+    }
+
+    private List<SearchResultDTO> searchOpenSearch(String query, String filter, String sortBy) throws IOException {
         List<String> indicesToSearch = new ArrayList<>();
         
         // Configuração de filtros de índice
@@ -90,7 +116,29 @@ public class SearchServiceImpl implements SearchService {
 
         return response.hits().hits().stream()
             .map(this::convertHitToDTO)
+            .filter(java.util.Objects::nonNull)
             .collect(Collectors.toList());
+    }
+
+    private List<SearchResultDTO> searchDatabase(String query, String filter) {
+        List<SearchResultDTO> results = new ArrayList<>();
+        if ("ALL".equalsIgnoreCase(filter) || "USER".equalsIgnoreCase(filter) || "PROFILE".equalsIgnoreCase(filter)) {
+            for (User user : userRepository.findTop50ByUsernameContainingIgnoreCaseOrNameContainingIgnoreCase(query, query)) {
+                String image = user.getProfile() == null ? "" : user.getProfile().getImageUrl();
+                results.add(new SearchResultDTO(user.getUserId().toString(), "user", user.getUsername(), user.getName(), image, 1.0));
+            }
+        }
+        if ("ALL".equalsIgnoreCase(filter) || "COMMUNITY".equalsIgnoreCase(filter)) {
+            for (Community community : communityRepository.findTop50ByNameContainingIgnoreCase(query)) {
+                results.add(new SearchResultDTO(community.getCommunityId().toString(), "community", community.getName(), community.getDescription(), community.getImageUrl(), 1.0));
+            }
+        }
+        if ("ALL".equalsIgnoreCase(filter) || "POST".equalsIgnoreCase(filter)) {
+            for (Post post : postRepository.findTop50ByContentContainingIgnoreCaseOrTitleContainingIgnoreCase(query, query)) {
+                results.add(new SearchResultDTO(String.valueOf(post.getPostId()), "post", post.getTitle(), post.getContent(), post.getImageUrl(), 1.0));
+            }
+        }
+        return results;
     }
 
     private SearchResultDTO convertHitToDTO(Hit<JsonNode> hit) {

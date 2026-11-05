@@ -12,6 +12,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Arrays;
 
 @Service
 public class GeminiApiModerationService implements ContentModerationService {
@@ -56,8 +57,8 @@ public class GeminiApiModerationService implements ContentModerationService {
             String responseJson;
             try {
                 responseJson = callGemini(model, requestBody);
-            } catch (WebClientResponseException.NotFound notFound) {
-                responseJson = callGemini(fallbackModel, requestBody);
+            } catch (WebClientResponseException modelError) {
+                responseJson = callGemini(resolveAvailableModel(), requestBody);
             }
 
             JsonNode rootNode = objectMapper.readTree(responseJson);
@@ -77,5 +78,24 @@ public class GeminiApiModerationService implements ContentModerationService {
                 .header("x-goog-api-key", apiKey)
                 .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
                 .bodyValue(requestBody).retrieve().bodyToMono(String.class).block();
+    }
+
+    private String resolveAvailableModel() throws Exception {
+        String response = webClient.get()
+                .uri("https://generativelanguage.googleapis.com/v1beta/models")
+                .header("x-goog-api-key", apiKey)
+                .retrieve()
+                .bodyToMono(String.class)
+                .block();
+        JsonNode models = objectMapper.readTree(response).path("models");
+        for (String preferred : Arrays.asList("gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-flash-8b", fallbackModel)) {
+            for (JsonNode item : models) {
+                String name = item.path("name").asText("").replaceFirst("^models/", "");
+                boolean supports = false;
+                for (JsonNode method : item.path("supportedGenerationMethods")) supports |= "generateContent".equalsIgnoreCase(method.asText());
+                if (preferred.equals(name) && supports) return name;
+            }
+        }
+        throw new IllegalStateException("Nenhum modelo Gemini disponível para moderação.");
     }
 }

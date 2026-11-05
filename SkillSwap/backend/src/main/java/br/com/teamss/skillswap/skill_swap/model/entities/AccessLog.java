@@ -35,6 +35,15 @@ public class AccessLog {
     @Column(name = "country")
     private String country;
 
+    @Column(name = "device_info")
+    private String deviceInfo;
+
+    @Column(name = "token_hash", length = 128)
+    private String tokenHash;
+
+    @Column(name = "revoked", nullable = false)
+    private boolean revoked = false;
+
     // Construtores
     public AccessLog() {}
 
@@ -64,4 +73,10 @@ public class AccessLog {
     public void setSubdivision(String subdivision) { this.subdivision = subdivision; }
     public String getCountry() { return country; }
     public void setCountry(String country) { this.country = country; }
+    public String getDeviceInfo() { return deviceInfo; }
+    public void setDeviceInfo(String deviceInfo) { this.deviceInfo = deviceInfo; }
+    public String getTokenHash() { return tokenHash; }
+    public void setTokenHash(String tokenHash) { this.tokenHash = tokenHash; }
+    public boolean isRevoked() { return revoked; }
+    public void setRevoked(boolean revoked) { this.revoked = revoked; }
 }

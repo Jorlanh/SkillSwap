@@ -16,6 +16,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.util.HashMap;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
@@ -63,9 +64,9 @@ public class ChatbotServiceImpl implements ChatbotService {
             String responseJson;
             try {
                 responseJson = callGemini(model, requestBody);
-            } catch (WebClientResponseException.NotFound notFound) {
-                logger.warn("O modelo Gemini '{}' não foi encontrado. Tentando '{}'.", model, fallbackModel);
-                responseJson = callGemini(fallbackModel, requestBody);
+            } catch (WebClientResponseException modelError) {
+                logger.warn("O modelo Gemini '{}' não está disponível (HTTP {}). Procurando um modelo habilitado para esta chave.", model, modelError.getStatusCode().value());
+                responseJson = callGemini(resolveAvailableModel(), requestBody);
             }
 
             JsonNode rootNode = objectMapper.readTree(responseJson);
@@ -91,10 +92,43 @@ public class ChatbotServiceImpl implements ChatbotService {
 
             return new ChatbotResponseDTO(finalResponse, null, wasSimplified);
 
+        } catch (WebClientResponseException e) {
+            String body = e.getResponseBodyAsString();
+            if (body.length() > 300) body = body.substring(0, 300);
+            logger.error("Gemini recusou a requisição (HTTP {}): {}", e.getStatusCode().value(), body);
+            return new ChatbotResponseDTO("O assistente está temporariamente indisponível. Tente novamente em alguns instantes.", null, false);
         } catch (Exception e) {
-            logger.error("Erro ao comunicar com a API do Google AI Studio: {}", e.getMessage(), e);
+            logger.error("Erro ao comunicar com a API do Google AI Studio: {}", e.getMessage());
             return new ChatbotResponseDTO("Tive um problema para responder agora. Tente novamente em alguns instantes.", null, false);
         }
+    }
+
+    private String resolveAvailableModel() throws Exception {
+        String response = webClient.get()
+                .uri("https://generativelanguage.googleapis.com/v1beta/models")
+                .header("x-goog-api-key", apiKey)
+                .retrieve()
+                .bodyToMono(String.class)
+                .block();
+        JsonNode models = objectMapper.readTree(response).path("models");
+        for (String preferredName : Arrays.asList("gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-flash-8b", "gemini-2.5-flash-lite")) {
+            for (JsonNode item : models) {
+                String name = item.path("name").asText("").replaceFirst("^models/", "");
+                if (preferredName.equals(name) && supportsGeneration(item)) return name;
+            }
+        }
+        for (JsonNode item : models) {
+            String name = item.path("name").asText("").replaceFirst("^models/", "");
+            if (name.contains("flash") && supportsGeneration(item)) return name;
+        }
+        throw new IllegalStateException("Nenhum modelo Gemini com generateContent está disponível para esta chave.");
+    }
+
+    private boolean supportsGeneration(JsonNode modelNode) {
+        for (JsonNode method : modelNode.path("supportedGenerationMethods")) {
+            if ("generateContent".equalsIgnoreCase(method.asText())) return true;
+        }
+        return false;
     }
 
     private String callGemini(String selectedModel, Map<String, Object> requestBody) {

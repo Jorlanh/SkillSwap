@@ -22,6 +22,12 @@ public interface PostRepository extends JpaRepository<Post, Long> {
 
     List<Post> findByUserUserId(UUID userId);
 
+    List<Post> findByUserUserIdIn(List<UUID> userIds);
+
+    List<Post> findAllByOrderByCreatedAtDesc();
+
+    List<Post> findTop50ByContentContainingIgnoreCaseOrTitleContainingIgnoreCase(String content, String title);
+
     @Query("SELECT p FROM Post p WHERE p.community.communityId = :communityId AND p.createdAt >= :startTime " +
            "ORDER BY (p.likesCount + p.repostsCount + p.commentsCount + p.sharesCount) DESC")
     List<Post> findByCommunity_CommunityId(@Param("communityId") UUID communityId, @Param("startTime") Instant startTime);

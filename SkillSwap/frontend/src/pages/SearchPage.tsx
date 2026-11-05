@@ -1,13 +1,14 @@
 import { useEffect, useState } from 'react';
 import { ChevronLeft, Search, LayoutGrid, List } from 'lucide-react';
 import { Input } from '@/components/ui/input';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { SearchService } from '@/services/api';
 
 const filters = ['Popularidade', 'Comunidade', 'Pessoas', 'Personalizado', 'Palavra-chave'];
 
 const SearchPage = () => {
-  const [query, setQuery] = useState('');
+  const [searchParams] = useSearchParams();
+  const [query, setQuery] = useState(searchParams.get('query') || '');
   const [activeFilter, setActiveFilter] = useState('Popularidade');
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -95,7 +96,7 @@ const SearchPage = () => {
             {searchResults.map((result) => (
               <article key={`${result.type}-${result.id}`} className="rounded-xl border border-border bg-card p-4">
                 <p className="text-xs uppercase tracking-wide text-muted-foreground">{result.type}</p>
-                <h3 className="font-display font-bold text-foreground">{result.title}</h3>
+                {result.type === 'user' ? <Link to={`/perfil/${result.title}`} className="font-display font-bold text-skillswap-teal hover:underline">@{result.title}</Link> : result.type === 'community' ? <Link to={`/comunidades/${result.id}`} className="font-display font-bold text-skillswap-teal hover:underline">{result.title}</Link> : <h3 className="font-display font-bold text-foreground">{result.title}</h3>}
                 {result.description && <p className="mt-1 text-sm text-muted-foreground">{result.description}</p>}
               </article>
             ))}

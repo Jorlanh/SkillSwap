@@ -4,6 +4,7 @@ import br.com.teamss.skillswap.skill_swap.dto.CommentDTO;
 import br.com.teamss.skillswap.skill_swap.model.entities.Comment;
 import br.com.teamss.skillswap.skill_swap.model.entities.Post;
 import br.com.teamss.skillswap.skill_swap.model.entities.User;
+import br.com.teamss.skillswap.skill_swap.model.entities.Profile;
 import br.com.teamss.skillswap.skill_swap.model.repositories.CommentRepository;
 import br.com.teamss.skillswap.skill_swap.model.repositories.PostRepository;
 import br.com.teamss.skillswap.skill_swap.model.repositories.UserRepository;
@@ -14,6 +15,8 @@ import org.springframework.stereotype.Service;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -76,6 +79,9 @@ public class CommentServiceImpl implements CommentService {
                     dto.setPostId(comment.getPost().getPostId());
                     dto.setUserId(comment.getUser().getUserId());
                     dto.setUsername(comment.getUser().getUsername());
+                    dto.setVerifiedBadge(comment.getUser().isVerifiedBadge());
+                    Profile profile = comment.getUser().getProfile();
+                    dto.setAvatarUrl(profile == null ? null : profile.getImageUrl());
                     dto.setParentCommentId(comment.getParentComment() == null ? null : comment.getParentComment().getCommentId());
                     dto.setLikesCount(commentLikeRepository.countByComment_CommentId(comment.getCommentId()));
                     return dto;
@@ -89,7 +95,22 @@ public class CommentServiceImpl implements CommentService {
         Comment comment = commentRepository.findById(commentId).orElseThrow(() -> new RuntimeException("Comentário não encontrado."));
         if (!comment.getUser().getUserId().equals(userId)) throw new org.springframework.security.access.AccessDeniedException("Você só pode excluir seus próprios comentários.");
         Post post = comment.getPost();
-        post.setCommentsCount(Math.max(0, post.getCommentsCount() - 1));
+        // Uma resposta fica vinculada ao comentário principal no banco. Ao
+        // apagar um comentário principal, o PostgreSQL remove suas respostas
+        // em cascata; o contador precisa acompanhar essa mesma quantidade.
+        Set<Long> removedIds = new HashSet<>();
+        removedIds.add(commentId);
+        boolean expanded;
+        do {
+            expanded = false;
+            for (Comment candidate : commentRepository.findAllByPost_PostId(post.getPostId())) {
+                Long parentId = candidate.getParentComment() == null ? null : candidate.getParentComment().getCommentId();
+                if (parentId != null && removedIds.contains(parentId) && removedIds.add(candidate.getCommentId())) {
+                    expanded = true;
+                }
+            }
+        } while (expanded);
+        post.setCommentsCount(Math.max(0, post.getCommentsCount() - removedIds.size()));
         postRepository.save(post);
         commentRepository.delete(comment);
     }

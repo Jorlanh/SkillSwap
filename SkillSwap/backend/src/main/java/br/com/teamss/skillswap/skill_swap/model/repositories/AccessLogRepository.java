@@ -9,4 +9,5 @@ import java.util.UUID;
 public interface AccessLogRepository extends JpaRepository<AccessLog, Long> {
     List<AccessLog> findByUserIdOrderByAccessTimeDesc(UUID userId);
     java.util.Optional<AccessLog> findTopByUserIdOrderByAccessTimeDesc(UUID userId);
+    boolean existsByTokenHashAndRevokedTrue(String tokenHash);
 }

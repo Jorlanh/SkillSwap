@@ -30,6 +30,13 @@ public class TrendingServiceImpl implements TrendingService {
     public List<Post> getTrendingPosts(String period, int limit) {
         Instant startTime = getStartTime(period);
         List<Post> posts = postRepository.findTrendingPosts(startTime);
+        if (posts.isEmpty()) {
+            // Uma plataforma nova ainda precisa mostrar o conteúdo recente,
+            // mesmo antes de existir volume suficiente para a janela de alta.
+            posts = postRepository.findAllByOrderByCreatedAtDesc().stream()
+                    .limit(Math.max(limit, 10))
+                    .collect(Collectors.toList());
+        }
 
         Map<Long, Integer> shareClicks = shareLinkRepository.findAllByPost_PostIdIn(
                 posts.stream().map(Post::getPostId).collect(Collectors.toList())

@@ -6,6 +6,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
+import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -24,6 +25,7 @@ import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import br.com.teamss.skillswap.skill_swap.filters.BanCheckFilter;
+import br.com.teamss.skillswap.skill_swap.filters.AccessLogFilter;
 
 import static org.springframework.security.config.Customizer.withDefaults;
 
@@ -36,9 +38,11 @@ public class SecurityFilterChainConfig {
     private String[] allowedOrigins;
 
     private final BanCheckFilter banCheckFilter; 
+    private final AccessLogFilter accessLogFilter;
 
-    public SecurityFilterChainConfig(BanCheckFilter banCheckFilter) {
+    public SecurityFilterChainConfig(BanCheckFilter banCheckFilter, AccessLogFilter accessLogFilter) {
         this.banCheckFilter = banCheckFilter;
+        this.accessLogFilter = accessLogFilter;
     }
 
     @Bean
@@ -118,9 +122,21 @@ public class SecurityFilterChainConfig {
             )
             
             // Filtro de Banimento após a autenticação
-            .addFilterAfter(banCheckFilter, BearerTokenAuthenticationFilter.class);
+            .addFilterAfter(banCheckFilter, BearerTokenAuthenticationFilter.class)
+            // O registro precisa ocorrer dentro da cadeia, depois do JWT e do
+            // provisionamento local, para que o histórico tenha dados reais.
+            .addFilterAfter(accessLogFilter, BanCheckFilter.class);
 
         return http.build();
+    }
+
+    @Bean
+    public FilterRegistrationBean<AccessLogFilter> accessLogFilterRegistration(AccessLogFilter filter) {
+        FilterRegistrationBean<AccessLogFilter> registration = new FilterRegistrationBean<>(filter);
+        // Evita uma segunda execução como filtro servlet global. A execução
+        // oficial acontece acima, dentro da cadeia do Spring Security.
+        registration.setEnabled(false);
+        return registration;
     }
 
     @Bean

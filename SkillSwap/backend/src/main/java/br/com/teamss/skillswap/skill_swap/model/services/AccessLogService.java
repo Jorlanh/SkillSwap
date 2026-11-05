@@ -10,4 +10,5 @@ public interface AccessLogService {
     void logAccess(UUID userId, HttpServletRequest request); // Registra um acesso
     List<AccessLogDTO> getAccessHistory(UUID userId); // Retorna o histórico de acessos
     void updateLatestLocation(UUID userId, double latitude, double longitude);
+    void revokeAccess(UUID userId, Long accessId);
 }

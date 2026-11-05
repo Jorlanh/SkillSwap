@@ -208,8 +208,52 @@ public class PostServiceImpl implements PostService {
 
     @Override
     public List<PostResponseDTO> getPosts(String sortBy, String period) {
+        return getPosts(sortBy, period, null);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<PostResponseDTO> getPosts(String sortBy, String period, UUID authenticatedUserId) {
         Instant startTime = calculateStartTime(period);
-        List<Post> posts = postRepository.findTrendingPosts(startTime);
+        List<Post> posts;
+
+        if (authenticatedUserId != null && "DATE".equalsIgnoreCase(sortBy)) {
+            User currentUser = userRepository.findById(authenticatedUserId).orElse(null);
+            if (currentUser != null) {
+                Set<UUID> followedUsers = new LinkedHashSet<>();
+                followedUsers.add(authenticatedUserId);
+                if (currentUser.getFollowingIds() != null) followedUsers.addAll(currentUser.getFollowingIds());
+
+                Map<Long, Post> personalized = new LinkedHashMap<>();
+                postRepository.findByUserUserIdIn(new ArrayList<>(followedUsers)).stream()
+                    .filter(post -> post.getCreatedAt() == null || !post.getCreatedAt().isBefore(startTime))
+                    .forEach(post -> personalized.put(post.getPostId(), post));
+
+                List<UUID> communityIds = currentUser.getCommunityIds() == null
+                    ? List.of() : currentUser.getCommunityIds();
+                if (!communityIds.isEmpty()) {
+                    postRepository.findByCommunity_CommunityIdIn(communityIds).stream()
+                        .filter(post -> post.getCreatedAt() == null || !post.getCreatedAt().isBefore(startTime))
+                        .forEach(post -> personalized.put(post.getPostId(), post));
+                }
+                posts = new ArrayList<>(personalized.values());
+            } else {
+                posts = postRepository.findAllByOrderByCreatedAtDesc();
+            }
+        } else if ("DATE".equalsIgnoreCase(sortBy)) {
+            posts = postRepository.findAllByOrderByCreatedAtDesc().stream()
+                .filter(post -> post.getCreatedAt() == null || !post.getCreatedAt().isBefore(startTime))
+                .collect(Collectors.toCollection(ArrayList::new));
+        } else {
+            posts = postRepository.findTrendingPosts(startTime);
+            if (posts.isEmpty()) {
+                posts = postRepository.findAllByOrderByCreatedAtDesc().stream()
+                    .limit(50).collect(Collectors.toCollection(ArrayList::new));
+            }
+        }
+
+        posts.sort(Comparator.comparing(Post::getCreatedAt,
+            Comparator.nullsLast(Comparator.reverseOrder())));
 
         // Lógica de ordenação robusta
         switch (sortBy.toUpperCase()) {

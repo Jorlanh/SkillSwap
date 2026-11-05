@@ -14,6 +14,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Arrays;
 
 @Service
 public class GeminiTranslationServiceImpl implements TranslationService {
@@ -75,8 +76,9 @@ public class GeminiTranslationServiceImpl implements TranslationService {
             String responseJson;
             try {
                 responseJson = callGemini(model, requestBody);
-            } catch (WebClientResponseException.NotFound notFound) {
-                responseJson = callGemini(fallbackModel, requestBody);
+            } catch (WebClientResponseException modelError) {
+                logger.warn("O modelo Gemini '{}' não está disponível (HTTP {}). Procurando um modelo habilitado para esta chave.", model, modelError.getStatusCode().value());
+                responseJson = callGemini(resolveAvailableModel(), requestBody);
             }
 
             JsonNode rootNode = objectMapper.readTree(responseJson);
@@ -95,5 +97,33 @@ public class GeminiTranslationServiceImpl implements TranslationService {
                 .header("x-goog-api-key", apiKey)
                 .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
                 .bodyValue(requestBody).retrieve().bodyToMono(String.class).block();
+    }
+
+    private String resolveAvailableModel() throws Exception {
+        String response = webClient.get()
+                .uri("https://generativelanguage.googleapis.com/v1beta/models")
+                .header("x-goog-api-key", apiKey)
+                .retrieve()
+                .bodyToMono(String.class)
+                .block();
+        JsonNode models = objectMapper.readTree(response).path("models");
+        for (String preferred : Arrays.asList(model, fallbackModel, "gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-flash-8b", "gemini-2.5-flash-lite")) {
+            for (JsonNode item : models) {
+                String name = item.path("name").asText("").replaceFirst("^models/", "");
+                if (preferred.equals(name) && supportsGeneration(item)) return name;
+            }
+        }
+        for (JsonNode item : models) {
+            String name = item.path("name").asText("").replaceFirst("^models/", "");
+            if (name.contains("flash") && supportsGeneration(item)) return name;
+        }
+        throw new IllegalStateException("Nenhum modelo Gemini com generateContent está disponível para esta chave.");
+    }
+
+    private boolean supportsGeneration(JsonNode modelNode) {
+        for (JsonNode method : modelNode.path("supportedGenerationMethods")) {
+            if ("generateContent".equalsIgnoreCase(method.asText())) return true;
+        }
+        return false;
     }
 }

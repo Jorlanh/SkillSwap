@@ -214,8 +214,16 @@ public class CommunityServiceImpl implements CommunityService {
     }
 
     @Override
+    @Transactional
     public Community joinCommunity(UUID communityId, UUID userId) {
-        joinCommunityWithMemberRepository(communityId, userId);
+        CommunityMember member = joinCommunityWithMemberRepository(communityId, userId);
+        if ("APPROVED".equals(member.getMembershipStatus())) {
+            User user = userRepository.findById(userId).orElseThrow();
+            if (!user.getCommunityIds().contains(communityId)) {
+                user.getCommunityIds().add(communityId);
+                userRepository.save(user);
+            }
+        }
         return communityRepository.findById(communityId)
                 .orElseThrow(() -> new RuntimeException("Comunidade não encontrada!"));
     }
@@ -352,6 +360,10 @@ public class CommunityServiceImpl implements CommunityService {
         if (community.getOwner() != null && community.getOwner().getUserId().equals(memberId)) throw new IllegalArgumentException("O criador não pode ser removido.");
         CommunityMemberId id = new CommunityMemberId(); id.setCommunityId(communityId); id.setUserId(memberId);
         communityMemberRepository.deleteById(id);
+        userRepository.findById(memberId).ifPresent(user -> {
+            user.getCommunityIds().removeIf(communityId::equals);
+            userRepository.save(user);
+        });
     }
 
     @Override
@@ -373,6 +385,11 @@ public class CommunityServiceImpl implements CommunityService {
                 .orElseThrow(() -> new IllegalArgumentException("Solicitação não encontrada."));
         member.setMembershipStatus("APPROVED");
         communityMemberRepository.save(member);
+        User user = userRepository.findById(memberId).orElseThrow();
+        if (!user.getCommunityIds().contains(communityId)) {
+            user.getCommunityIds().add(communityId);
+            userRepository.save(user);
+        }
     }
 
     private void ensureModerator(UUID communityId, UUID actorId) {

@@ -124,7 +124,16 @@ const SettingsPage = () => {
             <div className="space-y-3">
               {accessLogError ? <p className="text-sm text-destructive">Não foi possível carregar o histórico agora.</p> : accessLogs.length === 0 ? <p className="text-sm text-muted-foreground">Nenhum acesso registrado.</p> : accessLogs.map((log, index) => {
                 const date = log.accessTime ? new Date(log.accessTime) : null;
-                return <div key={`${log.accessTime ?? 'access'}-${index}`} className="flex flex-wrap items-center justify-between gap-2 bg-card rounded-xl px-4 py-3 border border-border"><div><p className="text-sm font-medium text-foreground">{log.location || log.city || 'Local não informado'}</p><p className="text-xs text-muted-foreground">{date ? date.toLocaleDateString('pt-BR') : 'Data não informada'}</p></div><span className="text-sm text-muted-foreground">{date ? `às ${date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}` : ''}</span></div>;
+                const accessId = Number(log.accessId);
+                const revoke = async () => {
+                  if (!accessId || !window.confirm('Desconectar este dispositivo? O token usado por ele deixará de funcionar.')) return;
+                  try {
+                    await AccessLogService.revokeMyAccess(accessId);
+                    setAccessLogs((current) => current.filter((item) => Number(item.accessId) !== accessId));
+                    toast.success('Dispositivo desconectado.');
+                  } catch { toast.error('Não foi possível desconectar este dispositivo.'); }
+                };
+                return <div key={`${log.accessId ?? log.accessTime ?? 'access'}-${index}`} className="flex flex-wrap items-center justify-between gap-3 bg-card rounded-xl px-4 py-3 border border-border"><div className="min-w-0"><p className="text-sm font-medium text-foreground">{log.deviceInfo || 'Dispositivo não identificado'}</p><p className="text-xs text-muted-foreground">{log.city && log.city !== 'Local não informado' ? `${log.city} · ` : ''}{log.location || 'Localização não informada'}{log.ipAddress ? ` · IP ${log.ipAddress}` : ''}</p><p className="text-xs text-muted-foreground">{date ? `${date.toLocaleDateString('pt-BR')} às ${date.toLocaleTimeString('pt-BR')}` : 'Data não informada'}</p></div><button type="button" onClick={() => void revoke()} className="text-xs font-semibold text-red-600 hover:underline">Desconectar</button></div>;
               })}
             </div>
           </section>

@@ -61,6 +61,11 @@ export const AdminService = {
     api.put(`/console-management/users/${userId}/role`, { role, enabled }),
 };
 
+export const AdminReportService = {
+  getPending: () => api.get('/reports/pending'),
+  review: (reportId: number, status: 'REVIEWED' | 'DISMISSED' | 'ACTION_TAKEN') => api.post(`/reports/${reportId}/review`, null, { params: { status } }),
+};
+
 // ==========================================
 // ROLES E SKILLS
 // ==========================================
@@ -92,7 +97,12 @@ export const HomeService = {
   createPost: (formData: FormData) => api.post('/home/posts', formData),
   likePost: (postId: number) => api.post(`/home/posts/${postId}/like`),
   repost: (postId: number) => api.post(`/home/posts/${postId}/repost`),
-  comment: (postId: number, content: string, parentCommentId?: number) => api.post(`/home/posts/${postId}/comment`, null, { params: { content, ...(parentCommentId ? { parentCommentId } : {}) } }),
+  comment: (postId: number, content: string, parentCommentId?: number | null) => {
+    const numericParent = parentCommentId != null && Number.isInteger(Number(parentCommentId)) && Number(parentCommentId) > 0
+      ? Number(parentCommentId)
+      : undefined;
+    return api.post(`/home/posts/${postId}/comment`, null, { params: { content, ...(numericParent ? { parentCommentId: numericParent } : {}) } });
+  },
   getCommunities: (limit: number = 5) => api.get('/home/communities', { params: { limit } }),
   createCommunity: (data: { name: string; description?: string; privateCommunity?: boolean }) => api.post('/home/communities', data),
   joinCommunity: (communityId: string) => api.post(`/home/communities/${communityId}/join`),
@@ -282,6 +292,7 @@ export const AchievementService = {
 export const AccessLogService = {
   getMyAccessHistory: () => api.get('/access-logs/me'),
   updateMyLocation: (latitude: number, longitude: number) => api.post('/access-logs/me/location', { latitude, longitude }),
+  revokeMyAccess: (accessId: number) => api.delete(`/access-logs/me/${accessId}`),
 };
 
 // ==========================================

@@ -40,8 +40,15 @@ public class LocalUserServiceImpl implements LocalUserService {
     @Transactional
     public User findOrCreateUser(Jwt jwt) {
         String email = jwt.getClaimAsString("email");
+        String subject = jwt.getSubject();
         if (email == null || email.isBlank()) {
-            throw new IllegalArgumentException("O token não contém e-mail.");
+            if (subject == null || subject.isBlank()) {
+                throw new IllegalArgumentException("O token não contém uma identidade válida.");
+            }
+            // Alguns provedores não enviam o e-mail no token. Ainda assim,
+            // a identidade Firebase continua sendo suficiente para criar o
+            // perfil local pela primeira vez.
+            email = "firebase_" + subject.replaceAll("[^a-zA-Z0-9._-]", "_") + "@local.skillswap";
         }
 
         User user = userRepository.findByEmail(email).orElseGet(() -> createUserFromJwt(jwt, email));

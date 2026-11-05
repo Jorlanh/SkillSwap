@@ -9,6 +9,7 @@ import { onIdTokenChanged, signOut } from 'firebase/auth';
 
 const Header = () => {
   const [user, setUser] = useState<any>(null);
+  const [search, setSearch] = useState('');
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -55,9 +56,14 @@ const Header = () => {
           <div className="relative">
             <Input
               placeholder="Buscar mestre em..."
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' && search.trim()) navigate(`/busca?query=${encodeURIComponent(search.trim())}`);
+              }}
               className="pr-10 bg-muted border-border rounded-full focus-visible:ring-skillswap-teal h-11"
             />
-            <Search className="absolute right-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <button type="button" aria-label="Pesquisar" onClick={() => search.trim() && navigate(`/busca?query=${encodeURIComponent(search.trim())}`)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-skillswap-teal"><Search className="h-4 w-4" /></button>
           </div>
         </div>
 

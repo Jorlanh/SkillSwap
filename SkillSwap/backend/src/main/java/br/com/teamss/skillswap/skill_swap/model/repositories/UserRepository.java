@@ -27,6 +27,8 @@ public interface UserRepository extends JpaRepository<User, UUID> {
      */
     Optional<User> findByUsername(String username);
 
+    List<User> findTop50ByUsernameContainingIgnoreCaseOrNameContainingIgnoreCase(String username, String name);
+
     /**
      * Carrega os relacionamentos usados pelo perfil privado enquanto a sessão
      * JPA ainda está aberta. Isso evita LazyInitializationException no endpoint

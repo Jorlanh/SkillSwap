@@ -16,6 +16,8 @@ public class CommentDTO {
     private UUID userId;
 
     private String username; // Pode ser preenchido pelo backend
+    private String avatarUrl;
+    private boolean verifiedBadge;
 
     @NotBlank(message = "Conteúdo do comentário não pode ser vazio") // Adicionado
     @Size(max = 1000, message = "Comentário não pode exceder 1000 caracteres") // Adicionado
@@ -34,6 +36,10 @@ public class CommentDTO {
     public void setUserId(UUID userId) { this.userId = userId; }
     public String getUsername() { return username; }
     public void setUsername(String username) { this.username = username; }
+    public String getAvatarUrl() { return avatarUrl; }
+    public void setAvatarUrl(String avatarUrl) { this.avatarUrl = avatarUrl; }
+    public boolean isVerifiedBadge() { return verifiedBadge; }
+    public void setVerifiedBadge(boolean verifiedBadge) { this.verifiedBadge = verifiedBadge; }
     public String getContent() { return content; }
     public void setContent(String content) { this.content = content; }
     public Instant getCreatedAt() { return createdAt; }

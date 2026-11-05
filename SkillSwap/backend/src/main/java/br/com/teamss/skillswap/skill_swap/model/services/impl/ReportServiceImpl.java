@@ -52,6 +52,18 @@ public class ReportServiceImpl implements ReportService {
     }
 
     @Override
+    @org.springframework.transaction.annotation.Transactional
+    public void reviewReport(Long reportId, ReportStatus status) {
+        Report report = reportRepository.findById(reportId)
+                .orElseThrow(() -> new EntityNotFoundException("Denúncia não encontrada."));
+        if (status == null || status == ReportStatus.PENDING) {
+            throw new IllegalArgumentException("Informe uma decisão válida para a denúncia.");
+        }
+        report.setStatus(status);
+        reportRepository.save(report);
+    }
+
+    @Override
     @Scheduled(fixedRate = 3600000) // Executa a cada hora
     public void processReports() {
         List<Report> pendingReports = getPendingReports();
