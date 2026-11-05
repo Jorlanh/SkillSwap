@@ -230,9 +230,6 @@ public class CommunityServiceImpl implements CommunityService {
     private CommunityMember joinCommunityWithMemberRepository(UUID communityId, UUID userId) {
         Community community = communityRepository.findById(communityId)
                 .orElseThrow(() -> new RuntimeException("Comunidade não encontrada com ID: " + communityId));
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("Usuário não encontrado com ID: " + userId));
-
         if (communityMemberRepository.existsById_CommunityIdAndId_UserId(communityId, userId)) {
             CommunityMemberId existingId = new CommunityMemberId();
             existingId.setCommunityId(communityId);
@@ -526,7 +523,8 @@ public class CommunityServiceImpl implements CommunityService {
         // Exclusão em lote evita que o Hibernate tente remover uma entidade
         // CommunityMember já removida pela tabela de associação legada.
         communityMemberRepository.deleteAllByCommunityId(communityId);
-        communityRepository.deleteAndFlush(community);
+        communityRepository.delete(community);
+        communityRepository.flush();
     }
 
     private CommunitySummaryDTO summaryForViewer(Community community, UUID viewerId) {
@@ -576,7 +574,7 @@ public class CommunityServiceImpl implements CommunityService {
     }
 
     private void ensureCommunityManager(UUID communityId, UUID actorId) {
-        Community community = communityRepository.findById(communityId)
+        communityRepository.findById(communityId)
             .orElseThrow(() -> new RuntimeException("Comunidade não encontrada."));
         if (isPlatformAdmin(actorId)) return;
         if (isCommunityOwner(communityId, actorId)) return;
@@ -588,7 +586,8 @@ public class CommunityServiceImpl implements CommunityService {
     }
 
     private void ensureModerator(UUID communityId, UUID actorId) {
-        Community community = communityRepository.findById(communityId).orElseThrow(() -> new RuntimeException("Comunidade não encontrada."));
+        communityRepository.findById(communityId)
+            .orElseThrow(() -> new RuntimeException("Comunidade não encontrada."));
         if (isCommunityOwner(communityId, actorId)) return;
         CommunityMember member = communityMemberRepository.findById_CommunityIdAndId_UserId(communityId, actorId).orElseThrow(() -> new org.springframework.security.access.AccessDeniedException("Você não administra esta comunidade."));
         if (!("ADMIN".equals(member.getMemberRole()) || "MODERATOR".equals(member.getMemberRole())) || !"APPROVED".equals(member.getMembershipStatus())) throw new org.springframework.security.access.AccessDeniedException("Você não administra esta comunidade.");
