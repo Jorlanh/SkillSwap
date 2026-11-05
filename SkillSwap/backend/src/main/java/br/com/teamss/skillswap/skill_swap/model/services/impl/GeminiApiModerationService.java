@@ -1,32 +1,49 @@
 package br.com.teamss.skillswap.skill_swap.model.services.impl;
 
 import br.com.teamss.skillswap.skill_swap.model.services.ContentModerationService;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
-import org.springframework.web.reactive.function.client.WebClientResponseException;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 
+import java.time.Duration;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Arrays;
-import java.util.LinkedHashSet;
 import java.util.Set;
 
+/** Moderação textual com Gemini como principal e Groq como fallback. */
 @Service
 public class GeminiApiModerationService implements ContentModerationService {
 
-    @Value("${gemini.api.key}")
+    private static final Logger logger = LoggerFactory.getLogger(GeminiApiModerationService.class);
+    private static final String GEMINI_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models/";
+
+    @Value("${gemini.api.key:}")
     private String apiKey;
 
-    @Value("${gemini.api.model:gemini-3.8-flash}")
+    @Value("${gemini.api.model:gemini-2.5-flash}")
     private String model;
 
-    @Value("${gemini.api.fallback-model:gemini-3.7-flash}")
+    @Value("${gemini.api.fallback-model:gemini-2.5-flash}")
     private String fallbackModel;
+
+    @Value("${gemini.api.timeout-seconds:10}")
+    private long timeoutSeconds;
+
+    @Value("${groq.api.key:}")
+    private String groqApiKey;
+
+    @Value("${groq.api.model:llama-3.1-8b-instant}")
+    private String groqModel;
+
+    @Value("${groq.api.url:https://api.groq.com/openai/v1/chat/completions}")
+    private String groqApiUrl;
 
     private final WebClient webClient;
     private final ObjectMapper objectMapper;
@@ -38,91 +55,120 @@ public class GeminiApiModerationService implements ContentModerationService {
 
     @Override
     public boolean isContentInappropriate(String text) {
-        if (apiKey == null || apiKey.isBlank() || text == null || text.isBlank()) {
-            System.err.println("AVISO: Credenciais da API Gemini não configuradas ou texto vazio. Moderação desativada.");
-            return false;
+        if (text == null || text.isBlank()) return false;
+
+        String prompt = moderationPrompt(text);
+        if (!isBlank(apiKey)) {
+            try {
+                return startsWithYes(extractGeminiText(callGeminiWithFallback(prompt)));
+            } catch (Exception error) {
+                logger.warn("Gemini indisponível para moderação; ativando Groq: {}", error.getMessage());
+            }
         }
 
-        try {
-            String prompt = String.format(
-                "Você é um moderador de conteúdo para uma plataforma social chamada SkillSwap. " +
-                "Sua tarefa é analisar o texto a seguir e determinar se ele viola alguma das seguintes categorias: " +
-                "racismo, xenofobia, homofobia, transfobia, discriminação contra deficiência, perseguição, assédio, " +
-                "ameaça real, incentivo à violência, conteúdo sexual envolvendo menores, exposição de dados pessoais, " +
-                "spam abusivo ou incentivo à automutilação. " +
-                "Marque SIM somente quando houver ataque ou ameaça contra uma pessoa ou grupo, incentivo a crime, " +
-                "ameaça concreta ou assédio abusivo. Não marque críticas, opiniões políticas, debates, linguagem coloquial " +
-                "ou discordância respeitosa apenas por serem controversos. Responda apenas com SIM ou NAO. " +
-                "Texto para analisar: \"%s\"", text
-            );
-
-            Map<String, Object> requestBody = Map.of(
-                "contents", List.of(Map.of("parts", List.of(Map.of("text", prompt))))
-            );
-
-            String responseJson = callGeminiWithFallback(requestBody);
-
-            JsonNode rootNode = objectMapper.readTree(responseJson);
-            String modelResponse = rootNode.path("candidates").get(0).path("content").path("parts").get(0).path("text").asText().trim();
-
-            return modelResponse.toUpperCase().startsWith("SIM");
-
-        } catch (Exception e) {
-            System.err.println("Erro ao comunicar com a API do Google AI Studio (Gemini): " + e.getMessage());
-            return false;
+        if (!isBlank(groqApiKey)) {
+            try {
+                return startsWithYes(extractGroqText(callGroq(prompt)));
+            } catch (Exception error) {
+                logger.error("Gemini e Groq falharam na moderação do conteúdo: {}", error.getMessage());
+            }
+        } else {
+            logger.error("Nenhum provedor de moderação está configurado. GEMINI_API_KEY e GROQ_API_KEY estão vazias.");
         }
+
+        // Indisponibilidade do provedor não aplica punição automática.
+        return false;
     }
 
-    private String callGemini(String selectedModel, Map<String, Object> requestBody) {
-        String url = "https://generativelanguage.googleapis.com/v1beta/models/" + selectedModel + ":generateContent";
-        return webClient.post().uri(url)
-                .header("x-goog-api-key", apiKey)
-                .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
-                .bodyValue(requestBody).retrieve().bodyToMono(String.class).block();
+    private String moderationPrompt(String text) {
+        return "Você é um moderador de conteúdo da plataforma SkillSwap. "
+            + "Classifique como SIM somente se houver racismo, xenofobia, homofobia, transfobia, "
+            + "discriminação contra deficiência, perseguição, assédio abusivo, ameaça real, incentivo à violência, "
+            + "conteúdo sexual envolvendo menores, exposição de dados pessoais, spam abusivo ou incentivo à automutilação. "
+            + "Não bloqueie críticas, opiniões políticas, debates, humor, linguagem coloquial ou discordância respeitosa "
+            + "apenas por serem controversos. Responda somente SIM ou NAO. Texto: \"" + text;
     }
 
-    private String callGeminiWithFallback(Map<String, Object> requestBody) throws Exception {
+    private String callGeminiWithFallback(String prompt) throws Exception {
         Set<String> candidates = new LinkedHashSet<>();
         addModel(candidates, model);
         addModel(candidates, fallbackModel);
         addModel(candidates, "gemini-3.8-flash");
-        WebClientResponseException lastError = null;
+        addModel(candidates, "gemini-3.7-flash");
+        addModel(candidates, "gemini-2.5-flash");
+
+        Exception lastError = null;
         for (String candidate : candidates) {
             try {
-                return callGemini(candidate, requestBody);
-            } catch (WebClientResponseException error) {
+                Map<String, Object> body = Map.of(
+                    "contents", List.of(Map.of("parts", List.of(Map.of("text", prompt))))
+                );
+                String response = webClient.post()
+                    .uri(GEMINI_ENDPOINT + candidate + ":generateContent")
+                    .header("x-goog-api-key", apiKey)
+                    .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+                    .bodyValue(body)
+                    .retrieve()
+                    .bodyToMono(String.class)
+                    .block(requestTimeout());
+                if (response != null && !response.isBlank()) return response;
+                lastError = new IllegalStateException("Resposta Gemini vazia.");
+            } catch (Exception error) {
                 lastError = error;
+                logger.warn("Modelo Gemini '{}' falhou na moderação: {}", candidate, error.getMessage());
             }
         }
-        String discovered = resolveAvailableModel();
-        if (discovered != null && candidates.add(discovered)) return callGemini(discovered, requestBody);
-        if (lastError != null) throw lastError;
-        throw new IllegalStateException("Nenhum modelo Gemini disponível para moderação.");
+        throw lastError == null
+            ? new IllegalStateException("Nenhum modelo Gemini disponível para moderação.")
+            : lastError;
+    }
+
+    private String callGroq(String prompt) {
+        Map<String, Object> body = Map.of(
+            "model", groqModel,
+            "messages", List.of(
+                Map.of("role", "system", "content", "Responda exclusivamente SIM ou NAO."),
+                Map.of("role", "user", "content", prompt)
+            ),
+            "temperature", 0.0
+        );
+        String response = webClient.post()
+            .uri(groqApiUrl)
+            .header(HttpHeaders.AUTHORIZATION, "Bearer " + groqApiKey)
+            .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+            .bodyValue(body)
+            .retrieve()
+            .bodyToMono(String.class)
+            .block(requestTimeout());
+        if (response == null || response.isBlank()) throw new IllegalStateException("Resposta Groq vazia.");
+        return response;
+    }
+
+    private String extractGeminiText(String responseJson) throws Exception {
+        JsonNode root = objectMapper.readTree(responseJson);
+        return root.path("candidates").path(0).path("content").path("parts").path(0).path("text").asText("").trim();
+    }
+
+    private String extractGroqText(String responseJson) throws Exception {
+        JsonNode root = objectMapper.readTree(responseJson);
+        return root.path("choices").path(0).path("message").path("content").asText("").trim();
     }
 
     private void addModel(Set<String> candidates, String value) {
-        if (value == null || value.isBlank()) return;
-        String normalized = value.replaceFirst("^models/", "");
-        if ("gemini-2.0-flash-001".equalsIgnoreCase(normalized)) return;
-        candidates.add(normalized);
+        if (isBlank(value)) return;
+        String normalized = value.trim().replaceFirst("^models/", "");
+        if (!"gemini-2.0-flash-001".equalsIgnoreCase(normalized)) candidates.add(normalized);
     }
 
-    private String resolveAvailableModel() throws Exception {
-        String response = webClient.get()
-                .uri("https://generativelanguage.googleapis.com/v1beta/models")
-                .header("x-goog-api-key", apiKey)
-                .retrieve()
-                .bodyToMono(String.class)
-                .block();
-        JsonNode models = objectMapper.readTree(response).path("models");
-        for (String preferred : Arrays.asList("gemini-3.8-flash", "gemini-3.7-flash", "gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-flash-8b", fallbackModel)) {
-            for (JsonNode item : models) {
-                String name = item.path("name").asText("").replaceFirst("^models/", "");
-                boolean supports = false;
-                for (JsonNode method : item.path("supportedGenerationMethods")) supports |= "generateContent".equalsIgnoreCase(method.asText());
-                if (preferred.equals(name) && supports) return name;
-            }
-        }
-        throw new IllegalStateException("Nenhum modelo Gemini disponível para moderação.");
+    private boolean startsWithYes(String value) {
+        return value != null && value.trim().toUpperCase().startsWith("SIM");
+    }
+
+    private Duration requestTimeout() {
+        return Duration.ofSeconds(Math.max(5, timeoutSeconds));
+    }
+
+    private boolean isBlank(String value) {
+        return value == null || value.isBlank();
     }
 }

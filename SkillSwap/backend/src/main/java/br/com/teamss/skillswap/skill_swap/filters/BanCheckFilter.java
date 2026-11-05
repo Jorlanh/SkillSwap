@@ -46,7 +46,8 @@ public class BanCheckFilter extends OncePerRequestFilter {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication != null && authentication.isAuthenticated() && authentication.getPrincipal() instanceof Jwt jwt) {
             try {
-                if (hasActiveIpBan(request)) {
+                boolean recoveryRequest = isSuspensionRecoveryRequest(request);
+                if (hasActiveIpBan(request) && !recoveryRequest) {
                     response.sendError(HttpServletResponse.SC_FORBIDDEN, "Acesso negado para este endereço de rede.");
                     return;
                 }
@@ -56,7 +57,7 @@ public class BanCheckFilter extends OncePerRequestFilter {
                     return;
                 }
                 User user = localUserService.findOrCreateUser(jwt);
-                if (hasActiveGeneralBan(user.getUserId()) || hasScopedBan(user.getUserId(), request)) {
+                if ((hasActiveGeneralBan(user.getUserId()) || hasScopedBan(user.getUserId(), request)) && !recoveryRequest) {
                     response.sendError(HttpServletResponse.SC_FORBIDDEN, "Acesso negado.");
                     return;
                 }
@@ -116,5 +117,20 @@ public class BanCheckFilter extends OncePerRequestFilter {
         if (ip == null || ip.isBlank()) return false;
         return banRepository.findByIpAddressAndActiveTrue(ip).stream()
             .anyMatch(ban -> ban.getExpiresAt() == null || ban.getExpiresAt().isAfter(java.time.Instant.now()));
+    }
+
+    /**
+     * Uma conta suspensa continua podendo entrar para consultar o motivo,
+     * ver notificações e enviar uma contestação. Nenhuma outra operação é
+     * liberada por esta exceção.
+     */
+    private boolean isSuspensionRecoveryRequest(HttpServletRequest request) {
+        String path = request.getRequestURI().toLowerCase();
+        String method = request.getMethod();
+        return path.equals("/api/users/me")
+            || path.equals("/api/home/notifications")
+            || (path.startsWith("/api/home/notifications/") && "POST".equals(method))
+            || path.equals("/api/account/suspension/status")
+            || (path.equals("/api/account/suspension/appeal") && "POST".equals(method));
     }
 }

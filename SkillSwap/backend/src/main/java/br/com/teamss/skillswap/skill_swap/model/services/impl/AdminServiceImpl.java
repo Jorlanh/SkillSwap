@@ -28,6 +28,7 @@ import br.com.teamss.skillswap.skill_swap.model.wallet.PaymentStatus;
 import br.com.teamss.skillswap.skill_swap.model.services.SwapCoinWalletService;
 import br.com.teamss.skillswap.skill_swap.model.services.AdminService;
 import br.com.teamss.skillswap.skill_swap.model.services.CommunityService;
+import br.com.teamss.skillswap.skill_swap.model.services.NotificationService;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.stereotype.Service;
 import java.time.Instant;
@@ -57,6 +58,7 @@ public class AdminServiceImpl implements AdminService {
     private final boolean rabbitMqEnabled;
     private final SwapCoinWalletService walletService;
     private final CommunityService communityService;
+    private final NotificationService notificationService;
 
     public AdminServiceImpl(UserRepository userRepository, SkillRepository skillRepository,
                             ProposalRepository proposalRepository, BanRepository banRepository, RoleRepository roleRepository,
@@ -65,7 +67,8 @@ public class AdminServiceImpl implements AdminService {
                             LessonExtraPurchaseRepository lessonPurchaseRepository, KarmaEventRepository karmaEventRepository,
                             PostRepository postRepository, ProfileRepository profileRepository,
                             @Value("${app.messaging.rabbitmq.enabled:false}") boolean rabbitMqEnabled,
-                            SwapCoinWalletService walletService, CommunityService communityService) {
+                            SwapCoinWalletService walletService, CommunityService communityService,
+                            NotificationService notificationService) {
         this.userRepository = userRepository;
         this.skillRepository = skillRepository;
         this.proposalRepository = proposalRepository;
@@ -82,6 +85,7 @@ public class AdminServiceImpl implements AdminService {
         this.rabbitMqEnabled = rabbitMqEnabled;
         this.walletService = walletService;
         this.communityService = communityService;
+        this.notificationService = notificationService;
     }
 
     @Override
@@ -136,6 +140,10 @@ public class AdminServiceImpl implements AdminService {
         ban.setIpAddress(ipAddress);
         ban.setScope(normalizedScope);
         banRepository.save(ban);
+        String action = expiresAt == null ? "banimento permanente" : "suspensão";
+        notificationService.createNotification(userId,
+            "Sua conta recebeu uma " + action + ". Motivo: " + reason
+                + (expiresAt == null ? "" : " Até: " + expiresAt));
         if (expiresAt == null && "GENERAL".equals(normalizedScope)) {
             communityService.handlePermanentOwnerBan(userId);
         }

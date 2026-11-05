@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { BrowserRouter, Route, Routes } from 'react-router-dom';
+import { BrowserRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { Toaster as Sonner } from '@/components/ui/sonner';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
@@ -25,10 +25,16 @@ import InstitutionalPage from '@/pages/InstitutionalPage';
 import SharedPostPage from '@/pages/SharedPostPage';
 import { ChatbotELOS } from '@/components/ChatbotELOS';
 import AuthPage from '@/pages/AuthPage';
+import SuspensionRecoveryPage from '@/pages/SuspensionRecoveryPage';
 import { auth } from './lib/firebase';
 import { onIdTokenChanged } from 'firebase/auth';
 
 const queryClient = new QueryClient();
+
+const ChatbotGate = ({ isAuthenticated }: { isAuthenticated: boolean }) => {
+  const location = useLocation();
+  return isAuthenticated && location.pathname !== '/suspensao' ? <ChatbotELOS /> : null;
+};
 
 const App = () => {
   const [showAuthModal, setShowAuthModal] = useState(false);
@@ -63,6 +69,7 @@ const App = () => {
           {showAuthModal && <AuthPage isModal onClose={() => setShowAuthModal(false)} />}
           <Routes>
             <Route path="/login" element={<AuthPage />} />
+            <Route path="/suspensao" element={<ProtectedRoute><SuspensionRecoveryPage /></ProtectedRoute>} />
             <Route element={<MainLayout requireAuth={requireAuth} />}>
               <Route path="/" element={<FeedPage />} />
               <Route path="/mensagens" element={<ChatPage />} />
@@ -85,7 +92,7 @@ const App = () => {
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>
-          {isAuthenticated && <ChatbotELOS />}
+          <ChatbotGate isAuthenticated={isAuthenticated} />
         </BrowserRouter>
       </TooltipProvider>
     </QueryClientProvider>

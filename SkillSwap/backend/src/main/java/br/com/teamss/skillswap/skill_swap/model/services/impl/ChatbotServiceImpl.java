@@ -45,9 +45,6 @@ public class ChatbotServiceImpl implements ChatbotService {
 
     private static final long MAX_JITTER_MS = 500L;
 
-    private static final Duration REQUEST_TIMEOUT =
-        Duration.ofSeconds(30);
-
     private final TranslationService translationService;
 
     private final WebClient webClient;
@@ -57,11 +54,23 @@ public class ChatbotServiceImpl implements ChatbotService {
     @Value("${gemini.api.key}")
     private String apiKey;
 
-    @Value("${gemini.api.model:gemini-3.8-flash}")
+    @Value("${gemini.api.model:gemini-2.5-flash}")
     private String model;
 
-    @Value("${gemini.api.fallback-model:gemini-3.7-flash}")
+    @Value("${gemini.api.fallback-model:gemini-2.5-flash}")
     private String fallbackModel;
+
+    @Value("${gemini.api.timeout-seconds:10}")
+    private long timeoutSeconds;
+
+    @Value("${groq.api.key:}")
+    private String groqApiKey;
+
+    @Value("${groq.api.model:llama-3.1-8b-instant}")
+    private String groqModel;
+
+    @Value("${groq.api.url:https://api.groq.com/openai/v1/chat/completions}")
+    private String groqApiUrl;
 
     public ChatbotServiceImpl(
         TranslationService translationService,
@@ -81,7 +90,7 @@ public class ChatbotServiceImpl implements ChatbotService {
         ChatbotRequestDTO requestDTO
     ) {
 
-        if (apiKey == null || apiKey.isBlank()) {
+        if (isBlank(apiKey) && isBlank(groqApiKey)) {
 
             logger.error(
                 "API Key do Gemini não configurada. Chatbot indisponível."
@@ -134,13 +143,14 @@ public class ChatbotServiceImpl implements ChatbotService {
                     + requestDTO.getMessage();
             }
 
-            // Comunicação com Gemini e fallback automático.
-            String responseJson = callGeminiWithFallback(
+            // Gemini é o provedor principal. Groq assume automaticamente
+            // quando a Gemini estiver indisponível, exceder cota ou expirar.
+            String responseJson = callPrimaryWithGroqFallback(
                 input,
                 systemPrompt
             );
 
-            String rawResponse = extractInteractionText(responseJson);
+            String rawResponse = extractProviderText(responseJson);
 
             if (rawResponse.isBlank()) {
 
@@ -327,6 +337,15 @@ public class ChatbotServiceImpl implements ChatbotService {
                     candidate,
                     error.getMessage()
                 );
+
+            } catch (IllegalStateException error) {
+                // WebClient usa IllegalStateException para timeout do block().
+                // O erro não pode impedir a tentativa do próximo modelo.
+                logger.warn(
+                    "Timeout ou resposta inválida do modelo Gemini '{}': {}. Tentando próximo modelo.",
+                    candidate,
+                    error.getMessage()
+                );
             }
         }
 
@@ -343,6 +362,59 @@ public class ChatbotServiceImpl implements ChatbotService {
         throw new IllegalStateException(
             "Nenhum modelo Gemini conseguiu processar a solicitação."
         );
+    }
+
+    private String callPrimaryWithGroqFallback(
+        String input,
+        String systemPrompt
+    ) throws Exception {
+        if (!isBlank(apiKey)) {
+            try {
+                return callGeminiWithFallback(input, systemPrompt);
+            } catch (Exception error) {
+                logger.warn(
+                    "Gemini indisponível. Ativando fallback Groq: {}",
+                    error.getMessage()
+                );
+            }
+        } else {
+            logger.warn("GEMINI_API_KEY não configurada. Usando Groq como provedor temporário.");
+        }
+
+        if (!isBlank(groqApiKey)) {
+            return callGroq(input, systemPrompt);
+        }
+
+        throw new IllegalStateException(
+            "Gemini e Groq não estão configuradas no servidor."
+        );
+    }
+
+    private String callGroq(String input, String systemPrompt) {
+        Map<String, Object> requestBody = Map.of(
+            "model", groqModel,
+            "messages", java.util.List.of(
+                Map.of("role", "system", "content", systemPrompt),
+                Map.of("role", "user", "content", input)
+            ),
+            "temperature", 0.2
+        );
+
+        String response = webClient.post()
+            .uri(groqApiUrl)
+            .header(HttpHeaders.AUTHORIZATION, "Bearer " + groqApiKey)
+            .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+            .bodyValue(requestBody)
+            .retrieve()
+            .bodyToMono(String.class)
+            .block(requestTimeout());
+
+        if (response == null || response.isBlank()) {
+            throw new IllegalStateException("Groq retornou uma resposta vazia.");
+        }
+
+        logger.info("Resposta obtida pelo fallback Groq com o modelo {}.", groqModel);
+        return response;
     }
 
     // =========================================================
@@ -408,7 +480,7 @@ public class ChatbotServiceImpl implements ChatbotService {
                     .bodyValue(requestBody)
                     .retrieve()
                     .bodyToMono(String.class)
-                    .block(REQUEST_TIMEOUT);
+                    .block(requestTimeout());
 
                 if (response == null || response.isBlank()) {
 
@@ -569,6 +641,24 @@ public class ChatbotServiceImpl implements ChatbotService {
         }
 
         return "";
+    }
+
+    private String extractProviderText(String responseJson) throws Exception {
+        JsonNode root = objectMapper.readTree(responseJson);
+        JsonNode choices = root.path("choices");
+        if (choices.isArray() && !choices.isEmpty()) {
+            String groqText = choices.get(0).path("message").path("content").asText("");
+            if (!groqText.isBlank()) return groqText;
+        }
+        return extractInteractionText(responseJson);
+    }
+
+    private Duration requestTimeout() {
+        return Duration.ofSeconds(Math.max(5, timeoutSeconds));
+    }
+
+    private boolean isBlank(String value) {
+        return value == null || value.isBlank();
     }
 
     // =========================================================

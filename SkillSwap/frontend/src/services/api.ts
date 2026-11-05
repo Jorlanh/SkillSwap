@@ -248,6 +248,12 @@ export const NotificationService = {
   markRead: (id: string | number) => api.put(`/notifications/${id}/read`),
 };
 
+// A conta suspensa mantém acesso somente ao motivo, às notificações e à contestação.
+export const SuspensionService = {
+  getStatus: () => api.get('/account/suspension/status'),
+  submitAppeal: (message: string) => api.post('/account/suspension/appeal', { message }),
+};
+
 // ==========================================
 // PROPOSTAS (RESTURADO COM DUALIDADE PARA NÃO QUEBRAR)
 // ==========================================
