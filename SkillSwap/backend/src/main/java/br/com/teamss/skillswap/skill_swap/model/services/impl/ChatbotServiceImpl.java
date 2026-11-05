@@ -119,7 +119,7 @@ public class ChatbotServiceImpl implements ChatbotService {
         addModel(candidates, model);
         addModel(candidates, fallbackModel);
         addModel(candidates, "gemini-3.7-flash");
-        addModel(candidates, "gemini-2.5-flash");
+        addModel(candidates, "gemini-3.8-flash");
 
         WebClientResponseException lastError = null;
         for (String candidate : candidates) {
