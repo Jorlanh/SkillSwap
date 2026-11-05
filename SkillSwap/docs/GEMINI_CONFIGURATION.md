@@ -1,14 +1,14 @@
 # Gemini configurável
 
-O SkillSwap usa um modelo Gemini configurável para chat, tradução, simplificação de texto e moderação de conteúdo. Para a chave usada nesta implantação, o modelo recomendado é `gemini-3.8-flash`. O backend tenta também o modelo de fallback e consulta os modelos habilitados para a chave quando necessário:
+O SkillSwap usa um modelo Gemini configurável para chat, tradução, simplificação de texto e moderação de conteúdo. Para o chatbot, o backend usa a Interactions API, que recebe `input` e devolve a resposta em `steps`. O modelo recomendado é `gemini-3.8-flash`; o fallback deve ser outro modelo atual, como `gemini-3.7-flash`:
 
 ```env
 GEMINI_MODEL=gemini-3.8-flash
-GEMINI_FALLBACK_MODEL=gemini-2.0-flash-001
+GEMINI_FALLBACK_MODEL=gemini-3.7-flash
 GEMINI_API_KEY=coloque-no-secret-manager
 ```
 
-A chave é enviada pelo backend no cabeçalho `x-goog-api-key`; ela não deve ser colocada no frontend, no Git, em logs ou na query string. O frontend conversa somente com a API Spring Boot.
+A chave é enviada pelo backend no cabeçalho `x-goog-api-key`; ela não deve ser colocada no frontend, no Git, em logs ou na query string. O frontend conversa somente com a API Spring Boot. O backend ignora explicitamente o modelo descontinuado `gemini-2.0-flash-001` e repete respostas transitórias `429`, `500`, `502`, `503` e `504` antes de tentar o fallback.
 
 ## Imagens
 

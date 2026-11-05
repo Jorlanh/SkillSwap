@@ -25,7 +25,7 @@ public class GeminiApiModerationService implements ContentModerationService {
     @Value("${gemini.api.model:gemini-3.8-flash}")
     private String model;
 
-    @Value("${gemini.api.fallback-model:gemini-2.0-flash-001}")
+    @Value("${gemini.api.fallback-model:gemini-3.7-flash}")
     private String fallbackModel;
 
     private final WebClient webClient;
@@ -86,7 +86,6 @@ public class GeminiApiModerationService implements ContentModerationService {
         addModel(candidates, model);
         addModel(candidates, fallbackModel);
         addModel(candidates, "gemini-3.8-flash");
-        addModel(candidates, "gemini-2.0-flash-001");
         WebClientResponseException lastError = null;
         for (String candidate : candidates) {
             try {
@@ -102,7 +101,10 @@ public class GeminiApiModerationService implements ContentModerationService {
     }
 
     private void addModel(Set<String> candidates, String value) {
-        if (value != null && !value.isBlank()) candidates.add(value.replaceFirst("^models/", ""));
+        if (value == null || value.isBlank()) return;
+        String normalized = value.replaceFirst("^models/", "");
+        if ("gemini-2.0-flash-001".equalsIgnoreCase(normalized)) return;
+        candidates.add(normalized);
     }
 
     private String resolveAvailableModel() throws Exception {
@@ -113,7 +115,7 @@ public class GeminiApiModerationService implements ContentModerationService {
                 .bodyToMono(String.class)
                 .block();
         JsonNode models = objectMapper.readTree(response).path("models");
-        for (String preferred : Arrays.asList("gemini-3.8-flash", "gemini-2.0-flash-001", "gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-flash-8b", fallbackModel)) {
+        for (String preferred : Arrays.asList("gemini-3.8-flash", "gemini-3.7-flash", "gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-flash-8b", fallbackModel)) {
             for (JsonNode item : models) {
                 String name = item.path("name").asText("").replaceFirst("^models/", "");
                 boolean supports = false;
