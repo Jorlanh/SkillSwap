@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.net.URI;
+import java.io.IOException;
 import java.util.Map;
 
 @RestControllerAdvice
@@ -67,6 +68,18 @@ public class GlobalExceptionHandler {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
         problem.setTitle("Requisição Inválida");
         problem.setType(URI.create("urn:problem-type:bad-request"));
+        return problem;
+    }
+
+    @ExceptionHandler(IOException.class)
+    public ProblemDetail handleStorageFailure(IOException ex) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+            HttpStatus.BAD_GATEWAY,
+            ex.getMessage() == null || ex.getMessage().isBlank()
+                ? "Não foi possível concluir o envio do arquivo agora."
+                : ex.getMessage());
+        problem.setTitle("Falha no armazenamento do arquivo");
+        problem.setType(URI.create("urn:problem-type:file-upload"));
         return problem;
     }
 

@@ -18,6 +18,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -192,9 +193,10 @@ public class CommunityServiceImpl implements CommunityService {
     public String getMembershipStatus(UUID communityId, UUID userId) {
         return communityMemberRepository.findById_CommunityIdAndId_UserId(communityId, userId)
                 .map(member -> {
-                    if (!"APPROVED".equals(member.getMembershipStatus())) return member.getMembershipStatus();
-                    if ("OWNER".equals(member.getMemberRole()) || "ADMIN".equals(member.getMemberRole()) || "MODERATOR".equals(member.getMemberRole())) {
-                        return member.getMemberRole();
+                    if (!"APPROVED".equalsIgnoreCase(member.getMembershipStatus())) return member.getMembershipStatus();
+                    String role = normalizeCommunityRole(member.getMemberRole());
+                    if ("OWNER".equals(role) || "ADMIN".equals(role) || "MODERATOR".equals(role)) {
+                        return role;
                     }
                     return "APPROVED";
                 })
@@ -208,8 +210,12 @@ public class CommunityServiceImpl implements CommunityService {
             .orElseThrow(() -> new RuntimeException("Comunidade não encontrada!"));
         ensureCommunityManager(communityId, userId);
         if (image == null || image.isEmpty()) throw new IllegalArgumentException("Escolha uma imagem.");
-        community.setImageUrl(fileUploadService.uploadFile(image));
-        communityRepository.save(community);
+        String imageUrl = fileUploadService.uploadFile(image);
+        if (imageUrl == null || imageUrl.isBlank()) {
+            throw new IOException("O serviço de imagens não retornou o endereço da foto.");
+        }
+        community.setImageUrl(imageUrl);
+        communityRepository.saveAndFlush(community);
     }
 
     @Override
@@ -530,8 +536,12 @@ public class CommunityServiceImpl implements CommunityService {
     private CommunitySummaryDTO summaryForViewer(Community community, UUID viewerId) {
         String status = viewerId == null ? null : communityMemberRepository
             .findById_CommunityIdAndId_UserId(community.getCommunityId(), viewerId)
-            .map(CommunityMember::getMembershipStatus).orElse("NONE");
-        boolean joined = "APPROVED".equals(status) || "OWNER".equals(status) || "ADMIN".equals(status) || "MODERATOR".equals(status);
+            .map(member -> "APPROVED".equalsIgnoreCase(member.getMembershipStatus())
+                ? normalizeCommunityRole(member.getMemberRole()).equals("MEMBER") ? "APPROVED" : normalizeCommunityRole(member.getMemberRole())
+                : member.getMembershipStatus())
+            .orElse("NONE");
+        boolean joined = "APPROVED".equalsIgnoreCase(status) || "OWNER".equalsIgnoreCase(status)
+            || "ADMIN".equalsIgnoreCase(status) || "MODERATOR".equalsIgnoreCase(status);
         return new CommunitySummaryDTO(community.getCommunityId(), community.getName(), community.getDescription(),
             (int) communityMemberRepository.countById_CommunityIdAndMembershipStatus(community.getCommunityId(), "APPROVED"),
             community.getImageUrl(), community.getOwner() == null ? null : community.getOwner().getUserId(),
@@ -553,9 +563,17 @@ public class CommunityServiceImpl implements CommunityService {
     }
 
     private boolean isOwnerRole(String role) {
-        return "OWNER".equalsIgnoreCase(role)
-            || "CREATOR".equalsIgnoreCase(role)
-            || "COMMUNITY_OWNER".equalsIgnoreCase(role);
+        return "OWNER".equalsIgnoreCase(normalizeCommunityRole(role));
+    }
+
+    private String normalizeCommunityRole(String role) {
+        if (role == null || role.isBlank()) return "MEMBER";
+        return switch (role.trim().toUpperCase(Locale.ROOT)) {
+            case "OWNER", "CREATOR", "COMMUNITY_OWNER" -> "OWNER";
+            case "ADMIN", "ADMINISTRATOR", "COMMUNITY_ADMIN" -> "ADMIN";
+            case "MODERATOR", "MODERATION" -> "MODERATOR";
+            default -> "MEMBER";
+        };
     }
 
     private boolean isPlatformAdmin(UUID actorId) {
@@ -580,7 +598,7 @@ public class CommunityServiceImpl implements CommunityService {
         if (isCommunityOwner(communityId, actorId)) return;
         CommunityMember member = communityMemberRepository.findById_CommunityIdAndId_UserId(communityId, actorId)
             .orElseThrow(() -> new org.springframework.security.access.AccessDeniedException("Você não administra esta comunidade."));
-        if (!"ADMIN".equalsIgnoreCase(member.getMemberRole()) || !"APPROVED".equalsIgnoreCase(member.getMembershipStatus())) {
+        if (!"APPROVED".equalsIgnoreCase(member.getMembershipStatus()) || !"ADMIN".equals(normalizeCommunityRole(member.getMemberRole()))) {
             throw new org.springframework.security.access.AccessDeniedException("Você não administra esta comunidade.");
         }
     }
@@ -590,7 +608,8 @@ public class CommunityServiceImpl implements CommunityService {
             .orElseThrow(() -> new RuntimeException("Comunidade não encontrada."));
         if (isCommunityOwner(communityId, actorId)) return;
         CommunityMember member = communityMemberRepository.findById_CommunityIdAndId_UserId(communityId, actorId).orElseThrow(() -> new org.springframework.security.access.AccessDeniedException("Você não administra esta comunidade."));
-        if (!("ADMIN".equals(member.getMemberRole()) || "MODERATOR".equals(member.getMemberRole())) || !"APPROVED".equals(member.getMembershipStatus())) throw new org.springframework.security.access.AccessDeniedException("Você não administra esta comunidade.");
+        String role = normalizeCommunityRole(member.getMemberRole());
+        if (!("ADMIN".equals(role) || "MODERATOR".equals(role)) || !"APPROVED".equalsIgnoreCase(member.getMembershipStatus())) throw new org.springframework.security.access.AccessDeniedException("Você não administra esta comunidade.");
     }
 
     private void ensureApprovedMember(UUID communityId, UUID userId) {

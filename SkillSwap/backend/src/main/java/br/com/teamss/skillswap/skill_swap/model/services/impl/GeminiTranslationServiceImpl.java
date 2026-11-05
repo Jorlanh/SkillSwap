@@ -15,6 +15,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.List;
 import java.util.Map;
 import java.util.Arrays;
+import java.util.LinkedHashSet;
+import java.util.Set;
 
 @Service
 public class GeminiTranslationServiceImpl implements TranslationService {
@@ -24,10 +26,10 @@ public class GeminiTranslationServiceImpl implements TranslationService {
     @Value("${gemini.api.key}")
     private String apiKey;
 
-    @Value("${gemini.api.model:gemini-2.0-flash}")
+    @Value("${gemini.api.model:gemini-3.8-flash}")
     private String model;
 
-    @Value("${gemini.api.fallback-model:gemini-2.5-flash-lite}")
+    @Value("${gemini.api.fallback-model:gemini-2.0-flash-001}")
     private String fallbackModel;
 
     private final WebClient webClient;
@@ -73,13 +75,7 @@ public class GeminiTranslationServiceImpl implements TranslationService {
                 "contents", List.of(Map.of("parts", List.of(Map.of("text", prompt))))
             );
 
-            String responseJson;
-            try {
-                responseJson = callGemini(model, requestBody);
-            } catch (WebClientResponseException modelError) {
-                logger.warn("O modelo Gemini '{}' não está disponível (HTTP {}). Procurando um modelo habilitado para esta chave.", model, modelError.getStatusCode().value());
-                responseJson = callGemini(resolveAvailableModel(), requestBody);
-            }
+            String responseJson = callGeminiWithFallback(requestBody);
 
             JsonNode rootNode = objectMapper.readTree(responseJson);
             String result = rootNode.path("candidates").get(0).path("content").path("parts").get(0).path("text").asText().trim();
@@ -99,6 +95,31 @@ public class GeminiTranslationServiceImpl implements TranslationService {
                 .bodyValue(requestBody).retrieve().bodyToMono(String.class).block();
     }
 
+    private String callGeminiWithFallback(Map<String, Object> requestBody) throws Exception {
+        Set<String> candidates = new LinkedHashSet<>();
+        addModel(candidates, model);
+        addModel(candidates, fallbackModel);
+        addModel(candidates, "gemini-3.8-flash");
+        addModel(candidates, "gemini-2.0-flash-001");
+        WebClientResponseException lastError = null;
+        for (String candidate : candidates) {
+            try {
+                return callGemini(candidate, requestBody);
+            } catch (WebClientResponseException error) {
+                lastError = error;
+                logger.warn("O modelo Gemini '{}' não está disponível (HTTP {}). Tentando o próximo modelo.", candidate, error.getStatusCode().value());
+            }
+        }
+        String discovered = resolveAvailableModel();
+        if (discovered != null && candidates.add(discovered)) return callGemini(discovered, requestBody);
+        if (lastError != null) throw lastError;
+        throw new IllegalStateException("Nenhum modelo Gemini disponível para tradução.");
+    }
+
+    private void addModel(Set<String> candidates, String value) {
+        if (value != null && !value.isBlank()) candidates.add(value.replaceFirst("^models/", ""));
+    }
+
     private String resolveAvailableModel() throws Exception {
         String response = webClient.get()
                 .uri("https://generativelanguage.googleapis.com/v1beta/models")
@@ -107,7 +128,7 @@ public class GeminiTranslationServiceImpl implements TranslationService {
                 .bodyToMono(String.class)
                 .block();
         JsonNode models = objectMapper.readTree(response).path("models");
-        for (String preferred : Arrays.asList(model, fallbackModel, "gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-flash-8b", "gemini-2.5-flash-lite")) {
+        for (String preferred : Arrays.asList("gemini-3.8-flash", "gemini-2.0-flash-001", model, fallbackModel, "gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-flash-8b", "gemini-2.5-flash-lite")) {
             for (JsonNode item : models) {
                 String name = item.path("name").asText("").replaceFirst("^models/", "");
                 if (preferred.equals(name) && supportsGeneration(item)) return name;

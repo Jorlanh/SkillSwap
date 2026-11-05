@@ -6,6 +6,7 @@ import br.com.teamss.skillswap.skill_swap.model.services.CommunityService;
 import br.com.teamss.skillswap.skill_swap.model.services.UserServiceDTO;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -107,7 +108,7 @@ public class CommunityController {
         return ResponseEntity.ok(communityService.createCommunity(request, authenticatedUser.getUserId()));
     }
 
-    @PostMapping("/{communityId}/avatar")
+    @PostMapping(value = "/{communityId}/avatar", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<Void> updateCommunityImage(@PathVariable UUID communityId,
                                                        @RequestParam("file") MultipartFile file) throws IOException {
         UserDTO authenticatedUser = userServiceDTO.getAuthenticatedUser();

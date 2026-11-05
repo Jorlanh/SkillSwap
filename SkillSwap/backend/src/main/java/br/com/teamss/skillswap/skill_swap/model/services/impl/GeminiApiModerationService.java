@@ -13,6 +13,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.List;
 import java.util.Map;
 import java.util.Arrays;
+import java.util.LinkedHashSet;
+import java.util.Set;
 
 @Service
 public class GeminiApiModerationService implements ContentModerationService {
@@ -20,10 +22,10 @@ public class GeminiApiModerationService implements ContentModerationService {
     @Value("${gemini.api.key}")
     private String apiKey;
 
-    @Value("${gemini.api.model:gemini-2.0-flash}")
+    @Value("${gemini.api.model:gemini-3.8-flash}")
     private String model;
 
-    @Value("${gemini.api.fallback-model:gemini-2.5-flash-lite}")
+    @Value("${gemini.api.fallback-model:gemini-2.0-flash-001}")
     private String fallbackModel;
 
     private final WebClient webClient;
@@ -58,12 +60,7 @@ public class GeminiApiModerationService implements ContentModerationService {
                 "contents", List.of(Map.of("parts", List.of(Map.of("text", prompt))))
             );
 
-            String responseJson;
-            try {
-                responseJson = callGemini(model, requestBody);
-            } catch (WebClientResponseException modelError) {
-                responseJson = callGemini(resolveAvailableModel(), requestBody);
-            }
+            String responseJson = callGeminiWithFallback(requestBody);
 
             JsonNode rootNode = objectMapper.readTree(responseJson);
             String modelResponse = rootNode.path("candidates").get(0).path("content").path("parts").get(0).path("text").asText().trim();
@@ -84,6 +81,30 @@ public class GeminiApiModerationService implements ContentModerationService {
                 .bodyValue(requestBody).retrieve().bodyToMono(String.class).block();
     }
 
+    private String callGeminiWithFallback(Map<String, Object> requestBody) throws Exception {
+        Set<String> candidates = new LinkedHashSet<>();
+        addModel(candidates, model);
+        addModel(candidates, fallbackModel);
+        addModel(candidates, "gemini-3.8-flash");
+        addModel(candidates, "gemini-2.0-flash-001");
+        WebClientResponseException lastError = null;
+        for (String candidate : candidates) {
+            try {
+                return callGemini(candidate, requestBody);
+            } catch (WebClientResponseException error) {
+                lastError = error;
+            }
+        }
+        String discovered = resolveAvailableModel();
+        if (discovered != null && candidates.add(discovered)) return callGemini(discovered, requestBody);
+        if (lastError != null) throw lastError;
+        throw new IllegalStateException("Nenhum modelo Gemini disponível para moderação.");
+    }
+
+    private void addModel(Set<String> candidates, String value) {
+        if (value != null && !value.isBlank()) candidates.add(value.replaceFirst("^models/", ""));
+    }
+
     private String resolveAvailableModel() throws Exception {
         String response = webClient.get()
                 .uri("https://generativelanguage.googleapis.com/v1beta/models")
@@ -92,7 +113,7 @@ public class GeminiApiModerationService implements ContentModerationService {
                 .bodyToMono(String.class)
                 .block();
         JsonNode models = objectMapper.readTree(response).path("models");
-        for (String preferred : Arrays.asList("gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-flash-8b", fallbackModel)) {
+        for (String preferred : Arrays.asList("gemini-3.8-flash", "gemini-2.0-flash-001", "gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-flash-8b", fallbackModel)) {
             for (JsonNode item : models) {
                 String name = item.path("name").asText("").replaceFirst("^models/", "");
                 boolean supports = false;

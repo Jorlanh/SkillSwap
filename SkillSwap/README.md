@@ -14,7 +14,7 @@ Esta entrega é exclusivamente de software. A alternativa de hardware foi retira
 - backend Spring Boot em monólito modular;
 - PostgreSQL com JPA e migrações Flyway;
 - Firebase Authentication para identidade e Firebase Cloud Messaging para notificações quando habilitado;
-- Gemini 2.5 Flash (`gemini-2.5-flash`) no backend para chatbot, tradução, simplificação e moderação;
+- Gemini configurável no backend para chatbot, tradução, simplificação e moderação (`gemini-3.8-flash` com fallback configurável);
 - recomendações determinísticas com pontuação e explicação;
 - módulo `/acesso` como jornada completa de oportunidades: plano, etapas, projeto, evidência e candidatura;
 - segurança por JWT validado no servidor, autorização por papel, WebSockets autenticados na primeira mensagem e ausência de token em query string;

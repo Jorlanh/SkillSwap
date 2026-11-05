@@ -152,17 +152,17 @@ const PostCard = ({ post }: PostCardProps) => {
     } catch { toast.error('Não foi possível compartilhar agora.'); }
   });
 
-  const submitComment = async (event: FormEvent) => {
+  const submitComment = async (event: FormEvent, parentCommentId: number | null = null) => {
     event.preventDefault();
     if (!newComment.trim()) return;
     requireAuth(async () => {
       try {
         // Apenas IDs reais do banco podem ser enviados. IDs "local-*" nunca chegam ao backend.
-        await HomeService.comment(postId, newComment.trim(), replyTo);
+        await HomeService.comment(postId, newComment.trim(), parentCommentId);
         await refreshComments();
         setNewComment('');
-        setReplyTo(null);
-        toast.success(replyTo ? 'Resposta enviada!' : 'Comentário enviado!');
+        if (replyTo === parentCommentId) setReplyTo(null);
+        toast.success(parentCommentId ? 'Resposta enviada!' : 'Comentário enviado!');
       } catch { toast.error('Não foi possível enviar o comentário. Tente novamente.'); }
     });
   };
@@ -187,6 +187,25 @@ const PostCard = ({ post }: PostCardProps) => {
         toast.success('Comentário excluído.');
       } catch { toast.error('Não foi possível excluir o comentário.'); }
     });
+  };
+
+  const renderCommentComposer = (commentId: number, username: string) => {
+    if (replyTo !== commentId) return null;
+    return (
+      <form onSubmit={(event) => submitComment(event, commentId)} className="mt-2 ml-10 flex flex-wrap items-center gap-2 rounded-lg bg-muted/30 p-2">
+        <span className="w-full text-[10px] text-muted-foreground">Respondendo a <strong className="text-skillswap-teal">@{username}</strong></span>
+        <Avatar className="h-7 w-7 shrink-0"><AvatarImage src={getAvatar(loggedUser)} alt="Sua foto" /><AvatarFallback>U</AvatarFallback></Avatar>
+        <Input
+          autoFocus
+          value={newComment}
+          onChange={(event) => setNewComment(event.target.value)}
+          placeholder="Escreva uma resposta..."
+          className="min-w-[180px] flex-1 h-9 text-xs bg-card border-none focus-visible:ring-skillswap-teal"
+        />
+        <Button type="submit" size="sm" disabled={!newComment.trim()} className="bg-skillswap-teal hover:bg-teal-700 h-9"><Send size={14} /></Button>
+        <button type="button" onClick={() => { setReplyTo(null); setNewComment(''); }} className="text-[10px] font-semibold underline text-muted-foreground">Cancelar</button>
+      </form>
+    );
   };
 
   const renderComment = (comment: any, depth = 0): JSX.Element => {
@@ -215,6 +234,7 @@ const PostCard = ({ post }: PostCardProps) => {
               {commentId && <ReportButton reportedUserId={comment.userId || comment.user?.userId} targetType="COMMENT" targetId={commentId} label="" />}
               {comment.replies?.length > 0 && commentId && <button type="button" onClick={() => setExpandedReplies((current) => ({ ...current, [commentId]: !current[commentId] }))} className="text-[10px] font-bold text-skillswap-teal hover:underline">{expandedReplies[commentId] ? 'Ocultar respostas' : `Ver mais ${comment.replies.length === 1 ? 'resposta' : `respostas (${comment.replies.length})`}`}</button>}
             </div>
+            {commentId && renderCommentComposer(commentId, username)}
           </div>
         </div>
         {comment.replies?.length > 0 && commentId && expandedReplies[commentId] && <div className="mt-3 space-y-3">{comment.replies.map((reply: any) => renderComment(reply, depth + 1))}</div>}
@@ -250,12 +270,11 @@ const PostCard = ({ post }: PostCardProps) => {
       </div>
 
       {showComments && <div className="mt-4 pt-4 border-t border-border animate-in fade-in slide-in-from-top-2">
-        {replyTo && <div className="mb-2 flex items-center justify-between rounded-md bg-muted px-3 py-2 text-xs">Respondendo a um comentário<button type="button" onClick={() => setReplyTo(null)} className="font-semibold underline">Cancelar</button></div>}
-        <form onSubmit={submitComment} className="flex gap-2 mb-4">
+        {replyTo === null && <form onSubmit={(event) => submitComment(event, null)} className="flex gap-2 mb-4">
           <Avatar className="h-8 w-8 shrink-0"><AvatarImage src={getAvatar(loggedUser)} alt="Sua foto" /><AvatarFallback>U</AvatarFallback></Avatar>
-          <Input value={newComment} onChange={(event) => setNewComment(event.target.value)} placeholder={replyTo ? 'Escreva uma resposta...' : 'Escreva um comentário...'} className="flex-1 h-9 text-xs bg-muted/30 border-none focus-visible:ring-skillswap-teal" />
+          <Input value={newComment} onChange={(event) => setNewComment(event.target.value)} placeholder="Escreva um comentário..." className="flex-1 h-9 text-xs bg-muted/30 border-none focus-visible:ring-skillswap-teal" />
           <Button type="submit" size="sm" disabled={!newComment.trim()} className="bg-skillswap-teal hover:bg-teal-700 h-9"><Send size={14} /></Button>
-        </form>
+        </form>}
         <div className="space-y-4">{commentTree.map((comment) => renderComment(comment))}</div>
       </div>}
     </div>

@@ -10,6 +10,20 @@ import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 import ReportButton from '@/components/ReportButton';
 
+const getApiErrorMessage = (error: any) => {
+  const responseData = error?.response?.data;
+  if (typeof responseData === 'string' && responseData.trim()) return responseData;
+  return responseData?.message || responseData?.detail || responseData?.error;
+};
+
+const normalizeMembershipRole = (value: unknown) => {
+  const role = String(value || '').trim().toUpperCase();
+  if (role === 'CREATOR' || role === 'COMMUNITY_OWNER') return 'OWNER';
+  if (role === 'ADMINISTRATOR' || role === 'COMMUNITY_ADMIN') return 'ADMIN';
+  if (role === 'MODERATION') return 'MODERATOR';
+  return role;
+};
+
 const CommunityDetailPage = () => {
   const { communityId } = useParams();
   const navigate = useNavigate();
@@ -50,9 +64,9 @@ const CommunityDetailPage = () => {
         try {
           const meResponse = await UserService.getMe();
           setMe(meResponse.data);
-          try {
-            const membershipResponse = await CommunityService.getMembership(communityId);
-            setMembershipStatus(String(membershipResponse.data || 'NONE'));
+           try {
+             const rawMembership = String((await CommunityService.getMembership(communityId)).data || 'NONE').toUpperCase();
+             setMembershipStatus(normalizeMembershipRole(rawMembership));
           } catch { setMembershipStatus('NONE'); }
         } catch { setMe(null); setMembershipStatus('NONE'); }
       } else {
@@ -126,7 +140,7 @@ const CommunityDetailPage = () => {
       toast.success('Foto da comunidade atualizada.');
       await load();
     } catch (error: any) {
-      const message = error?.response?.data?.message || error?.response?.data?.error;
+      const message = getApiErrorMessage(error);
       toast.error(message || 'Não foi possível alterar a foto desta comunidade.');
     }
   });
@@ -141,7 +155,7 @@ const CommunityDetailPage = () => {
       toast.success('Perfil da comunidade atualizado.');
       await load();
     } catch (error: any) {
-      const message = error?.response?.data?.message || error?.response?.data?.error;
+      const message = getApiErrorMessage(error);
       toast.error(message || 'Não foi possível editar esta comunidade.');
     }
     finally { setSavingCommunity(false); }
@@ -158,7 +172,7 @@ const CommunityDetailPage = () => {
       toast.success('Comunidade excluída.');
       navigate('/comunidades');
     } catch (error: any) {
-      const message = error?.response?.data?.message || error?.response?.data?.error;
+      const message = getApiErrorMessage(error);
       toast.error(message || 'Não foi possível excluir a comunidade.');
     }
   };
@@ -178,10 +192,13 @@ const CommunityDetailPage = () => {
 
   const currentUserId = me?.userId ?? me?.id;
   const ownerId = community.ownerId ?? community.owner?.userId ?? community.owner?.id;
-  const isPlatformAdmin = Array.isArray(me?.roles) && me.roles.some((role: string) => role.toUpperCase() === 'ADMIN' || role.toUpperCase() === 'ROLE_ADMIN');
+  const isPlatformAdmin = Array.isArray(me?.roles) && me.roles.some((role: any) => {
+    const roleName = typeof role === 'string' ? role : role?.name;
+    return ['ADMIN', 'ROLE_ADMIN'].includes(String(roleName || '').toUpperCase());
+  });
   const isOwner = membershipStatus === 'OWNER'
     || Boolean(currentUserId && ownerId && String(currentUserId) === String(ownerId));
-  const isAdmin = membershipStatus === 'ADMIN' || isPlatformAdmin;
+  const isAdmin = normalizeMembershipRole(membershipStatus) === 'ADMIN' || isPlatformAdmin;
   const isCommunityManager = isOwner || isAdmin;
   const isModerator = isCommunityManager || membershipStatus === 'MODERATOR';
   const isApprovedMember = isOwner || membershipStatus === 'APPROVED' || membershipStatus === 'OWNER' || membershipStatus === 'ADMIN' || membershipStatus === 'MODERATOR';
@@ -193,7 +210,7 @@ const CommunityDetailPage = () => {
           <div className="relative shrink-0">
             {community.imageUrl ? <img src={community.imageUrl} alt={`Imagem da comunidade ${community.name}`} className="h-24 w-24 rounded-2xl object-cover" /> : <div className="h-24 w-24 rounded-2xl bg-skillswap-light-blue grid place-items-center text-3xl font-bold">{community.name?.slice(0, 1).toUpperCase()}</div>}
             {isCommunityManager && <button type="button" aria-label="Alterar foto da comunidade" onClick={() => fileRef.current?.click()} className="absolute -bottom-2 -right-2 rounded-full bg-skillswap-teal p-2 text-white"><Camera className="h-4 w-4" /></button>}
-            {isCommunityManager && <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && updateAvatar(e.target.files[0])} />}
+            {isCommunityManager && <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(e) => { const file = e.target.files?.[0]; e.currentTarget.value = ''; if (file) updateAvatar(file); }} />}
           </div>
           <div className="min-w-0 flex-1"><h1 className="text-2xl font-bold break-words">{community.name}</h1><p className="mt-2 text-muted-foreground break-words">{community.description || 'Um espaço para aprender e compartilhar.'}</p><p className="mt-2 text-sm text-muted-foreground">{community.memberCount ?? 0} membros</p><div className="mt-3 flex flex-wrap gap-2">{isCommunityManager && <><Button type="button" variant="outline" onClick={() => setEditing((current) => !current)}><Pencil className="mr-2 h-4 w-4" /> Editar perfil da comunidade</Button>{(isOwner || isPlatformAdmin) && <Button type="button" variant="outline" className="text-red-600" onClick={() => void deleteCommunity()}><Trash2 className="mr-2 h-4 w-4" /> Excluir comunidade</Button>}</>}<ReportButton reportedUserId={ownerId} targetType="COMMUNITY" targetId={communityId} /></div></div>
           {isOwner ? <span className="rounded-full bg-skillswap-teal/10 px-4 py-2 text-sm font-semibold text-skillswap-teal">Criador da comunidade</span> : isApprovedMember ? <span className="rounded-full bg-skillswap-teal/10 px-4 py-2 text-sm font-semibold text-skillswap-teal">Membro</span> : membershipStatus === 'PENDING' ? <span className="rounded-full bg-amber-100 px-4 py-2 text-sm font-semibold text-amber-800">Aguardando aprovação</span> : <Button type="button" onClick={join} className="bg-skillswap-teal text-white">Entrar</Button>}

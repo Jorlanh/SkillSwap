@@ -16,9 +16,11 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 @Service
 public class ChatbotServiceImpl implements ChatbotService {
@@ -31,10 +33,10 @@ public class ChatbotServiceImpl implements ChatbotService {
     @Value("${gemini.api.key}")
     private String apiKey;
 
-    @Value("${gemini.api.model:gemini-2.5-flash}")
+    @Value("${gemini.api.model:gemini-3.8-flash}")
     private String model;
 
-    @Value("${gemini.api.fallback-model:gemini-2.5-flash-lite}")
+    @Value("${gemini.api.fallback-model:gemini-2.0-flash-001}")
     private String fallbackModel;
 
     public ChatbotServiceImpl(TranslationService translationService, WebClient.Builder webClientBuilder) {
@@ -58,16 +60,13 @@ public class ChatbotServiceImpl implements ChatbotService {
             String systemPrompt = "Você é um assistente prestativo da plataforma SkillSwap. Seu objetivo é ajudar os usuários a navegar na plataforma, encontrar informações sobre habilidades, entender como funcionam as trocas e responder perguntas gerais sobre o SkillSwap. Seja amigável, claro e conciso. Responda sempre em português brasileiro.";
 
             Map<String, Object> requestBody = new HashMap<>();
-            requestBody.put("system_instruction", Map.of("parts", List.of(Map.of("text", systemPrompt))));
+            // A API REST do Gemini usa camelCase neste campo. O nome com
+            // underscore é aceito em alguns exemplos antigos, mas não é
+            // interpretado de forma consistente nas versões atuais.
+            requestBody.put("systemInstruction", Map.of("parts", List.of(Map.of("text", systemPrompt))));
             requestBody.put("contents", List.of(Map.of("parts", List.of(Map.of("text", requestDTO.getMessage())))));
 
-            String responseJson;
-            try {
-                responseJson = callGemini(model, requestBody);
-            } catch (WebClientResponseException modelError) {
-                logger.warn("O modelo Gemini '{}' não está disponível (HTTP {}). Procurando um modelo habilitado para esta chave.", model, modelError.getStatusCode().value());
-                responseJson = callGemini(resolveAvailableModel(), requestBody);
-            }
+            String responseJson = callGeminiWithFallback(requestBody);
 
             JsonNode rootNode = objectMapper.readTree(responseJson);
             JsonNode candidatesNode = rootNode.path("candidates");
@@ -103,6 +102,44 @@ public class ChatbotServiceImpl implements ChatbotService {
         }
     }
 
+    private String callGeminiWithFallback(Map<String, Object> requestBody) throws Exception {
+        Set<String> candidates = new LinkedHashSet<>();
+        addModel(candidates, model);
+        addModel(candidates, fallbackModel);
+        // Modelo indicado pela documentação atual e também pela resposta
+        // 404 recebida no Railway para gemini-2.5-flash.
+        addModel(candidates, "gemini-3.8-flash");
+        addModel(candidates, "gemini-2.0-flash-001");
+
+        WebClientResponseException lastError = null;
+        for (String candidate : candidates) {
+            try {
+                return callGemini(candidate, requestBody);
+            } catch (WebClientResponseException error) {
+                lastError = error;
+                logger.warn("O modelo Gemini '{}' recusou a requisição (HTTP {}). Tentando o próximo modelo.", candidate, error.getStatusCode().value());
+            }
+        }
+
+        // A lista da conta pode conter um modelo diferente dos padrões. Só o
+        // adicionamos depois das tentativas explícitas e nunca repetimos um
+        // modelo já testado.
+        String discovered = resolveAvailableModel();
+        if (discovered != null && candidates.add(discovered)) {
+            try {
+                return callGemini(discovered, requestBody);
+            } catch (WebClientResponseException error) {
+                lastError = error;
+            }
+        }
+        if (lastError != null) throw lastError;
+        throw new IllegalStateException("Nenhum modelo Gemini disponível para esta chave.");
+    }
+
+    private void addModel(Set<String> candidates, String value) {
+        if (value != null && !value.isBlank()) candidates.add(value.replaceFirst("^models/", ""));
+    }
+
     private String resolveAvailableModel() throws Exception {
         String response = webClient.get()
                 .uri("https://generativelanguage.googleapis.com/v1beta/models")
@@ -111,7 +148,7 @@ public class ChatbotServiceImpl implements ChatbotService {
                 .bodyToMono(String.class)
                 .block();
         JsonNode models = objectMapper.readTree(response).path("models");
-        for (String preferredName : Arrays.asList("gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-flash-8b", "gemini-2.5-flash-lite")) {
+        for (String preferredName : Arrays.asList("gemini-3.8-flash", "gemini-2.0-flash-001", "gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-flash-8b", "gemini-2.5-flash-lite")) {
             for (JsonNode item : models) {
                 String name = item.path("name").asText("").replaceFirst("^models/", "");
                 if (preferredName.equals(name) && supportsGeneration(item)) return name;
