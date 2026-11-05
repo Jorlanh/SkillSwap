@@ -43,6 +43,9 @@ public class ReportServiceImpl implements ReportService {
         report.setReporter(reporter);
         report.setReportedUser(reportedUser);
         report.setReason(reportDTO.getReason());
+        report.setTargetType(reportDTO.getTargetType() == null || reportDTO.getTargetType().isBlank() ? "USER" : reportDTO.getTargetType().trim().toUpperCase());
+        report.setTargetId(reportDTO.getTargetId());
+        report.setCategory(reportDTO.getCategory());
         return reportRepository.save(report);
     }
 

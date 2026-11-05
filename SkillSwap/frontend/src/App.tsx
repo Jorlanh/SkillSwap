@@ -22,6 +22,7 @@ import AdminConsole from '@/pages/AdminConsole';
 import OpportunityOsPage from '@/pages/OpportunityOsPage';
 import CommunityDetailPage from '@/pages/CommunityDetailPage';
 import InstitutionalPage from '@/pages/InstitutionalPage';
+import SharedPostPage from '@/pages/SharedPostPage';
 import { ChatbotELOS } from '@/components/ChatbotELOS';
 import AuthPage from '@/pages/AuthPage';
 import { auth } from './lib/firebase';
@@ -69,6 +70,7 @@ const App = () => {
               <Route path="/busca" element={<SearchPage />} />
               <Route path="/comunidades" element={<CommunitiesPage />} />
               <Route path="/comunidades/:communityId" element={<CommunityDetailPage />} />
+              <Route path="/post/:postId" element={<SharedPostPage />} />
               <Route path="/institucional/:section" element={<InstitutionalPage />} />
               <Route path="/atividades" element={<ActivitiesPage />} />
               <Route path="/propostas" element={<ProposalsPage />} />

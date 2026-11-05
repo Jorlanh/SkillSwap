@@ -10,4 +10,7 @@ public class ReportDTO {
     private UUID reporterId;
     private UUID reportedUserId;
     private String reason;
+    private String targetType;
+    private String targetId;
+    private String category;
 }

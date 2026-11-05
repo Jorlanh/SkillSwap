@@ -66,6 +66,28 @@ public class CommunityController {
         return ResponseEntity.noContent().build();
     }
 
+    @PutMapping("/{communityId}/members/{memberId}/moderator")
+    public ResponseEntity<Void> setModerator(@PathVariable UUID communityId, @PathVariable UUID memberId,
+                                             @RequestParam boolean moderator) {
+        UserDTO authenticatedUser = userServiceDTO.getAuthenticatedUser();
+        communityService.setModerator(communityId, authenticatedUser.getUserId(), memberId, moderator);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PutMapping("/{communityId}/ownership/{newOwnerId}")
+    public ResponseEntity<Void> transferOwnership(@PathVariable UUID communityId, @PathVariable UUID newOwnerId) {
+        UserDTO authenticatedUser = userServiceDTO.getAuthenticatedUser();
+        communityService.transferOwnership(communityId, authenticatedUser.getUserId(), newOwnerId);
+        return ResponseEntity.noContent().build();
+    }
+
+    @DeleteMapping("/{communityId}")
+    public ResponseEntity<Void> deleteCommunity(@PathVariable UUID communityId) {
+        UserDTO authenticatedUser = userServiceDTO.getAuthenticatedUser();
+        communityService.deleteCommunity(communityId, authenticatedUser.getUserId());
+        return ResponseEntity.noContent().build();
+    }
+
     @PutMapping("/{communityId}/members/{memberId}/approve")
     public ResponseEntity<Void> approveMember(@PathVariable UUID communityId, @PathVariable UUID memberId) {
         UserDTO authenticatedUser = userServiceDTO.getAuthenticatedUser();

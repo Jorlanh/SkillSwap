@@ -261,7 +261,8 @@ public class PostServiceImpl implements PostService {
             case "REPOSTS" -> posts.sort(Comparator.comparingInt(Post::getRepostsCount).reversed());
             case "COMMENTS" -> posts.sort(Comparator.comparingInt(Post::getCommentsCount).reversed());
             case "SHARES" -> posts.sort(Comparator.comparingInt(Post::getSharesCount).reversed());
-            case "DATE" -> posts.sort(Comparator.comparing(Post::getCreatedAt).reversed());
+            case "DATE" -> posts.sort(Comparator.comparing(Post::getCreatedAt,
+                Comparator.nullsLast(Comparator.reverseOrder())));
             default -> {} 
         }
 
@@ -275,7 +276,7 @@ public class PostServiceImpl implements PostService {
             dto.setContent(post.getContent());
             UserSummaryDTO summary = new UserSummaryDTO(post.getUser().getUsername(), post.getUser().getName(), post.getUser().isVerifiedBadge());
             summary.setUserId(post.getUser().getUserId());
-            Profile currentProfile = post.getUser().getProfile() != null ? post.getUser().getProfile() : post.getProfile();
+            Profile currentProfile = post.getProfile() != null ? post.getProfile() : post.getUser().getProfile();
             summary.setAvatarUrl(currentProfile == null ? null : currentProfile.getImageUrl());
             dto.setUser(summary);
             if (post.getCommunity() != null) {
@@ -292,6 +293,10 @@ public class PostServiceImpl implements PostService {
             dto.setRepostsCount(post.getRepostsCount());
             dto.setSharesCount(post.getSharesCount());
             dto.setViewsCount(post.getViewsCount());
+            if (authenticatedUserId != null) {
+                dto.setLikedByMe(likeRepository.existsByPost_PostIdAndUser_UserId(post.getPostId(), authenticatedUserId));
+                dto.setRepostedByMe(repostRepository.existsByPost_PostIdAndUser_UserId(post.getPostId(), authenticatedUserId));
+            }
             return dto;
         }).collect(Collectors.toList());
     }
@@ -339,6 +344,18 @@ public class PostServiceImpl implements PostService {
                     return new LikeDTO(userSummary, like.getCreatedAt());
                 })
                 .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public boolean isLikedBy(Long postId, UUID userId) {
+        return userId != null && likeRepository.existsByPost_PostIdAndUser_UserId(postId, userId);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public boolean isRepostedBy(Long postId, UUID userId) {
+        return userId != null && repostRepository.existsByPost_PostIdAndUser_UserId(postId, userId);
     }
 
     private Instant calculateStartTime(String period) {

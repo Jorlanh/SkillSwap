@@ -10,4 +10,5 @@ import java.util.List;
 @Repository
 public interface CommunityRepository extends JpaRepository<Community, UUID> {
     List<Community> findTop50ByNameContainingIgnoreCase(String name);
+    List<Community> findByOwner_UserId(UUID ownerId);
 }

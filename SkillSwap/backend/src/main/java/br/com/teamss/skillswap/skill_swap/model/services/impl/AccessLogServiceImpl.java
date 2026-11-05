@@ -58,7 +58,9 @@ public class AccessLogServiceImpl implements AccessLogService {
     @Override
     public List<AccessLogDTO> getAccessHistory(UUID userId) {
         List<AccessLog> accessLogs = accessLogRepository.findByUserIdOrderByAccessTimeDesc(userId);
-        return accessLogs.stream().filter(log -> !log.isRevoked())
+        // Registros antigos da primeira versão não tinham data nem dispositivo.
+        // Eles não devem aparecer como se fossem acessos reais com "N/A".
+        return accessLogs.stream().filter(log -> !log.isRevoked() && log.getAccessTime() != null)
                 .map(log -> new AccessLogDTO(
                     log.getAccessId(),
                     log.getAccessTime(),
@@ -77,7 +79,9 @@ public class AccessLogServiceImpl implements AccessLogService {
         if (latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
             throw new IllegalArgumentException("Coordenadas inválidas.");
         }
-        accessLogRepository.findTopByUserIdOrderByAccessTimeDesc(userId).ifPresent(log -> {
+        accessLogRepository.findByUserIdOrderByAccessTimeDesc(userId).stream()
+            .filter(log -> !log.isRevoked() && log.getAccessTime() != null)
+            .findFirst().ifPresent(log -> {
             log.setLocation(String.format(Locale.US, "%.6f, %.6f", latitude, longitude));
             log.setCity("Localização do dispositivo");
             accessLogRepository.save(log);

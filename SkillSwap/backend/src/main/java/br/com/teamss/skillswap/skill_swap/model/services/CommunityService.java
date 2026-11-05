@@ -35,5 +35,12 @@ public interface CommunityService {
     String getMembershipStatus(UUID communityId, UUID userId);
     void removeMember(UUID communityId, UUID actorId, UUID memberId);
     void setAdministrator(UUID communityId, UUID actorId, UUID memberId, boolean administrator);
+    void setModerator(UUID communityId, UUID actorId, UUID memberId, boolean moderator);
     void approveMember(UUID communityId, UUID actorId, UUID memberId);
+    void deleteCommunity(UUID communityId, UUID actorId);
+    void deleteCommunityAsPlatformAdmin(UUID communityId);
+    void transferOwnership(UUID communityId, UUID actorId, UUID newOwnerId);
+    void transferOwnershipAsPlatformAdmin(UUID communityId, UUID newOwnerId);
+    List<CommunityMemberDTO> listMembersAsPlatformAdmin(UUID communityId, String search);
+    void handlePermanentOwnerBan(UUID bannedUserId);
 }

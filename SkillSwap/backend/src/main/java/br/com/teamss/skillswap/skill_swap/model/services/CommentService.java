@@ -10,6 +10,7 @@ public interface CommentService {
     Comment createComment(Long postId, UUID userId, String content, Long parentCommentId);
     
     List<CommentDTO> getCommentsByPost(Long postId);
+    List<CommentDTO> getCommentsByPost(Long postId, UUID authenticatedUserId);
     void deleteComment(Long commentId, UUID userId);
     long toggleLike(Long commentId, UUID userId);
 }

@@ -2,12 +2,13 @@ import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useOutletContext, useParams } from 'react-router-dom';
 import { onIdTokenChanged } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
-import { ArrowLeft, Camera, ImagePlus, Send, Video, Search, UserMinus, ShieldCheck, Pencil } from 'lucide-react';
+import { ArrowLeft, Camera, ImagePlus, Send, Video, Search, UserMinus, ShieldCheck, Pencil, Trash2, Crown } from 'lucide-react';
 import { CommunityService, UserService } from '@/services/api';
 import PostCard from '@/components/PostCard';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
+import ReportButton from '@/components/ReportButton';
 
 const CommunityDetailPage = () => {
   const { communityId } = useParams();
@@ -88,7 +89,7 @@ const CommunityDetailPage = () => {
   };
 
   useEffect(() => {
-    if (membershipStatus === 'ADMIN' || membershipStatus === 'OWNER') void loadMembers();
+    if (membershipStatus === 'ADMIN' || membershipStatus === 'OWNER' || membershipStatus === 'MODERATOR') void loadMembers();
   }, [membershipStatus, communityId]);
 
   const approveMember = async (memberId: string) => {
@@ -124,7 +125,7 @@ const CommunityDetailPage = () => {
       await CommunityService.updateAvatar(communityId!, file);
       toast.success('Foto da comunidade atualizada.');
       await load();
-    } catch { toast.error('Somente quem criou a comunidade pode alterar a foto.'); }
+    } catch { toast.error('Você não tem permissão para alterar a foto desta comunidade.'); }
   });
 
   const saveCommunity = async (event: React.FormEvent) => {
@@ -136,8 +137,27 @@ const CommunityDetailPage = () => {
       setEditing(false);
       toast.success('Perfil da comunidade atualizado.');
       await load();
-    } catch { toast.error('Somente o criador pode editar o perfil da comunidade.'); }
+    } catch { toast.error('Você não tem permissão para editar esta comunidade.'); }
     finally { setSavingCommunity(false); }
+  };
+
+  const deleteCommunity = async () => {
+    if (!communityId || !window.confirm('Excluir esta comunidade? Essa ação não pode ser desfeita.')) return;
+    try {
+      await CommunityService.delete(communityId);
+      toast.success('Comunidade excluída.');
+      navigate('/comunidades');
+    } catch { toast.error('Não foi possível excluir a comunidade.'); }
+  };
+
+  const transferOwnership = async (memberId: string) => {
+    if (!communityId || !window.confirm('Transferir a propriedade para este membro? Você continuará como administrador.')) return;
+    try {
+      await CommunityService.transferOwnership(communityId, memberId);
+      toast.success('Propriedade transferida.');
+      await load();
+      await loadMembers();
+    } catch { toast.error('Não foi possível transferir a propriedade.'); }
   };
 
   if (loading) return <main className="max-w-4xl mx-auto p-6 text-muted-foreground">Carregando comunidade...</main>;
@@ -146,8 +166,10 @@ const CommunityDetailPage = () => {
   const currentUserId = me?.userId ?? me?.id;
   const ownerId = community.ownerId ?? community.owner?.userId ?? community.owner?.id;
   const isOwner = Boolean(currentUserId && ownerId && String(currentUserId) === String(ownerId));
-  const isModerator = isOwner || membershipStatus === 'ADMIN';
-  const isApprovedMember = isOwner || membershipStatus === 'APPROVED' || membershipStatus === 'OWNER' || membershipStatus === 'ADMIN';
+  const isAdmin = membershipStatus === 'ADMIN';
+  const isCommunityManager = isOwner || isAdmin;
+  const isModerator = isCommunityManager || membershipStatus === 'MODERATOR';
+  const isApprovedMember = isOwner || membershipStatus === 'APPROVED' || membershipStatus === 'OWNER' || membershipStatus === 'ADMIN' || membershipStatus === 'MODERATOR';
   return (
     <main className="max-w-4xl mx-auto p-4 space-y-4">
       <Link to="/comunidades" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"><ArrowLeft className="h-4 w-4" /> Voltar para comunidades</Link>
@@ -155,14 +177,14 @@ const CommunityDetailPage = () => {
         <div className="flex flex-col sm:flex-row gap-4 sm:items-center">
           <div className="relative shrink-0">
             {community.imageUrl ? <img src={community.imageUrl} alt={`Imagem da comunidade ${community.name}`} className="h-24 w-24 rounded-2xl object-cover" /> : <div className="h-24 w-24 rounded-2xl bg-skillswap-light-blue grid place-items-center text-3xl font-bold">{community.name?.slice(0, 1).toUpperCase()}</div>}
-            {isOwner && <button type="button" aria-label="Alterar foto da comunidade" onClick={() => fileRef.current?.click()} className="absolute -bottom-2 -right-2 rounded-full bg-skillswap-teal p-2 text-white"><Camera className="h-4 w-4" /></button>}
-            {isOwner && <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && updateAvatar(e.target.files[0])} />}
+            {isCommunityManager && <button type="button" aria-label="Alterar foto da comunidade" onClick={() => fileRef.current?.click()} className="absolute -bottom-2 -right-2 rounded-full bg-skillswap-teal p-2 text-white"><Camera className="h-4 w-4" /></button>}
+            {isCommunityManager && <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && updateAvatar(e.target.files[0])} />}
           </div>
-          <div className="min-w-0 flex-1"><h1 className="text-2xl font-bold break-words">{community.name}</h1><p className="mt-2 text-muted-foreground break-words">{community.description || 'Um espaço para aprender e compartilhar.'}</p><p className="mt-2 text-sm text-muted-foreground">{community.memberCount ?? 0} membros</p>{isOwner && <Button type="button" variant="outline" className="mt-3" onClick={() => setEditing((current) => !current)}><Pencil className="mr-2 h-4 w-4" /> Editar perfil da comunidade</Button>}</div>
+          <div className="min-w-0 flex-1"><h1 className="text-2xl font-bold break-words">{community.name}</h1><p className="mt-2 text-muted-foreground break-words">{community.description || 'Um espaço para aprender e compartilhar.'}</p><p className="mt-2 text-sm text-muted-foreground">{community.memberCount ?? 0} membros</p><div className="mt-3 flex flex-wrap gap-2">{isCommunityManager && <><Button type="button" variant="outline" onClick={() => setEditing((current) => !current)}><Pencil className="mr-2 h-4 w-4" /> Editar perfil da comunidade</Button>{isOwner && <Button type="button" variant="outline" className="text-red-600" onClick={() => void deleteCommunity()}><Trash2 className="mr-2 h-4 w-4" /> Excluir comunidade</Button>}</>}<ReportButton reportedUserId={ownerId} targetType="COMMUNITY" targetId={communityId} /></div></div>
           {isOwner ? <span className="rounded-full bg-skillswap-teal/10 px-4 py-2 text-sm font-semibold text-skillswap-teal">Criador da comunidade</span> : isApprovedMember ? <span className="rounded-full bg-skillswap-teal/10 px-4 py-2 text-sm font-semibold text-skillswap-teal">Membro</span> : membershipStatus === 'PENDING' ? <span className="rounded-full bg-amber-100 px-4 py-2 text-sm font-semibold text-amber-800">Aguardando aprovação</span> : <Button type="button" onClick={join} className="bg-skillswap-teal text-white">Entrar</Button>}
         </div>
       </section>
-      {editing && isOwner && <section className="rounded-2xl border border-border bg-card p-4 sm:p-6">
+      {editing && isCommunityManager && <section className="rounded-2xl border border-border bg-card p-4 sm:p-6">
         <h2 className="font-bold text-lg mb-3">Editar perfil da comunidade</h2>
         <form onSubmit={saveCommunity} className="space-y-3">
           <label className="block text-sm font-medium">Nome<input value={editName} onChange={(event) => setEditName(event.target.value)} maxLength={120} required className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2" /></label>
@@ -189,7 +211,7 @@ const CommunityDetailPage = () => {
           </form>
         </div>
         <div className="mt-4 space-y-2">
-          {members.map((member) => <div key={member.userId} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border p-3"><div><strong>{member.name || member.username}</strong><span className="ml-2 text-sm text-muted-foreground">@{member.username}</span><span className="ml-2 text-xs text-skillswap-teal">{member.role}</span></div><div className="flex gap-2">{isOwner && member.role !== 'OWNER' && <Button size="sm" variant="outline" onClick={() => CommunityService.setAdministrator(communityId!, member.userId, member.role !== 'ADMIN').then(loadMembers)}>{member.role === 'ADMIN' ? 'Remover admin' : 'Tornar admin'}</Button>}{member.role !== 'OWNER' && <Button size="sm" variant="outline" className="text-red-600" onClick={() => CommunityService.removeMember(communityId!, member.userId).then(loadMembers)}><UserMinus className="mr-1 h-4 w-4" /> Remover</Button>}</div></div>)}
+          {members.map((member) => <div key={member.userId} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border p-3"><div className="min-w-0"><strong>{member.name || member.username}</strong><span className="ml-2 text-sm text-muted-foreground">@{member.username}</span><span className="ml-2 inline-flex items-center gap-1 text-xs text-skillswap-teal"><Crown className="h-3 w-3" />{member.role}</span></div><div className="flex flex-wrap gap-2">{isOwner && member.role !== 'OWNER' && <Button size="sm" variant="outline" onClick={() => void transferOwnership(member.userId)}>Transferir dono</Button>}{isOwner && member.role !== 'OWNER' && <Button size="sm" variant="outline" onClick={() => CommunityService.setAdministrator(communityId!, member.userId, member.role !== 'ADMIN').then(loadMembers)}>{member.role === 'ADMIN' ? 'Remover admin' : 'Tornar admin'}</Button>}{isCommunityManager && member.role !== 'OWNER' && member.role !== 'ADMIN' && <Button size="sm" variant="outline" onClick={() => CommunityService.setModerator(communityId!, member.userId, member.role !== 'MODERATOR').then(loadMembers)}>{member.role === 'MODERATOR' ? 'Remover moderador' : 'Tornar moderador'}</Button>}{member.role !== 'OWNER' && <Button size="sm" variant="outline" className="text-red-600" onClick={() => CommunityService.removeMember(communityId!, member.userId).then(loadMembers)}><UserMinus className="mr-1 h-4 w-4" /> Remover</Button>}</div></div>)}
           {!members.length && <p className="text-sm text-muted-foreground">Pesquise ou carregue os membros para administrar a comunidade.</p>}
         </div>
         {pendingMembers.length > 0 && <div className="mt-6 border-t border-border pt-4"><h3 className="font-semibold">Solicitações pendentes</h3><div className="mt-2 space-y-2">{pendingMembers.map((member) => <div key={member.userId} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3"><div><strong>{member.name || member.username}</strong><span className="ml-2 text-sm text-muted-foreground">@{member.username}</span></div><Button size="sm" onClick={() => void approveMember(member.userId)} className="bg-skillswap-teal text-white">Aprovar</Button></div>)}</div></div>}

@@ -35,6 +35,8 @@ public class PostResponseDTO {
     private int commentsCount = 0;
     private int sharesCount = 0;
     private int viewsCount = 0;
+    private boolean likedByMe = false;
+    private boolean repostedByMe = false;
 
     public PostResponseDTO() {}
 
@@ -73,4 +75,8 @@ public class PostResponseDTO {
     public void setSharesCount(int sharesCount) { this.sharesCount = sharesCount; }
     public int getViewsCount() { return viewsCount; }
     public void setViewsCount(int viewsCount) { this.viewsCount = viewsCount; }
+    public boolean isLikedByMe() { return likedByMe; }
+    public void setLikedByMe(boolean likedByMe) { this.likedByMe = likedByMe; }
+    public boolean isRepostedByMe() { return repostedByMe; }
+    public void setRepostedByMe(boolean repostedByMe) { this.repostedByMe = repostedByMe; }
 }

@@ -9,7 +9,10 @@ import br.com.teamss.skillswap.skill_swap.dto.AdminOperationsReportDTO;
 import br.com.teamss.skillswap.skill_swap.dto.SwapCoinLedgerResponse;
 import br.com.teamss.skillswap.skill_swap.dto.AdminWalletAdjustmentRequest;
 import br.com.teamss.skillswap.skill_swap.dto.SwapCoinWalletResponse;
+import br.com.teamss.skillswap.skill_swap.dto.CommunityMemberDTO;
+import br.com.teamss.skillswap.skill_swap.dto.CommunitySummaryDTO;
 import br.com.teamss.skillswap.skill_swap.model.services.AdminService;
+import br.com.teamss.skillswap.skill_swap.model.services.CommunityService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -28,9 +31,11 @@ import org.springframework.data.domain.Sort;
 public class AdminController {
 
     private final AdminService adminService;
+    private final CommunityService communityService;
 
-    public AdminController(AdminService adminService) {
+    public AdminController(AdminService adminService, CommunityService communityService) {
         this.adminService = adminService;
+        this.communityService = communityService;
     }
 
     @GetMapping("/stats")
@@ -88,5 +93,29 @@ public class AdminController {
     @PutMapping("/users/{userId}/role")
     public ResponseEntity<UserManagementDTO> setRole(@PathVariable UUID userId, @Valid @RequestBody AdminRoleRequest request) {
         return ResponseEntity.ok(adminService.setRole(userId, request.role(), request.enabled()));
+    }
+
+    @GetMapping("/communities")
+    public ResponseEntity<List<CommunitySummaryDTO>> getCommunities() {
+        return ResponseEntity.ok(communityService.getCommunities(500));
+    }
+
+    @GetMapping("/communities/{communityId}/members")
+    public ResponseEntity<List<CommunityMemberDTO>> getCommunityMembers(@PathVariable UUID communityId,
+                                                                          @RequestParam(defaultValue = "") String search) {
+        return ResponseEntity.ok(communityService.listMembersAsPlatformAdmin(communityId, search));
+    }
+
+    @PutMapping("/communities/{communityId}/owner/{newOwnerId}")
+    public ResponseEntity<Void> transferCommunityOwnership(@PathVariable UUID communityId,
+                                                            @PathVariable UUID newOwnerId) {
+        communityService.transferOwnershipAsPlatformAdmin(communityId, newOwnerId);
+        return ResponseEntity.noContent().build();
+    }
+
+    @DeleteMapping("/communities/{communityId}")
+    public ResponseEntity<Void> deleteCommunity(@PathVariable UUID communityId) {
+        communityService.deleteCommunityAsPlatformAdmin(communityId);
+        return ResponseEntity.noContent().build();
     }
 }

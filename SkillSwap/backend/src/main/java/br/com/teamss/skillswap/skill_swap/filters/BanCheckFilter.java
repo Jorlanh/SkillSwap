@@ -11,6 +11,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.security.MessageDigest;
 import java.util.ArrayList;
 import org.springframework.lang.NonNull;
@@ -55,7 +56,7 @@ public class BanCheckFilter extends OncePerRequestFilter {
                     return;
                 }
                 User user = localUserService.findOrCreateUser(jwt);
-                if (user.isBanned() || hasScopedBan(user.getUserId(), request)) {
+                if (hasActiveGeneralBan(user.getUserId()) || hasScopedBan(user.getUserId(), request)) {
                     response.sendError(HttpServletResponse.SC_FORBIDDEN, "Acesso negado.");
                     return;
                 }
@@ -100,6 +101,13 @@ public class BanCheckFilter extends OncePerRequestFilter {
             .filter(ban -> ban.getExpiresAt() == null || ban.getExpiresAt().isAfter(java.time.Instant.now()))
             .anyMatch(ban -> ("POSTS".equalsIgnoreCase(ban.getScope()) && path.contains("/posts"))
                 || ("COMMENTS".equalsIgnoreCase(ban.getScope()) && path.contains("comment")));
+    }
+
+    private boolean hasActiveGeneralBan(java.util.UUID userId) {
+        Instant now = Instant.now();
+        return banRepository.findByUser_UserIdAndActiveTrue(userId).stream()
+            .filter(ban -> ban.getExpiresAt() == null || ban.getExpiresAt().isAfter(now))
+            .anyMatch(ban -> "GENERAL".equalsIgnoreCase(ban.getScope()));
     }
 
     private boolean hasActiveIpBan(HttpServletRequest request) {

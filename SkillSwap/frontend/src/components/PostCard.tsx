@@ -9,6 +9,7 @@ import { auth } from '@/lib/firebase';
 import { onIdTokenChanged } from 'firebase/auth';
 import { toast } from 'sonner';
 import VerifiedBadge from '@/components/VerifiedBadge';
+import ReportButton from '@/components/ReportButton';
 
 interface PostCardProps { post: any; }
 
@@ -57,6 +58,7 @@ const PostCard = ({ post }: PostCardProps) => {
   const [commentsCount, setCommentsCount] = useState(post.commentsCount || 0);
   const [replyTo, setReplyTo] = useState<number | null>(null);
   const [commentLikes, setCommentLikes] = useState<Record<number, number>>({});
+  const [commentLiked, setCommentLiked] = useState<Record<number, boolean>>({});
 
   const author = post.user || post.author || { username: 'Usuário', avatarUrl: '' };
   const postId = post.postId ?? post.id;
@@ -80,7 +82,10 @@ const PostCard = ({ post }: PostCardProps) => {
     const { data } = await HomeService.getPostComments(postId);
     const list = Array.isArray(data) ? data : [];
     setCommentsList(list);
-    setCommentLikes(Object.fromEntries(list.map((comment: any) => [getCommentId(comment), Number(comment.likesCount ?? 0)])));
+    const validComments = list.filter((comment: any) => getCommentId(comment));
+    setCommentLikes(Object.fromEntries(validComments.map((comment: any) => [getCommentId(comment), Number(comment.likesCount ?? 0)])));
+    setCommentLiked(Object.fromEntries(validComments.map((comment: any) => [getCommentId(comment), Boolean(comment.likedByMe || comment.isLikedByMe)])));
+    setCommentsCount(list.length);
   }, [postId]);
 
   useEffect(() => {
@@ -123,9 +128,11 @@ const PostCard = ({ post }: PostCardProps) => {
 
   const handleShare = () => requireAuth(async () => {
     try {
-      const { data } = await HomeService.generateShareLink(postId);
-      const url = typeof data === 'string' ? data : data?.shareUrl;
-      if (!url) throw new Error('link ausente');
+      // Registra o compartilhamento no backend, mas monta o link com o domínio
+      // atual do frontend. Assim o endereço não aponta para localhost ou para
+      // uma URL antiga configurada no ambiente do servidor.
+      await HomeService.generateShareLink(postId);
+      const url = `${window.location.origin}/post/${postId}`;
       await navigator.clipboard.writeText(url);
       toast.success('Link da publicação copiado!');
     } catch { toast.error('Não foi possível compartilhar agora.'); }
@@ -139,7 +146,6 @@ const PostCard = ({ post }: PostCardProps) => {
         // Apenas IDs reais do banco podem ser enviados. IDs "local-*" nunca chegam ao backend.
         await HomeService.comment(postId, newComment.trim(), replyTo);
         await refreshComments();
-        setCommentsCount((previous: number) => previous + 1);
         setNewComment('');
         setReplyTo(null);
         toast.success(replyTo ? 'Resposta enviada!' : 'Comentário enviado!');
@@ -153,6 +159,7 @@ const PostCard = ({ post }: PostCardProps) => {
       try {
         const { data } = await HomeService.likeComment(commentId);
         setCommentLikes((current) => ({ ...current, [commentId]: Number(data ?? current[commentId] ?? 0) }));
+        setCommentLiked((current) => ({ ...current, [commentId]: !current[commentId] }));
       } catch { toast.error('Não foi possível curtir o comentário.'); }
     });
   };
@@ -163,7 +170,6 @@ const PostCard = ({ post }: PostCardProps) => {
       try {
         await HomeService.deleteComment(commentId);
         await refreshComments();
-        setCommentsCount((previous: number) => Math.max(0, previous - 1));
         toast.success('Comentário excluído.');
       } catch { toast.error('Não foi possível excluir o comentário.'); }
     });
@@ -184,11 +190,12 @@ const PostCard = ({ post }: PostCardProps) => {
             <div className="bg-muted/40 p-2 px-3 rounded-2xl rounded-tl-sm relative">
               <p className="text-[11px] font-bold text-skillswap-teal mb-0.5 flex items-center gap-1">@{username}<VerifiedBadge user={commentUser} size={13} /></p>
               <p className="text-xs text-foreground/90 whitespace-pre-wrap">{comment.content}</p>
-              <button type="button" onClick={() => handleLikeComment(commentId)} disabled={!commentId} aria-label="Curtir comentário" className="absolute -right-2 -bottom-2 bg-card border border-border rounded-full px-1.5 py-1 shadow-sm hover:scale-110 transition-transform text-muted-foreground hover:text-red-500 disabled:opacity-50"><Heart size={10} className="inline fill-current" /> <span className="text-[10px] ml-0.5">{commentId ? (commentLikes[commentId] ?? comment.likesCount ?? 0) : 0}</span></button>
+              <button type="button" onClick={() => handleLikeComment(commentId)} disabled={!commentId} aria-label="Curtir comentário" className={`absolute -right-2 -bottom-2 bg-card border border-border rounded-full px-1.5 py-1 shadow-sm hover:scale-110 transition-transform disabled:opacity-50 ${commentId && commentLiked[commentId] ? 'text-red-500' : 'text-muted-foreground hover:text-red-500'}`}><Heart size={10} className="inline fill-current" /> <span className="text-[10px] ml-0.5">{commentId ? (commentLikes[commentId] ?? comment.likesCount ?? 0) : 0}</span></button>
             </div>
             <div className="flex items-center gap-3 mt-1 ml-1">
               <button type="button" disabled={!commentId} onClick={() => setReplyTo(commentId)} className="text-[10px] font-bold text-muted-foreground hover:text-foreground flex items-center gap-1 disabled:opacity-50"><Reply size={10} /> Responder</button>
               {username === loggedUser.username && commentId && <button type="button" onClick={() => handleDeleteComment(commentId)} className="text-[10px] font-bold text-muted-foreground hover:text-red-500">Excluir</button>}
+              {commentId && <ReportButton reportedUserId={comment.userId || comment.user?.userId} targetType="COMMENT" targetId={commentId} label="" />}
             </div>
           </div>
         </div>
@@ -205,7 +212,7 @@ const PostCard = ({ post }: PostCardProps) => {
           <Avatar className="h-10 w-10 shrink-0 border border-border group-hover:border-skillswap-teal transition-colors"><AvatarImage src={getAvatar(author)} alt={`Foto de ${author.name || author.username}`} /><AvatarFallback>{author.username?.[0]?.toUpperCase()}</AvatarFallback></Avatar>
           <span className="min-w-0"><span className="text-sm font-bold text-foreground truncate group-hover:text-skillswap-teal transition-colors flex items-center gap-1">{author.name || author.username}<VerifiedBadge user={author} size={18} /></span><span className="text-xs text-muted-foreground truncate block">@{author.username?.toLowerCase()}</span></span>
         </button>
-        {ownPost && <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-red-500" onClick={handleDeletePost} aria-label="Excluir publicação"><Trash2 size={16} /></Button>}
+        <div className="flex items-center gap-1">{ownPost && <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-red-500" onClick={handleDeletePost} aria-label="Excluir publicação"><Trash2 size={16} /></Button>}<ReportButton reportedUserId={author.userId || post.userId} targetType="POST" targetId={postId} label="" /></div>
       </div>
 
       <div className="mb-3 space-y-2">

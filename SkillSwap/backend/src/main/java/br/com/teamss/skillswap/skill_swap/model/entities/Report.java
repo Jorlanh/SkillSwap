@@ -30,6 +30,15 @@ public class Report {
     @Column(length = 1000)
     private String reason;
 
+    @Column(name = "target_type", nullable = false, length = 32)
+    private String targetType = "USER";
+
+    @Column(name = "target_id", length = 64)
+    private String targetId;
+
+    @Column(length = 64)
+    private String category;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private ReportStatus status = ReportStatus.PENDING;

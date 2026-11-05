@@ -27,6 +27,7 @@ import br.com.teamss.skillswap.skill_swap.model.wallet.LedgerEntryType;
 import br.com.teamss.skillswap.skill_swap.model.wallet.PaymentStatus;
 import br.com.teamss.skillswap.skill_swap.model.services.SwapCoinWalletService;
 import br.com.teamss.skillswap.skill_swap.model.services.AdminService;
+import br.com.teamss.skillswap.skill_swap.model.services.CommunityService;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.stereotype.Service;
 import java.time.Instant;
@@ -55,6 +56,7 @@ public class AdminServiceImpl implements AdminService {
     private final ProfileRepository profileRepository;
     private final boolean rabbitMqEnabled;
     private final SwapCoinWalletService walletService;
+    private final CommunityService communityService;
 
     public AdminServiceImpl(UserRepository userRepository, SkillRepository skillRepository,
                             ProposalRepository proposalRepository, BanRepository banRepository, RoleRepository roleRepository,
@@ -63,7 +65,7 @@ public class AdminServiceImpl implements AdminService {
                             LessonExtraPurchaseRepository lessonPurchaseRepository, KarmaEventRepository karmaEventRepository,
                             PostRepository postRepository, ProfileRepository profileRepository,
                             @Value("${app.messaging.rabbitmq.enabled:false}") boolean rabbitMqEnabled,
-                            SwapCoinWalletService walletService) {
+                            SwapCoinWalletService walletService, CommunityService communityService) {
         this.userRepository = userRepository;
         this.skillRepository = skillRepository;
         this.proposalRepository = proposalRepository;
@@ -79,6 +81,7 @@ public class AdminServiceImpl implements AdminService {
         this.profileRepository = profileRepository;
         this.rabbitMqEnabled = rabbitMqEnabled;
         this.walletService = walletService;
+        this.communityService = communityService;
     }
 
     @Override
@@ -133,12 +136,17 @@ public class AdminServiceImpl implements AdminService {
         ban.setIpAddress(ipAddress);
         ban.setScope(normalizedScope);
         banRepository.save(ban);
+        if (expiresAt == null && "GENERAL".equals(normalizedScope)) {
+            communityService.handlePermanentOwnerBan(userId);
+        }
     }
 
     @Override
     @org.springframework.transaction.annotation.Transactional(readOnly = true)
     public List<AdminBanDTO> getActiveBans() {
+        Instant now = Instant.now();
         return banRepository.findByActiveTrueOrderByCreatedAtDesc().stream()
+                .filter(ban -> ban.getExpiresAt() == null || ban.getExpiresAt().isAfter(now))
                 .map(ban -> new AdminBanDTO(
                         ban.getId(), ban.getUser().getUserId(), ban.getUser().getUsername(), ban.getReason(),
                         ban.getScope(), ban.getCreatedAt(), ban.getExpiresAt(), ban.isActive()))
@@ -198,6 +206,10 @@ public class AdminServiceImpl implements AdminService {
     }
 
     private UserManagementDTO convertToUserManagementDTO(User user) {
+        Instant now = Instant.now();
+        boolean activeGeneralBan = banRepository.findByUser_UserIdAndActiveTrue(user.getUserId()).stream()
+                .filter(ban -> ban.getExpiresAt() == null || ban.getExpiresAt().isAfter(now))
+                .anyMatch(ban -> "GENERAL".equalsIgnoreCase(ban.getScope()));
         return new UserManagementDTO(
                 user.getUserId(),
                 user.getUsername(),
@@ -205,7 +217,7 @@ public class AdminServiceImpl implements AdminService {
                 user.getEmail(),
                 user.isVerifiedBadge(),
                 user.getRoles().stream().map(Role::getName).collect(Collectors.toSet()),
-                user.isBanned(),
+                activeGeneralBan,
                 user.getCreatedAt(),
                 walletRepository.findByOwner_UserId(user.getUserId()).map(wallet -> wallet.getBalance()).orElse(0L),
                 user.getKarmaPoints()

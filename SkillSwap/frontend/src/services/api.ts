@@ -59,6 +59,12 @@ export const AdminService = {
   unbanUser: (userId: string) => api.post(`/console-management/users/${userId}/unban`),
   setRole: (userId: string, role: string, enabled: boolean) =>
     api.put(`/console-management/users/${userId}/role`, { role, enabled }),
+  getCommunities: () => api.get('/console-management/communities'),
+  getCommunityMembers: (communityId: string, search = '') =>
+    api.get(`/console-management/communities/${communityId}/members`, { params: { search } }),
+  transferCommunityOwnership: (communityId: string, newOwnerId: string) =>
+    api.put(`/console-management/communities/${communityId}/owner/${newOwnerId}`),
+  deleteCommunity: (communityId: string) => api.delete(`/console-management/communities/${communityId}`),
 };
 
 export const AdminReportService = {
@@ -94,6 +100,7 @@ export const HomeService = {
   getTrendingTopics: (period: string = 'DAY') => api.get('/home/trending-topics', { params: { period } }),
   getTrendingPosts: (period: string = 'DAY') => api.get('/home/trending-posts', { params: { period } }),
   getPosts: (sortBy: string = 'TRENDING', period: string = 'DAY') => api.get('/home/posts', { params: { sortBy, period } }),
+  getPost: (postId: number) => api.get(`/home/posts/${postId}`),
   createPost: (formData: FormData) => api.post('/home/posts', formData),
   likePost: (postId: number) => api.post(`/home/posts/${postId}/like`),
   repost: (postId: number) => api.post(`/home/posts/${postId}/repost`),
@@ -147,6 +154,9 @@ export const CommunityService = {
   getPendingMembers: (communityId: string, search = '') => api.get(`/communities/${communityId}/members/pending`, { params: { search } }),
   removeMember: (communityId: string, memberId: string) => api.delete(`/communities/${communityId}/members/${memberId}`),
   setAdministrator: (communityId: string, memberId: string, administrator: boolean) => api.put(`/communities/${communityId}/members/${memberId}/admin`, null, { params: { administrator } }),
+  setModerator: (communityId: string, memberId: string, moderator: boolean) => api.put(`/communities/${communityId}/members/${memberId}/moderator`, null, { params: { moderator } }),
+  transferOwnership: (communityId: string, memberId: string) => api.put(`/communities/${communityId}/ownership/${memberId}`),
+  delete: (communityId: string) => api.delete(`/communities/${communityId}`),
   approveMember: (communityId: string, memberId: string) => api.put(`/communities/${communityId}/members/${memberId}/approve`),
   updateAvatar: (communityId: string, file: File) => {
     const formData = new FormData();

@@ -179,24 +179,25 @@ public class CommunityServiceImpl implements CommunityService {
     public CommunitySummaryDTO updateCommunity(UUID communityId, UUID userId, UpdateCommunityRequest request) {
         Community community = communityRepository.findById(communityId)
                 .orElseThrow(() -> new RuntimeException("Comunidade não encontrada!"));
-        if (community.getOwner() == null || !community.getOwner().getUserId().equals(userId)) {
-            throw new org.springframework.security.access.AccessDeniedException("Somente o criador pode editar o perfil da comunidade.");
-        }
+        ensureCommunityManager(communityId, userId);
         if (request.name() != null && !request.name().isBlank()) community.setName(request.name().trim());
         if (request.description() != null) community.setDescription(request.description().trim());
         if (request.privateCommunity() != null) community.setPrivateCommunity(request.privateCommunity());
         Community saved = communityRepository.save(community);
-        int memberCount = (int) communityMemberRepository.countById_CommunityIdAndMembershipStatus(communityId, "APPROVED");
-        return new CommunitySummaryDTO(saved.getCommunityId(), saved.getName(), saved.getDescription(), memberCount,
-                saved.getImageUrl(), saved.getOwner() == null ? null : saved.getOwner().getUserId(),
-                saved.isPrivateCommunity(), true, "OWNER");
+        return summaryForViewer(saved, userId);
     }
 
     @Override
     @Transactional(readOnly = true)
     public String getMembershipStatus(UUID communityId, UUID userId) {
         return communityMemberRepository.findById_CommunityIdAndId_UserId(communityId, userId)
-                .map(CommunityMember::getMembershipStatus)
+                .map(member -> {
+                    if (!"APPROVED".equals(member.getMembershipStatus())) return member.getMembershipStatus();
+                    if ("OWNER".equals(member.getMemberRole()) || "ADMIN".equals(member.getMemberRole()) || "MODERATOR".equals(member.getMemberRole())) {
+                        return member.getMemberRole();
+                    }
+                    return "APPROVED";
+                })
                 .orElse("NONE");
     }
 
@@ -205,9 +206,7 @@ public class CommunityServiceImpl implements CommunityService {
     public void updateCommunityImage(UUID communityId, UUID userId, MultipartFile image) throws IOException {
         Community community = communityRepository.findById(communityId)
             .orElseThrow(() -> new RuntimeException("Comunidade não encontrada!"));
-        if (community.getOwner() == null || !community.getOwner().getUserId().equals(userId)) {
-            throw new org.springframework.security.access.AccessDeniedException("Somente quem criou a comunidade pode alterar a foto.");
-        }
+        ensureCommunityManager(communityId, userId);
         if (image == null || image.isEmpty()) throw new IllegalArgumentException("Escolha uma imagem.");
         community.setImageUrl(fileUploadService.uploadFile(image));
         communityRepository.save(community);
@@ -358,6 +357,11 @@ public class CommunityServiceImpl implements CommunityService {
         ensureModerator(communityId, actorId);
         Community community = communityRepository.findById(communityId).orElseThrow();
         if (community.getOwner() != null && community.getOwner().getUserId().equals(memberId)) throw new IllegalArgumentException("O criador não pode ser removido.");
+        CommunityMember target = communityMemberRepository.findById_CommunityIdAndId_UserId(communityId, memberId)
+            .orElseThrow(() -> new IllegalArgumentException("Membro não encontrado."));
+        if ("ADMIN".equals(target.getMemberRole()) && !isCommunityOwner(communityId, actorId)) {
+            throw new org.springframework.security.access.AccessDeniedException("Somente o dono pode remover um administrador.");
+        }
         CommunityMemberId id = new CommunityMemberId(); id.setCommunityId(communityId); id.setUserId(memberId);
         communityMemberRepository.deleteById(id);
         userRepository.findById(memberId).ifPresent(user -> {
@@ -369,7 +373,7 @@ public class CommunityServiceImpl implements CommunityService {
     @Override
     @Transactional
     public void setAdministrator(UUID communityId, UUID actorId, UUID memberId, boolean administrator) {
-        ensureModerator(communityId, actorId);
+        ensureCommunityOwner(communityId, actorId);
         Community community = communityRepository.findById(communityId).orElseThrow();
         if (community.getOwner() != null && community.getOwner().getUserId().equals(memberId)) return;
         CommunityMember member = communityMemberRepository.findById_CommunityIdAndId_UserId(communityId, memberId).orElseThrow(() -> new IllegalArgumentException("Membro não encontrado."));
@@ -379,8 +383,23 @@ public class CommunityServiceImpl implements CommunityService {
 
     @Override
     @Transactional
+    public void setModerator(UUID communityId, UUID actorId, UUID memberId, boolean moderator) {
+        ensureCommunityManager(communityId, actorId);
+        Community community = communityRepository.findById(communityId).orElseThrow();
+        if (community.getOwner() != null && community.getOwner().getUserId().equals(memberId)) return;
+        CommunityMember member = communityMemberRepository.findById_CommunityIdAndId_UserId(communityId, memberId)
+            .orElseThrow(() -> new IllegalArgumentException("Membro não encontrado."));
+        if ("ADMIN".equals(member.getMemberRole()) && !isCommunityOwner(communityId, actorId)) {
+            throw new org.springframework.security.access.AccessDeniedException("Somente o dono pode alterar o papel de um administrador.");
+        }
+        member.setMemberRole(moderator ? "MODERATOR" : "MEMBER");
+        communityMemberRepository.save(member);
+    }
+
+    @Override
+    @Transactional
     public void approveMember(UUID communityId, UUID actorId, UUID memberId) {
-        ensureModerator(communityId, actorId);
+        ensureCommunityManager(communityId, actorId);
         CommunityMember member = communityMemberRepository.findById_CommunityIdAndId_UserId(communityId, memberId)
                 .orElseThrow(() -> new IllegalArgumentException("Solicitação não encontrada."));
         member.setMembershipStatus("APPROVED");
@@ -392,11 +411,148 @@ public class CommunityServiceImpl implements CommunityService {
         }
     }
 
+    @Override
+    @Transactional
+    public void deleteCommunity(UUID communityId, UUID actorId) {
+        Community community = communityRepository.findById(communityId)
+            .orElseThrow(() -> new RuntimeException("Comunidade não encontrada."));
+        ensureCommunityOwner(communityId, actorId);
+        deleteCommunityData(community);
+    }
+
+    @Override
+    @Transactional
+    public void deleteCommunityAsPlatformAdmin(UUID communityId) {
+        Community community = communityRepository.findById(communityId)
+            .orElseThrow(() -> new RuntimeException("Comunidade não encontrada."));
+        deleteCommunityData(community);
+    }
+
+    @Override
+    @Transactional
+    public void transferOwnership(UUID communityId, UUID actorId, UUID newOwnerId) {
+        ensureCommunityOwner(communityId, actorId);
+        transferOwnershipInternal(communityId, newOwnerId);
+    }
+
+    @Override
+    @Transactional
+    public void transferOwnershipAsPlatformAdmin(UUID communityId, UUID newOwnerId) {
+        transferOwnershipInternal(communityId, newOwnerId);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<br.com.teamss.skillswap.skill_swap.dto.CommunityMemberDTO> listMembersAsPlatformAdmin(UUID communityId, String search) {
+        if (!communityRepository.existsById(communityId)) throw new RuntimeException("Comunidade não encontrada.");
+        return toMemberDtos(communityMemberRepository.findById_CommunityIdAndMembershipStatusOrderByJoinedAtAsc(communityId, "APPROVED"), search);
+    }
+
+    @Override
+    @Transactional
+    public void handlePermanentOwnerBan(UUID bannedUserId) {
+        for (Community community : communityRepository.findByOwner_UserId(bannedUserId)) {
+            List<CommunityMember> approved = communityMemberRepository
+                .findById_CommunityIdAndMembershipStatusOrderByJoinedAtAsc(community.getCommunityId(), "APPROVED");
+            CommunityMember successor = approved.stream()
+                .filter(member -> !bannedUserId.equals(member.getId().getUserId()) && "ADMIN".equals(member.getMemberRole()))
+                .findFirst()
+                .orElseGet(() -> approved.stream()
+                    .filter(member -> !bannedUserId.equals(member.getId().getUserId()))
+                    .findFirst().orElse(null));
+            if (successor == null) continue;
+            CommunityMember formerOwner = communityMemberRepository
+                .findById_CommunityIdAndId_UserId(community.getCommunityId(), bannedUserId).orElse(null);
+            if (formerOwner != null) formerOwner.setMemberRole("MEMBER");
+            successor.setMemberRole("OWNER");
+            community.setOwner(successor.getUser());
+            if (formerOwner != null) communityMemberRepository.save(formerOwner);
+            communityMemberRepository.save(successor);
+            communityRepository.save(community);
+        }
+    }
+
+    private void transferOwnershipInternal(UUID communityId, UUID newOwnerId) {
+        Community community = communityRepository.findById(communityId)
+            .orElseThrow(() -> new RuntimeException("Comunidade não encontrada."));
+        User newOwner = userRepository.findById(newOwnerId)
+            .orElseThrow(() -> new IllegalArgumentException("O novo dono não foi encontrado."));
+        CommunityMember target = communityMemberRepository.findById_CommunityIdAndId_UserId(communityId, newOwnerId)
+            .orElseThrow(() -> new IllegalArgumentException("O novo dono precisa participar da comunidade."));
+        if (!"APPROVED".equals(target.getMembershipStatus())) {
+            throw new IllegalArgumentException("O novo dono precisa ser um membro aprovado.");
+        }
+        if (community.getOwner() != null) {
+            communityMemberRepository.findById_CommunityIdAndId_UserId(communityId, community.getOwner().getUserId())
+                .ifPresent(previous -> { previous.setMemberRole("ADMIN"); communityMemberRepository.save(previous); });
+        }
+        target.setMemberRole("OWNER");
+        community.setOwner(newOwner);
+        communityMemberRepository.save(target);
+        communityRepository.save(community);
+    }
+
+    private void deleteCommunityData(Community community) {
+        UUID communityId = community.getCommunityId();
+        // Os posts da comunidade continuam sendo publicações da plataforma.
+        // Desvinculá-los antes de apagar a comunidade evita quebrar a FK e
+        // preserva o conteúdo publicado pelos membros.
+        List<Post> communityPosts = postRepository.findByCommunity_CommunityId(communityId);
+        for (Post post : communityPosts) {
+            post.setCommunity(null);
+        }
+        postRepository.saveAll(communityPosts);
+
+        List<CommunityMember> members = communityMemberRepository.findById_CommunityId(communityId);
+        for (CommunityMember member : members) {
+            userRepository.findById(member.getId().getUserId()).ifPresent(user -> {
+                user.getCommunityIds().removeIf(communityId::equals);
+                userRepository.save(user);
+            });
+        }
+        communityMemberRepository.deleteAll(members);
+        communityRepository.delete(community);
+    }
+
+    private CommunitySummaryDTO summaryForViewer(Community community, UUID viewerId) {
+        String status = viewerId == null ? null : communityMemberRepository
+            .findById_CommunityIdAndId_UserId(community.getCommunityId(), viewerId)
+            .map(CommunityMember::getMembershipStatus).orElse("NONE");
+        boolean joined = "APPROVED".equals(status) || "OWNER".equals(status) || "ADMIN".equals(status) || "MODERATOR".equals(status);
+        return new CommunitySummaryDTO(community.getCommunityId(), community.getName(), community.getDescription(),
+            (int) communityMemberRepository.countById_CommunityIdAndMembershipStatus(community.getCommunityId(), "APPROVED"),
+            community.getImageUrl(), community.getOwner() == null ? null : community.getOwner().getUserId(),
+            community.isPrivateCommunity(), joined, status);
+    }
+
+    private boolean isCommunityOwner(UUID communityId, UUID actorId) {
+        return communityRepository.findById(communityId)
+            .map(community -> community.getOwner() != null && actorId.equals(community.getOwner().getUserId()))
+            .orElse(false);
+    }
+
+    private void ensureCommunityOwner(UUID communityId, UUID actorId) {
+        if (!isCommunityOwner(communityId, actorId)) {
+            throw new org.springframework.security.access.AccessDeniedException("Somente o dono da comunidade pode realizar esta ação.");
+        }
+    }
+
+    private void ensureCommunityManager(UUID communityId, UUID actorId) {
+        Community community = communityRepository.findById(communityId)
+            .orElseThrow(() -> new RuntimeException("Comunidade não encontrada."));
+        if (community.getOwner() != null && actorId.equals(community.getOwner().getUserId())) return;
+        CommunityMember member = communityMemberRepository.findById_CommunityIdAndId_UserId(communityId, actorId)
+            .orElseThrow(() -> new org.springframework.security.access.AccessDeniedException("Você não administra esta comunidade."));
+        if (!"ADMIN".equals(member.getMemberRole()) || !"APPROVED".equals(member.getMembershipStatus())) {
+            throw new org.springframework.security.access.AccessDeniedException("Você não administra esta comunidade.");
+        }
+    }
+
     private void ensureModerator(UUID communityId, UUID actorId) {
         Community community = communityRepository.findById(communityId).orElseThrow(() -> new RuntimeException("Comunidade não encontrada."));
         if (community.getOwner() != null && community.getOwner().getUserId().equals(actorId)) return;
         CommunityMember member = communityMemberRepository.findById_CommunityIdAndId_UserId(communityId, actorId).orElseThrow(() -> new org.springframework.security.access.AccessDeniedException("Você não administra esta comunidade."));
-        if (!"ADMIN".equals(member.getMemberRole()) || !"APPROVED".equals(member.getMembershipStatus())) throw new org.springframework.security.access.AccessDeniedException("Você não administra esta comunidade.");
+        if (!("ADMIN".equals(member.getMemberRole()) || "MODERATOR".equals(member.getMemberRole())) || !"APPROVED".equals(member.getMembershipStatus())) throw new org.springframework.security.access.AccessDeniedException("Você não administra esta comunidade.");
     }
 
     private void ensureApprovedMember(UUID communityId, UUID userId) {

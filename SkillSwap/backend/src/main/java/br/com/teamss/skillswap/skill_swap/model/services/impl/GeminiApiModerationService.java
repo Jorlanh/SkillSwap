@@ -45,8 +45,12 @@ public class GeminiApiModerationService implements ContentModerationService {
             String prompt = String.format(
                 "Você é um moderador de conteúdo para uma plataforma social chamada SkillSwap. " +
                 "Sua tarefa é analisar o texto a seguir e determinar se ele viola alguma das seguintes categorias: " +
-                "discurso de ódio, assédio, violência explícita, conteúdo sexualmente explícito, ameaças, spam, ou incentivo à automutilação. " +
-                "Responda apenas com 'SIM' se violar alguma categoria, ou 'NÃO' se for seguro. Não dê nenhuma outra explicação. " +
+                "racismo, xenofobia, homofobia, transfobia, discriminação contra deficiência, perseguição, assédio, " +
+                "ameaça real, incentivo à violência, conteúdo sexual envolvendo menores, exposição de dados pessoais, " +
+                "spam abusivo ou incentivo à automutilação. " +
+                "Marque SIM somente quando houver ataque ou ameaça contra uma pessoa ou grupo, incentivo a crime, " +
+                "ameaça concreta ou assédio abusivo. Não marque críticas, opiniões políticas, debates, linguagem coloquial " +
+                "ou discordância respeitosa apenas por serem controversos. Responda apenas com SIM ou NAO. " +
                 "Texto para analisar: \"%s\"", text
             );
 
@@ -64,7 +68,7 @@ public class GeminiApiModerationService implements ContentModerationService {
             JsonNode rootNode = objectMapper.readTree(responseJson);
             String modelResponse = rootNode.path("candidates").get(0).path("content").path("parts").get(0).path("text").asText().trim();
 
-            return "SIM".equalsIgnoreCase(modelResponse);
+            return modelResponse.toUpperCase().startsWith("SIM");
 
         } catch (Exception e) {
             System.err.println("Erro ao comunicar com a API do Google AI Studio (Gemini): " + e.getMessage());

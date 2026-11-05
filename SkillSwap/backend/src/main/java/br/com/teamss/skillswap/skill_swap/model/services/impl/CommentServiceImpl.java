@@ -10,6 +10,8 @@ import br.com.teamss.skillswap.skill_swap.model.repositories.PostRepository;
 import br.com.teamss.skillswap.skill_swap.model.repositories.UserRepository;
 import br.com.teamss.skillswap.skill_swap.model.repositories.CommentLikeRepository;
 import br.com.teamss.skillswap.skill_swap.model.services.CommentService;
+import br.com.teamss.skillswap.skill_swap.model.services.ContentModerationService;
+import br.com.teamss.skillswap.skill_swap.model.exception.InappropriateContentException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -27,13 +29,15 @@ public class CommentServiceImpl implements CommentService {
     private final PostRepository postRepository;
     private final UserRepository userRepository;
     private final CommentLikeRepository commentLikeRepository;
+    private final ContentModerationService moderationService;
 
     @Autowired
-    public CommentServiceImpl(CommentRepository commentRepository, PostRepository postRepository, UserRepository userRepository, CommentLikeRepository commentLikeRepository) {
+    public CommentServiceImpl(CommentRepository commentRepository, PostRepository postRepository, UserRepository userRepository, CommentLikeRepository commentLikeRepository, ContentModerationService moderationService) {
         this.commentRepository = commentRepository;
         this.postRepository = postRepository;
         this.userRepository = userRepository;
         this.commentLikeRepository = commentLikeRepository;
+        this.moderationService = moderationService;
     }
 
     @Override
@@ -44,6 +48,9 @@ public class CommentServiceImpl implements CommentService {
     @Override
     @org.springframework.transaction.annotation.Transactional
     public Comment createComment(Long postId, UUID userId, String content, Long parentCommentId) {
+        if (moderationService.isContentInappropriate(content)) {
+            throw new InappropriateContentException("O comentário viola as diretrizes de convivência da SkillSwap.");
+        }
         Post post = postRepository.findById(postId)
                 .orElseThrow(() -> new RuntimeException("Post não encontrado!"));
         User user = userRepository.findById(userId)
@@ -69,6 +76,12 @@ public class CommentServiceImpl implements CommentService {
     @Override
     @org.springframework.transaction.annotation.Transactional(readOnly = true)
     public List<CommentDTO> getCommentsByPost(Long postId) {
+        return getCommentsByPost(postId, null);
+    }
+
+    @Override
+    @org.springframework.transaction.annotation.Transactional(readOnly = true)
+    public List<CommentDTO> getCommentsByPost(Long postId, UUID authenticatedUserId) {
         List<Comment> comments = commentRepository.findAllByPost_PostId(postId);
         return comments.stream()
                 .map(comment -> {
@@ -84,6 +97,8 @@ public class CommentServiceImpl implements CommentService {
                     dto.setAvatarUrl(profile == null ? null : profile.getImageUrl());
                     dto.setParentCommentId(comment.getParentComment() == null ? null : comment.getParentComment().getCommentId());
                     dto.setLikesCount(commentLikeRepository.countByComment_CommentId(comment.getCommentId()));
+                    dto.setLikedByMe(authenticatedUserId != null
+                            && commentLikeRepository.existsByComment_CommentIdAndUser_UserId(comment.getCommentId(), authenticatedUserId));
                     return dto;
                 })
                 .collect(Collectors.toList());

@@ -26,6 +26,7 @@ public class CommentDTO {
     private Instant createdAt; // Gerado pelo backend
     private Long parentCommentId;
     private long likesCount;
+    private boolean likedByMe;
 
     // Getters e Setters
     public Long getCommentId() { return commentId; } // Corrigido para retornar commentId
@@ -48,4 +49,6 @@ public class CommentDTO {
     public void setParentCommentId(Long parentCommentId) { this.parentCommentId = parentCommentId; }
     public long getLikesCount() { return likesCount; }
     public void setLikesCount(long likesCount) { this.likesCount = likesCount; }
+    public boolean isLikedByMe() { return likedByMe; }
+    public void setLikedByMe(boolean likedByMe) { this.likedByMe = likedByMe; }
 }

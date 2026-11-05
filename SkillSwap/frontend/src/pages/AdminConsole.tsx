@@ -20,7 +20,8 @@ type ManagedUser = {
   createdAt: string;
 };
 type ActiveBan = { id: number; userId: string; username: string; reason: string; scope: string; createdAt?: string; expiresAt?: string };
-type AdminReport = { id: number; reporterUsername: string; reportedUserId: string; reportedUsername: string; reason: string; status: string; createdAt?: string };
+type AdminReport = { id: number; reporterUsername: string; reportedUserId: string; reportedUsername: string; reason: string; status: string; createdAt?: string; targetType?: string; targetId?: string; category?: string };
+type ManagedCommunity = { communityId: string; name: string; description?: string; memberCount?: number; ownerId?: string; privateCommunity?: boolean };
 type Opportunity = { opportunityId: string; organizationName: string; title: string; description: string; requiredSkills: string; participationMode?: string; location?: string; contactUrl?: string; };
 
 const AdminConsole = () => {
@@ -28,6 +29,7 @@ const AdminConsole = () => {
   const [users, setUsers] = useState<ManagedUser[]>([]);
   const [activeBans, setActiveBans] = useState<ActiveBan[]>([]);
   const [reports, setReports] = useState<AdminReport[]>([]);
+  const [communities, setCommunities] = useState<ManagedCommunity[]>([]);
   const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
   const [opportunityForm, setOpportunityForm] = useState({ organizationName: '', title: '', description: '', requiredSkills: '', participationMode: 'REMOTE', location: '', contactUrl: '', accessibleSupport: true });
   const [banDuration, setBanDuration] = useState('24');
@@ -41,18 +43,20 @@ const AdminConsole = () => {
   const loadAdminData = useCallback(async () => {
     setLoading(true);
     try {
-      const [statsRes, usersRes, bansRes, opportunitiesRes, reportsRes] = await Promise.all([
+      const [statsRes, usersRes, bansRes, opportunitiesRes, reportsRes, communitiesRes] = await Promise.all([
         AdminService.getStats(),
         AdminService.getUsers(),
         AdminService.getActiveBans(),
         AccessService.getOpportunities(),
         AdminReportService.getPending(),
+        AdminService.getCommunities(),
       ]);
       setStats(statsRes.data);
       setUsers(usersRes.data);
       setActiveBans(Array.isArray(bansRes.data) ? bansRes.data : []);
       setOpportunities(Array.isArray(opportunitiesRes.data) ? opportunitiesRes.data : []);
       setReports(Array.isArray(reportsRes.data) ? reportsRes.data : []);
+      setCommunities(Array.isArray(communitiesRes.data) ? communitiesRes.data : []);
     } catch {
       toast({ title: 'Acesso negado', description: 'Sua conta não possui a função ADMIN.', variant: 'destructive' });
     } finally {
@@ -128,6 +132,18 @@ const AdminConsole = () => {
     }
   };
 
+  const transferCommunityOwner = async (communityId: string, name: string) => {
+    const newOwnerId = window.prompt(`Informe o UUID do novo dono de ${name}`);
+    if (!newOwnerId?.trim()) return;
+    try {
+      await AdminService.transferCommunityOwnership(communityId, newOwnerId.trim());
+      toast({ title: 'Propriedade transferida' });
+      await loadAdminData();
+    } catch {
+      toast({ title: 'Erro', description: 'Não foi possível transferir a propriedade.', variant: 'destructive' });
+    }
+  };
+
   return (
     <div className="p-4 sm:p-8 space-y-8 bg-white min-h-screen text-slate-900">
       <div className="flex flex-wrap items-center justify-between gap-4">
@@ -163,7 +179,7 @@ const AdminConsole = () => {
                   <TableCell className="text-right space-x-2 space-y-2">
                     <Button size="sm" variant="outline" onClick={() => handleToggleVerify(user.userId)}>{user.verifiedBadge ? 'Remover selo' : 'Dar selo'}</Button>
                     <Button size="sm" variant={isAdmin ? 'destructive' : 'outline'} onClick={() => handleRole(user)}><KeyRound size={14} className="mr-1" />{isAdmin ? 'Remover admin' : 'Tornar admin'}</Button>
-                    {user.banned ? <Button size="sm" variant="outline" onClick={() => handleBan(user.userId, true)}><UserCheck size={14} className="mr-1" />Reativar</Button> : <Button size="sm" variant="destructive" onClick={() => handleBan(user.userId, false)}><UserX size={14} className="mr-1" />Banir</Button>}
+                    {user.banned ? <Button size="sm" variant="outline" onClick={() => handleBan(user.userId, true)}><UserCheck size={14} className="mr-1" />Reativar</Button> : <Button size="sm" variant="destructive" onClick={() => handleBan(user.userId, false)}><UserX size={14} className="mr-1" />Suspender</Button>}
                   </TableCell>
                 </TableRow>;
               })}</TableBody>
@@ -177,7 +193,11 @@ const AdminConsole = () => {
       </Card>
       <Card className="bg-white border-slate-200 text-slate-900 shadow-sm">
         <CardHeader><CardTitle>Denúncias para revisão</CardTitle><p className="text-sm text-slate-500">A IA classifica o conteúdo; a decisão administrativa fica registrada nesta fila.</p></CardHeader>
-        <CardContent>{reports.length ? <div className="space-y-3">{reports.map((report) => <div key={report.id} className="rounded-lg border border-slate-200 p-3"><p className="font-semibold">@{report.reportedUsername}</p><p className="text-sm text-slate-600">Denunciado por @{report.reporterUsername}</p><p className="mt-1 text-sm">{report.reason || 'Motivo não informado.'}</p><div className="mt-3 flex gap-2"><Button size="sm" variant="outline" onClick={() => void reviewReport(report.id, 'DISMISSED')}>Arquivar</Button><Button size="sm" onClick={() => void reviewReport(report.id, 'REVIEWED')}>Marcar revisada</Button></div></div>)}</div> : <p className="text-sm text-slate-500">Nenhuma denúncia pendente.</p>}</CardContent>
+        <CardContent>{reports.length ? <div className="space-y-3">{reports.map((report) => <div key={report.id} className="rounded-lg border border-slate-200 p-3"><p className="font-semibold">@{report.reportedUsername}</p><p className="text-sm text-slate-600">Denunciado por @{report.reporterUsername} · {report.category || 'Outro'} · {report.targetType || 'USER'} {report.targetId ? `#${report.targetId}` : ''}</p><p className="mt-1 text-sm">{report.reason || 'Motivo não informado.'}</p><div className="mt-3 flex gap-2"><Button size="sm" variant="outline" onClick={() => void reviewReport(report.id, 'DISMISSED')}>Arquivar</Button><Button size="sm" onClick={() => void reviewReport(report.id, 'REVIEWED')}>Marcar revisada</Button></div></div>)}</div> : <p className="text-sm text-slate-500">Nenhuma denúncia pendente.</p>}</CardContent>
+      </Card>
+      <Card className="bg-white border-slate-200 text-slate-900 shadow-sm">
+        <CardHeader><CardTitle>Comunidades da plataforma</CardTitle><p className="text-sm text-slate-500">O administrador da plataforma pode apagar uma comunidade ou transferir a propriedade.</p></CardHeader>
+        <CardContent><div className="space-y-2">{communities.map((community) => <div key={community.communityId} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 p-3"><div><p className="font-semibold">{community.name}</p><p className="text-sm text-slate-600">{community.memberCount ?? 0} membros · {community.privateCommunity ? 'Privada' : 'Pública'}</p></div><div className="flex flex-wrap gap-2"><Button size="sm" variant="outline" onClick={() => void transferCommunityOwner(community.communityId, community.name)}>Transferir dono</Button><Button size="sm" variant="destructive" onClick={async () => { if (!window.confirm(`Excluir a comunidade ${community.name}?`)) return; try { await AdminService.deleteCommunity(community.communityId); toast({ title: 'Comunidade excluída' }); await loadAdminData(); } catch { toast({ title: 'Erro', description: 'Não foi possível excluir a comunidade.', variant: 'destructive' }); } }}><Trash2 className="mr-1 h-4 w-4" />Excluir</Button></div></div>)}{!communities.length && <p className="text-sm text-slate-500">Nenhuma comunidade cadastrada.</p>}</div></CardContent>
       </Card>
       <Card className="bg-white border-slate-200 text-slate-900 shadow-sm">
         <CardHeader><CardTitle className="flex items-center gap-2"><BriefcaseBusiness className="h-5 w-5 text-skillswap-teal" /> Projetos e oportunidades</CardTitle><p className="text-sm text-slate-500">Cadastre o que deve aparecer em Minha Jornada. O acesso continua gratuito.</p></CardHeader>

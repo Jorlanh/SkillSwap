@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { HomeService } from '@/services/api';
 import PostCard from '@/components/PostCard';
 import RightSidebar from '@/components/RightSidebar';
@@ -10,6 +10,7 @@ const FeedPage = () => {
   const [posts, setPosts] = useState<any[]>([]);
   const [trending, setTrending] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const trendingRef = useRef<HTMLDivElement>(null);
   const { requireAuth } = useOutletContext<{ requireAuth: (action: () => void) => void }>();
 
   useEffect(() => {
@@ -30,6 +31,19 @@ const FeedPage = () => {
     loadFeed();
   }, []);
 
+  useEffect(() => {
+    const container = trendingRef.current;
+    if (!container || trending.length < 2) return;
+    const timer = window.setInterval(() => {
+      const firstCard = container.firstElementChild as HTMLElement | null;
+      if (!firstCard) return;
+      const step = firstCard.getBoundingClientRect().width + 12;
+      const atEnd = container.scrollLeft + container.clientWidth >= container.scrollWidth - 8;
+      container.scrollTo({ left: atEnd ? 0 : container.scrollLeft + step, behavior: 'smooth' });
+    }, 5000);
+    return () => window.clearInterval(timer);
+  }, [trending]);
+
   return (
     // AJUSTE: max-w-4xl para centralizar melhor e não espalhar tanto para a direita
     <div className="flex gap-6 max-w-4xl mx-auto p-4 justify-center">
@@ -41,7 +55,7 @@ const FeedPage = () => {
           </span>
         </div>
 
-        <div className="mb-6 flex gap-3 overflow-x-auto pb-2 snap-x" aria-label="As dez publicações em alta">
+        <div ref={trendingRef} className="mb-6 flex gap-3 overflow-x-auto scroll-smooth snap-x pb-2" aria-label="As dez publicações em alta">
           {trending.length ? trending.map((post) => <div key={`trend-${post.postId || post.id}`} className="min-w-[260px] max-w-[300px] snap-start rounded-xl border border-border bg-card p-3 shadow-sm">
             <p className="line-clamp-3 text-sm font-medium text-foreground">{post.content || post.title}</p>
             {post.user?.username && <p className="mt-2 text-xs text-muted-foreground">Por <Link className="text-skillswap-teal hover:underline" to={`/perfil/${post.user.username}`}>@{post.user.username}</Link></p>}

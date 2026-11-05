@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import br.com.teamss.skillswap.skill_swap.model.services.FileUploadService;
 import br.com.teamss.skillswap.skill_swap.model.services.CommentService;
+import br.com.teamss.skillswap.skill_swap.model.repositories.ProfileRepository;
 import br.com.teamss.skillswap.skill_swap.dto.CommentDTO;
 import java.util.List;
 import java.util.UUID;
@@ -24,17 +25,20 @@ public class PostController {
     private final UserServiceDTO userServiceDTO;
     private final FileUploadService fileUploadService;
     private final CommentService commentService;
+    private final ProfileRepository profileRepository;
 
-    public PostController(PostService postService, UserServiceDTO userServiceDTO, FileUploadService fileUploadService, CommentService commentService) {
+    public PostController(PostService postService, UserServiceDTO userServiceDTO, FileUploadService fileUploadService, CommentService commentService, ProfileRepository profileRepository) {
         this.postService = postService;
         this.userServiceDTO = userServiceDTO;
         this.fileUploadService = fileUploadService;
         this.commentService = commentService;
+        this.profileRepository = profileRepository;
     }
 
     @GetMapping
     public ResponseEntity<List<PostResponseDTO>> getAllPosts() {
-        return ResponseEntity.ok(postService.findAll().stream().map(this::toResponse).toList());
+        UUID viewerId = userServiceDTO.getAuthenticatedUser().getUserId();
+        return ResponseEntity.ok(postService.findAll().stream().map(post -> toResponse(post, viewerId)).toList());
     }
 
     @PostMapping
@@ -52,7 +56,7 @@ public class PostController {
             }
             // Salvamento real no Banco de Dados
             Post savedPost = postService.save(newPost, authenticatedUser.getUserId());
-            return ResponseEntity.ok(toResponse(savedPost));
+            return ResponseEntity.ok(toResponse(savedPost, authenticatedUser.getUserId()));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body("Falha ao salvar postagem: " + e.getMessage());
         }
@@ -61,13 +65,13 @@ public class PostController {
     @PostMapping("/{postId}/like")
     public ResponseEntity<PostResponseDTO> like(@PathVariable Long postId) {
         UserDTO user = userServiceDTO.getAuthenticatedUser();
-        return ResponseEntity.ok(toResponse(postService.likePost(postId, user.getUserId())));
+        return ResponseEntity.ok(toResponse(postService.likePost(postId, user.getUserId()), user.getUserId()));
     }
 
     @PostMapping("/{postId}/repost")
     public ResponseEntity<PostResponseDTO> repost(@PathVariable Long postId) {
         UserDTO user = userServiceDTO.getAuthenticatedUser();
-        return ResponseEntity.ok(toResponse(postService.repost(postId, user.getUserId())));
+        return ResponseEntity.ok(toResponse(postService.repost(postId, user.getUserId()), user.getUserId()));
     }
 
     @PostMapping("/{postId}/comment")
@@ -82,7 +86,7 @@ public class PostController {
         created.setUsername(user.getUsername());
         created.setContent(comment.getContent());
         created.setCreatedAt(comment.getCreatedAt());
-        return ResponseEntity.ok(toResponse(postService.findAll().stream().filter(p -> postId.equals(p.getPostId())).findFirst().orElseThrow()));
+        return ResponseEntity.ok(toResponse(postService.findAll().stream().filter(p -> postId.equals(p.getPostId())).findFirst().orElseThrow(), user.getUserId()));
     }
 
     @DeleteMapping("/{postId}")
@@ -93,6 +97,10 @@ public class PostController {
     }
 
     private PostResponseDTO toResponse(Post post) {
+        return toResponse(post, null);
+    }
+
+    private PostResponseDTO toResponse(Post post, UUID viewerId) {
         PostResponseDTO response = new PostResponseDTO();
         response.setPostId(post.getPostId());
         if (post.getUser() != null) {
@@ -108,11 +116,18 @@ public class PostController {
         response.setRepostsCount(post.getRepostsCount());
         response.setSharesCount(post.getSharesCount());
         response.setViewsCount(post.getViewsCount());
+        if (viewerId != null) {
+            response.setLikedByMe(postService.isLikedBy(post.getPostId(), viewerId));
+            response.setRepostedByMe(postService.isRepostedBy(post.getPostId(), viewerId));
+        }
         if (post.getUser() != null) {
             UserSummaryDTO summary = new UserSummaryDTO(post.getUser().getUsername(), post.getUser().getName());
             summary.setUserId(post.getUser().getUserId());
             summary.setVerifiedBadge(post.getUser().isVerifiedBadge());
-            Profile currentProfile = post.getUser().getProfile() != null ? post.getUser().getProfile() : post.getProfile();
+            Profile currentProfile = post.getProfile();
+            if (currentProfile == null) {
+                currentProfile = profileRepository.findByUser_UserId(post.getUser().getUserId()).orElse(null);
+            }
             summary.setAvatarUrl(currentProfile == null ? null : currentProfile.getImageUrl());
             response.setUser(summary);
         }

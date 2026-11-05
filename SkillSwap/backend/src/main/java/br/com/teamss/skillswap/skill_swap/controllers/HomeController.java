@@ -5,6 +5,7 @@ import br.com.teamss.skillswap.skill_swap.model.entities.Post;
 import br.com.teamss.skillswap.skill_swap.model.entities.Profile;
 import br.com.teamss.skillswap.skill_swap.model.entities.ShareLink;
 import br.com.teamss.skillswap.skill_swap.model.repositories.ShareLinkRepository;
+import br.com.teamss.skillswap.skill_swap.model.repositories.ProfileRepository;
 import br.com.teamss.skillswap.skill_swap.model.services.*;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -26,6 +27,7 @@ public class HomeController {
     private final CommunityService communityService;
     private final NotificationService notificationService;
     private final ShareLinkRepository shareLinkRepository;
+    private final ProfileRepository profileRepository;
     private final TrendingService trendingService;
     private final CommentService commentService;
     private final UserServiceDTO userServiceDTO;
@@ -33,11 +35,13 @@ public class HomeController {
     @Autowired
     public HomeController(PostService postService, CommunityService communityService,
                           NotificationService notificationService, ShareLinkRepository shareLinkRepository,
-                          TrendingService trendingService, CommentService commentService, UserServiceDTO userServiceDTO) {
+                          TrendingService trendingService, CommentService commentService, UserServiceDTO userServiceDTO,
+                          ProfileRepository profileRepository) {
         this.postService = postService;
         this.communityService = communityService;
         this.notificationService = notificationService;
         this.shareLinkRepository = shareLinkRepository;
+        this.profileRepository = profileRepository;
         this.trendingService = trendingService;
         this.commentService = commentService;
         this.userServiceDTO = userServiceDTO;
@@ -49,7 +53,8 @@ public class HomeController {
      */
     @GetMapping("/trending")
     public ResponseEntity<List<PostResponseDTO>> getTrending(@RequestParam(defaultValue = "DAY") String period) {
-        return ResponseEntity.ok(trendingService.getTrendingPosts(period, 10).stream().map(this::toResponse).toList());
+        UUID viewerId = authenticatedUserIdOrNull();
+        return ResponseEntity.ok(trendingService.getTrendingPosts(period, 10).stream().map(post -> toResponse(post, viewerId)).toList());
     }
 
     @PostMapping("/notifications/{notificationId}/read")
@@ -67,19 +72,19 @@ public class HomeController {
             @RequestParam(required = false) MultipartFile video) throws IOException {
         UserDTO authenticatedUser = userServiceDTO.getAuthenticatedUser();
         Post post = postService.createPost(authenticatedUser.getUserId(), title, content, image, video);
-        return ResponseEntity.ok(toResponse(post));
+        return ResponseEntity.ok(toResponse(post, authenticatedUser.getUserId()));
     }
 
     @PostMapping("/posts/{postId}/like")
     public ResponseEntity<PostResponseDTO> likePost(@PathVariable Long postId) {
         UserDTO authenticatedUser = userServiceDTO.getAuthenticatedUser();
-        return ResponseEntity.ok(toResponse(postService.likePost(postId, authenticatedUser.getUserId())));
+        return ResponseEntity.ok(toResponse(postService.likePost(postId, authenticatedUser.getUserId()), authenticatedUser.getUserId()));
     }
 
     @PostMapping("/posts/{postId}/repost")
     public ResponseEntity<PostResponseDTO> repost(@PathVariable Long postId) {
         UserDTO authenticatedUser = userServiceDTO.getAuthenticatedUser();
-        return ResponseEntity.ok(toResponse(postService.repost(postId, authenticatedUser.getUserId())));
+        return ResponseEntity.ok(toResponse(postService.repost(postId, authenticatedUser.getUserId()), authenticatedUser.getUserId()));
     }
 
     @PostMapping("/posts/{postId}/comment")
@@ -87,7 +92,7 @@ public class HomeController {
                                                          @RequestParam(required = false) Long parentCommentId) {
         UserDTO authenticatedUser = userServiceDTO.getAuthenticatedUser();
         commentService.createComment(postId, authenticatedUser.getUserId(), content, parentCommentId);
-        return ResponseEntity.ok(toResponse(postService.findAll().stream().filter(p -> postId.equals(p.getPostId())).findFirst().orElseThrow()));
+        return ResponseEntity.ok(toResponse(postService.findAll().stream().filter(p -> postId.equals(p.getPostId())).findFirst().orElseThrow(), authenticatedUser.getUserId()));
     }
 
     @GetMapping("/notifications")
@@ -134,6 +139,15 @@ public class HomeController {
         return ResponseEntity.ok(postService.generateShareLink(postId));
     }
 
+    @GetMapping("/posts/{postId}")
+    public ResponseEntity<PostResponseDTO> getPost(@PathVariable Long postId) {
+        Post post = postService.findAll().stream()
+                .filter(candidate -> postId.equals(candidate.getPostId()))
+                .findFirst()
+                .orElseThrow(() -> new RuntimeException("Post não encontrado."));
+        return ResponseEntity.ok(toResponse(post));
+    }
+
     @GetMapping("/trending-topics")
     public ResponseEntity<List<String>> getTrendingTopics(@RequestParam(defaultValue = "DAY") String period) {
         return ResponseEntity.ok(postService.getTrendingTopics(period));
@@ -155,7 +169,8 @@ public class HomeController {
 
     @GetMapping("/trending-posts")
     public ResponseEntity<List<PostResponseDTO>> getTrendingPosts(@RequestParam(defaultValue = "DAY") String period) {
-        return ResponseEntity.ok(trendingService.getTrendingPosts(period, 10).stream().map(this::toResponse).toList());
+        UUID viewerId = authenticatedUserIdOrNull();
+        return ResponseEntity.ok(trendingService.getTrendingPosts(period, 10).stream().map(post -> toResponse(post, viewerId)).toList());
     }
 
     @GetMapping("/posts/{postId}/likes")
@@ -165,7 +180,7 @@ public class HomeController {
 
     @GetMapping("/posts/{postId}/comments")
     public ResponseEntity<List<CommentDTO>> getCommentsByPost(@PathVariable Long postId) {
-        return ResponseEntity.ok(commentService.getCommentsByPost(postId));
+        return ResponseEntity.ok(commentService.getCommentsByPost(postId, authenticatedUserIdOrNull()));
     }
 
     @PostMapping("/comments/{commentId}/like")
@@ -182,6 +197,10 @@ public class HomeController {
     }
 
     private PostResponseDTO toResponse(Post post) {
+        return toResponse(post, authenticatedUserIdOrNull());
+    }
+
+    private PostResponseDTO toResponse(Post post, UUID viewerId) {
         PostResponseDTO response = new PostResponseDTO();
         response.setPostId(post.getPostId());
         if (post.getUser() != null) {
@@ -197,11 +216,18 @@ public class HomeController {
         response.setRepostsCount(post.getRepostsCount());
         response.setSharesCount(post.getSharesCount());
         response.setViewsCount(post.getViewsCount());
+        if (viewerId != null) {
+            response.setLikedByMe(postService.isLikedBy(post.getPostId(), viewerId));
+            response.setRepostedByMe(postService.isRepostedBy(post.getPostId(), viewerId));
+        }
         if (post.getUser() != null) {
             UserSummaryDTO summary = new UserSummaryDTO(post.getUser().getUsername(), post.getUser().getName());
             summary.setUserId(post.getUser().getUserId());
             summary.setVerifiedBadge(post.getUser().isVerifiedBadge());
-            Profile currentProfile = post.getUser().getProfile() != null ? post.getUser().getProfile() : post.getProfile();
+            Profile currentProfile = post.getProfile();
+            if (currentProfile == null) {
+                currentProfile = profileRepository.findByUser_UserId(post.getUser().getUserId()).orElse(null);
+            }
             summary.setAvatarUrl(currentProfile == null ? null : currentProfile.getImageUrl());
             response.setUser(summary);
         }

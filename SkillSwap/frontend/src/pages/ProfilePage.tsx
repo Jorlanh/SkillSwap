@@ -31,6 +31,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import ReportButton from '@/components/ReportButton';
 
 const tabs = ['Publicações', 'Cursos', 'Conquistas', 'Atividade', 'Comunidades'];
 
@@ -433,7 +434,8 @@ const ProfilePage = () => {
               </div>
               
               <div className="flex w-full sm:w-auto flex-wrap gap-2 shrink-0">
-                {!isOwnProfile ? (
+                 {!isOwnProfile && <ReportButton reportedUserId={user?.userId || user?.id} targetType="USER" targetId={user?.userId || user?.id} />}
+                 {!isOwnProfile ? (
                   <>
                     <Button onClick={() => setIsProposalOpen(true)} className="bg-skillswap-teal hover:bg-teal-700 text-white font-bold rounded-full px-6">
                       Enviar Proposta
@@ -546,7 +548,7 @@ const ProfilePage = () => {
                 {user?.skills?.map((s: any) => (
                   <Card key={s.skillId || s.id || s.name} className="group relative border-border bg-card/50">
                     <CardContent className="p-4 flex justify-between items-center">
-                      <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3">
                         <div className="p-2 bg-skillswap-teal/10 rounded-lg text-skillswap-teal"><BookOpen size={20}/></div>
                         <div><p className="font-bold text-sm">{s.name}</p><p className="text-[10px] text-muted-foreground font-bold uppercase">Disponível para troca</p></div>
                       </div>
