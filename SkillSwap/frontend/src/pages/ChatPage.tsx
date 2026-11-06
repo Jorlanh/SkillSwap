@@ -66,13 +66,11 @@ const ChatPage = () => {
         const existingConversation = openChatTargetId
           ? data.find((convo: any) => String(convo?.user?.id || convo?.user?.userId) === String(openChatTargetId))
           : undefined;
-        const openExistingOrFirst = (conversationData: any[]) => {
+        const keepConversationListOpen = (conversationData: any[]) => {
+          // A lista é a tela inicial do chat, inclusive no celular. A conversa
+          // só abre depois que a pessoa escolhe um contato.
           setConversations(conversationData);
-          const conversationToOpen = existingConversation || conversationData[0];
-          if (conversationToOpen) {
-            handleSelectConversation(conversationToOpen);
-            navigate(location.pathname, { replace: true, state: {} });
-          }
+          if (openChatWith) navigate(location.pathname, { replace: true, state: {} });
         };
 
         if (openChatWith && openChatTargetId && !existingConversation) {
@@ -81,8 +79,7 @@ const ChatPage = () => {
           ChatService.canMessage(String(openChatTargetId)).then((permission) => {
             if (!permission.data?.allowed) {
               toast.info('Envie uma proposta e aguarde a aceitação para iniciar a conversa.');
-              openExistingOrFirst(data);
-              navigate(location.pathname, { replace: true, state: {} });
+              keepConversationListOpen(data);
               return;
             }
             const directConversation = {
@@ -96,14 +93,13 @@ const ChatPage = () => {
               },
               lastMessage: 'Conversa liberada',
             };
-            openExistingOrFirst([directConversation, ...data]);
+            keepConversationListOpen([directConversation, ...data]);
           }).catch(() => {
             toast.info('Envie uma proposta e aguarde a aceitação para iniciar a conversa.');
-            openExistingOrFirst(data);
-            navigate(location.pathname, { replace: true, state: {} });
+            keepConversationListOpen(data);
           });
         } else {
-          openExistingOrFirst(data);
+          keepConversationListOpen(data);
         }
       })
       .catch(() => {
@@ -113,6 +109,19 @@ const ChatPage = () => {
       
     return () => socket.current?.close();
   }, [myData.userId, openChatTargetId, navigate, location.pathname]);
+
+  // Mantém a lista atualizada para que conversas e mensagens novas apareçam
+  // sem abrir automaticamente a primeira conversa.
+  useEffect(() => {
+    if (!myData.userId) return;
+    const refreshConversations = () => {
+      ChatService.getConversations()
+        .then((res) => setConversations(Array.isArray(res.data) ? res.data : []))
+        .catch(() => undefined);
+    };
+    const interval = window.setInterval(refreshConversations, 7000);
+    return () => window.clearInterval(interval);
+  }, [myData.userId]);
 
   // 2. SELECIONAR CONVERSA E SINCRONIZAR HISTÓRICO
   const handleSelectConversation = async (convo: any) => {
@@ -262,7 +271,9 @@ const ChatPage = () => {
         const receiverId = getConversationUserId(selectedConvo);
         if (!receiverId) return;
         const formData = new FormData();
-        formData.append('voice', new Blob(audioChunksRef.current, { type: recorder.mimeType || 'audio/webm' }), 'mensagem.webm');
+        const voiceType = recorder.mimeType || 'audio/webm';
+        const extension = voiceType.includes('ogg') ? 'ogg' : voiceType.includes('mp4') ? 'm4a' : 'webm';
+        formData.append('voice', new Blob(audioChunksRef.current, { type: voiceType }), `mensagem.${extension}`);
         formData.append('receiverId', receiverId);
         try {
           const { data } = await ChatService.sendVoiceMessage(formData);
@@ -401,7 +412,7 @@ const ChatPage = () => {
                 <div key={msg?.messageId || msg?.id || i} className={`flex flex-col ${ownMessage ? 'items-end' : 'items-start'}`}>
                   <div className={`max-w-[90%] sm:max-w-[75%] px-4 py-2 text-sm shadow-sm relative ${ownMessage ? 'bg-skillswap-teal text-white rounded-2xl rounded-tr-none' : 'bg-card border border-border rounded-2xl rounded-tl-none'}`}>
                     {msg?.content && <p className="whitespace-pre-wrap break-words">{msg.content}</p>}
-                    {msg?.voiceData && <audio controls className="max-w-full" src={`data:audio/webm;base64,${msg.voiceData}`} />}
+                    {msg?.voiceData && <audio controls className="max-w-full" src={`data:${msg.voiceType || 'audio/webm'};base64,${msg.voiceData}`} />}
                     {msg?.fileData && String(msg.fileType || '').startsWith('image/') && (
                       <img className="max-h-72 max-w-full rounded-lg object-contain" alt="Imagem enviada na conversa" src={`data:${msg.fileType};base64,${msg.fileData}`} />
                     )}
@@ -426,7 +437,7 @@ const ChatPage = () => {
                 </label>
                 <Button type="button" onClick={() => void scheduleLesson()} disabled={!scheduledAt} className="bg-skillswap-teal text-white">Salvar no calendário</Button>
               </div>
-              <p className="mt-2 text-xs text-muted-foreground">Se o Google Calendar estiver habilitado no backend, o evento também será criado no calendário compartilhado.</p>
+              <p className="mt-2 text-xs text-muted-foreground">A aula fica registrada na Agenda SkillSwap. A integração com o Google Calendar é opcional.</p>
             </div>}
 
             {/* BARRA DE INPUT */}

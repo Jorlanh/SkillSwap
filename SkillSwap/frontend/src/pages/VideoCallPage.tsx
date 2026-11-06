@@ -26,26 +26,60 @@ const VideoCallPage = () => {
     const room = new Room({ adaptiveStream: true, dynacast: true });
     roomRef.current = room;
 
-    const attachTrack = (track: any) => {
-      if (!mediaContainer.current || !track) return;
-      if (track.sid && mediaContainer.current.querySelector(`[data-track-sid="${track.sid}"]`)) return;
-      const element = track.attach();
-      element.dataset.trackSid = track.sid || '';
-      element.autoplay = true;
-      element.playsInline = true;
-      element.className = track.kind === Track.Kind.Video
-        ? 'h-full min-h-48 w-full rounded-xl bg-black object-contain aspect-video'
-        : 'hidden';
-      mediaContainer.current.appendChild(element);
-    };
-    const detachTrack = (track: any) => {
-      track?.detach().forEach((element: HTMLElement) => element.remove());
+    const layoutTracks = () => {
+      const container = mediaContainer.current;
+      if (!container) return;
+      const elements = Array.from(container.querySelectorAll<HTMLElement>('[data-video-track="true"]'));
+      const screen = elements.find((element) => element.dataset.trackSource === String(Track.Source.ScreenShare));
+      elements.forEach((element) => {
+        const isScreen = element === screen;
+        element.className = screen
+          ? (isScreen
+            ? 'absolute inset-0 h-full w-full rounded-xl bg-black object-contain'
+            : 'absolute bottom-4 right-4 z-20 h-32 w-52 rounded-xl border-2 border-white/80 bg-black object-cover shadow-2xl sm:h-40 sm:w-64')
+          : 'absolute inset-0 h-full w-full rounded-xl bg-black object-contain';
+      });
     };
 
-    room.on(RoomEvent.TrackSubscribed, (track) => attachTrack(track));
+    const attachTrack = (track: any, allowAudio = false) => {
+      if (!mediaContainer.current || !track) return;
+      if (track.kind === Track.Kind.Audio && allowAudio) {
+        if (track.sid && mediaContainer.current.querySelector(`[data-track-sid="${track.sid}"]`)) return;
+        const element = track.attach() as HTMLAudioElement;
+        element.dataset.trackSid = track.sid || '';
+        element.dataset.audioTrack = 'true';
+        element.autoplay = true;
+        element.controls = false;
+        mediaContainer.current.appendChild(element);
+        return;
+      }
+      if (track.kind !== Track.Kind.Video) return;
+      if (track.sid && mediaContainer.current.querySelector(`[data-track-sid="${track.sid}"]`)) return;
+      const element = track.attach() as HTMLVideoElement;
+      element.dataset.trackSid = track.sid || '';
+      element.dataset.videoTrack = 'true';
+      element.dataset.trackSource = String(track.source || '');
+      element.autoplay = true;
+      element.playsInline = true;
+      element.muted = track.source === Track.Source.Camera && !track.isSubscribed;
+      mediaContainer.current.appendChild(element);
+      layoutTracks();
+    };
+
+    const detachTrack = (track: any) => {
+      track?.detach().forEach((element: HTMLElement) => element.remove());
+      layoutTracks();
+    };
+
+    // TrackSubscribed é remoto: áudio e vídeo precisam ser anexados para que
+    // o outro participante veja a câmera e ouça o microfone.
+    room.on(RoomEvent.TrackSubscribed, (track) => attachTrack(track, true));
     room.on(RoomEvent.TrackUnsubscribed, (track) => detachTrack(track));
     room.on(RoomEvent.LocalTrackPublished, (publication) => {
       if (publication.track) attachTrack(publication.track);
+    });
+    room.on(RoomEvent.LocalTrackUnpublished, (publication) => {
+      if (publication.track) detachTrack(publication.track);
     });
     room.on(RoomEvent.Disconnected, () => setConnected(false));
 
@@ -55,9 +89,19 @@ const VideoCallPage = () => {
         await room.connect(livekitUrl, data.token);
         if (disposed) return;
         setConnected(true);
-        await room.localParticipant.enableCameraAndMicrophone();
-        setCameraEnabled(true);
-        setMicrophoneEnabled(true);
+
+        try {
+          await room.localParticipant.setMicrophoneEnabled(true);
+          setMicrophoneEnabled(true);
+        } catch {
+          toast.info('Microfone desativado. Você pode ativá-lo pelos controles da sala.');
+        }
+        try {
+          await room.localParticipant.setCameraEnabled(true);
+          setCameraEnabled(true);
+        } catch {
+          toast.info('Câmera desativada. Você pode ativá-la pelos controles da sala.');
+        }
         room.localParticipant.trackPublications.forEach((publication) => {
           if (publication.track) attachTrack(publication.track);
         });
@@ -73,7 +117,7 @@ const VideoCallPage = () => {
       roomRef.current = null;
       if (mediaContainer.current) mediaContainer.current.replaceChildren();
     };
-  }, [roomName]);
+  }, [roomName, userId]);
 
   const toggleCamera = async () => {
     if (!roomRef.current) return;
@@ -118,14 +162,14 @@ const VideoCallPage = () => {
   };
 
   return (
-    <main className="mx-auto flex min-h-[calc(100vh-4rem)] max-w-6xl flex-col gap-4 p-4">
+    <main className="mx-auto flex min-h-[calc(100dvh-4rem)] max-w-7xl flex-col gap-4 p-3 sm:p-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div><h1 className="text-xl font-bold">Sala SkillSwap</h1><p className="text-sm text-muted-foreground">{connected ? 'Conectado' : 'Conectando...'} · {roomName}</p></div>
         <Link to="/mensagens"><Button variant="outline"><PhoneOff className="mr-2 h-4 w-4" />Sair da chamada</Button></Link>
       </div>
-      <div ref={stageRef} className="relative min-h-[50vh] rounded-2xl bg-slate-950 p-3">
-        <div ref={mediaContainer} className="grid h-full min-h-[50vh] auto-rows-fr gap-3 sm:grid-cols-2" aria-live="polite" />
-        <Button type="button" variant="secondary" size="icon" className="absolute right-5 top-5" onClick={() => void toggleFullscreen()} aria-label="Abrir chamada em tela cheia">
+      <div ref={stageRef} data-call-stage className="relative h-[min(78vh,720px)] min-h-[60vh] rounded-2xl bg-slate-950 p-2 sm:p-3">
+        <div ref={mediaContainer} className="relative h-full min-h-full w-full overflow-hidden rounded-xl" aria-live="polite" />
+        <Button type="button" variant="secondary" size="icon" className="absolute right-5 top-5 z-30" onClick={() => void toggleFullscreen()} aria-label="Abrir chamada em tela cheia">
           <Maximize2 className="h-4 w-4" />
         </Button>
       </div>

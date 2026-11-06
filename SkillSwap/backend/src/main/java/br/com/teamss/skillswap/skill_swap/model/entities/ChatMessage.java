@@ -4,6 +4,8 @@ import jakarta.persistence.*;
 import java.time.Instant;
 
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -32,16 +34,21 @@ public class ChatMessage {
 
     private String content;
 
-    @Lob
-    @Column(name = "voice_data", columnDefinition = "bytea") // Adicionado columnDefinition
+    // PostgreSQL BYTEA must not be mapped as a JDBC LOB/OID. Using VARBINARY
+    // keeps the Java byte[] compatible with the schema created by Flyway.
+    @JdbcTypeCode(SqlTypes.VARBINARY)
+    @Column(name = "voice_data", columnDefinition = "bytea")
     private byte[] voiceData;
 
-    @Lob
-    @Column(name = "file_data", columnDefinition = "bytea") // Adicionado columnDefinition
+    @JdbcTypeCode(SqlTypes.VARBINARY)
+    @Column(name = "file_data", columnDefinition = "bytea")
     private byte[] fileData;
 
     @Column(name = "file_type")
     private String fileType;
+
+    @Column(name = "voice_type")
+    private String voiceType;
 
     @CreationTimestamp
     private Instant sentAt;

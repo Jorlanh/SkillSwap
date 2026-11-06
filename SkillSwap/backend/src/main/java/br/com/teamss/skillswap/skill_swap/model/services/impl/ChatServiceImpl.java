@@ -61,7 +61,7 @@ public class ChatServiceImpl implements ChatService {
 
     @Override
     @Transactional
-    public ChatMessage sendVoiceMessage(UUID senderId, UUID receiverId, byte[] voiceData) {
+    public ChatMessage sendVoiceMessage(UUID senderId, UUID receiverId, byte[] voiceData, String voiceType) {
         ensureAcceptedProposal(senderId, receiverId);
         User sender = userRepository.findById(senderId)
                 .orElseThrow(() -> new EntityNotFoundException("Remetente não encontrado"));
@@ -72,6 +72,7 @@ public class ChatServiceImpl implements ChatService {
         message.setSender(sender);
         message.setReceiver(receiver);
         message.setVoiceData(voiceData);
+        message.setVoiceType(voiceType);
         message.setSentAt(Instant.now());
 
         return saveAndNotify(message);
@@ -107,7 +108,14 @@ public class ChatServiceImpl implements ChatService {
         notification.setMessage(messageContent);
         notification.setSentAt(Instant.now());
         notification.setRead(false);
-        notificationRepository.save(notification);
+        try {
+            notificationRepository.save(notification);
+        } catch (RuntimeException exception) {
+            // A gravação da conversa não pode ser desfeita porque o serviço de
+            // notificações está com problema ou em migração.
+            System.err.println("Aviso: não foi possível registrar a notificação da mensagem: "
+                    + exception.getMessage());
+        }
 
         // A mensagem continua disponível mesmo quando o SMTP do ambiente ainda
         // não foi configurado. O e-mail é uma camada adicional de aviso, não o

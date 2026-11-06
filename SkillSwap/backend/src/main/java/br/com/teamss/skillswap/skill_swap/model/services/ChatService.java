@@ -8,7 +8,7 @@ import java.util.Map; // IMPORT ESSENCIAL ADICIONADO
 
 public interface ChatService {
     ChatMessage sendMessage(ChatMessageRequestDTO messageRequest);
-    ChatMessage sendVoiceMessage(UUID senderId, UUID receiverId, byte[] voiceData);
+    ChatMessage sendVoiceMessage(UUID senderId, UUID receiverId, byte[] voiceData, String voiceType);
     ChatMessage sendFileMessage(UUID senderId, UUID receiverId, byte[] fileData, String fileType);
     List<ChatMessage> getChatHistory(UUID userId1, UUID userId2);
     

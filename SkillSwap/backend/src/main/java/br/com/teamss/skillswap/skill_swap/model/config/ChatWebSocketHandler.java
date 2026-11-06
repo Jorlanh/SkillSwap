@@ -76,7 +76,14 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
                 String userId = user.getUserId().toString();
                 localSessionToUser.put(session.getId(), userId);
                 session.getAttributes().put("userId", userId);
-                redisTemplate.opsForHash().put(REDIS_KEY_USER_TO_SESSION, userId, session.getId());
+                try {
+                    redisTemplate.opsForHash().put(REDIS_KEY_USER_TO_SESSION, userId, session.getId());
+                } catch (RuntimeException exception) {
+                    // O WebSocket continua válido nesta instância mesmo sem
+                    // Redis. O histórico HTTP permanece como fonte oficial.
+                    System.err.println("Aviso: Redis indisponível ao registrar sessão do chat: "
+                            + exception.getMessage());
+                }
                 session.sendMessage(new TextMessage("{\"type\":\"auth.ok\"}"));
             } catch (Exception exception) {
                 session.close(CloseStatus.POLICY_VIOLATION);
@@ -136,6 +143,7 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
                 .put("sentAt", saved.getSentAt() == null ? "" : saved.getSentAt().toString())
                 .put("type", saved.getVoiceData() != null ? "VOICE" : saved.getFileData() != null ? "FILE" : "TEXT");
         if (saved.getFileType() != null) payload.put("fileType", saved.getFileType());
+        if (saved.getVoiceType() != null) payload.put("voiceType", saved.getVoiceType());
         if (saved.getVoiceData() != null) payload.put("voiceData", saved.getVoiceData());
         if (saved.getFileData() != null) payload.put("fileData", saved.getFileData());
         String messagePayload = payload.toString();
@@ -146,7 +154,21 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
             // não pode invalidar uma mensagem que já foi gravada no PostgreSQL.
             System.err.println("Aviso: Redis indisponível para o broadcast do chat: " + exception.getMessage());
         }
+        deliverToLocalReceiver(saved.getReceiver().getUserId().toString(), messagePayload);
         return messagePayload;
+    }
+
+    private void deliverToLocalReceiver(String receiverId, String messagePayload) {
+        localSessionToUser.forEach((sessionId, mappedUserId) -> {
+            if (!receiverId.equals(mappedUserId)) return;
+            WebSocketSession clientSession = localSessions.get(sessionId);
+            if (clientSession == null || !clientSession.isOpen()) return;
+            try {
+                clientSession.sendMessage(new TextMessage(messagePayload));
+            } catch (IOException exception) {
+                System.err.println("Falha ao entregar mensagem localmente: " + exception.getMessage());
+            }
+        });
     }
 
     /**
@@ -160,7 +182,11 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
             
             if (receiverId == null) return; // Não é uma mensagem de chat direcionada
 
-            // Verifica no Redis qual sessão pertence a este usuário
+            // Primeiro tenta a sessão local. Isso também funciona quando o
+            // ambiente está sem Redis ou quando a conexão acabou de ser criada.
+            deliverToLocalReceiver(receiverId, messagePayload);
+
+            // Em múltiplas instâncias, o Redis localiza a sessão remota.
             String targetSessionId = (String) redisTemplate.opsForHash().get(REDIS_KEY_USER_TO_SESSION, receiverId);
 
             if (targetSessionId != null && localSessions.containsKey(targetSessionId)) {

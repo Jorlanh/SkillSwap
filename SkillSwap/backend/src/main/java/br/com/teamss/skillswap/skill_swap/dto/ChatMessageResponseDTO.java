@@ -12,6 +12,7 @@ public class ChatMessageResponseDTO {
     private byte[] voiceData;
     private byte[] fileData;
     private String fileType;
+    private String voiceType;
     private Instant sentAt;
 
     public Long getMessageId() { return messageId; }
@@ -28,6 +29,8 @@ public class ChatMessageResponseDTO {
     public void setFileData(byte[] fileData) { this.fileData = fileData; }
     public String getFileType() { return fileType; }
     public void setFileType(String fileType) { this.fileType = fileType; }
+    public String getVoiceType() { return voiceType; }
+    public void setVoiceType(String voiceType) { this.voiceType = voiceType; }
     public Instant getSentAt() { return sentAt; }
     public void setSentAt(Instant sentAt) { this.sentAt = sentAt; }
 }

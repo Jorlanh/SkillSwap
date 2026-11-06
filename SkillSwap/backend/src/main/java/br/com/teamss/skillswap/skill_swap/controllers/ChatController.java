@@ -52,7 +52,8 @@ public class ChatController {
     public ChatMessageResponseDTO sendVoiceMessage(@RequestParam("voice") MultipartFile voiceFile, @RequestParam UUID receiverId) {
         UserDTO authenticatedUser = userServiceDTO.getAuthenticatedUser();
         try {
-            ChatMessage saved = chatService.sendVoiceMessage(authenticatedUser.getUserId(), receiverId, voiceFile.getBytes());
+            ChatMessage saved = chatService.sendVoiceMessage(authenticatedUser.getUserId(), receiverId,
+                    voiceFile.getBytes(), voiceFile.getContentType());
             chatWebSocketHandler.publishPersistedMessage(saved);
             return toResponse(saved);
         } catch (IOException e) {
@@ -90,6 +91,7 @@ public class ChatController {
         response.setVoiceData(message.getVoiceData());
         response.setFileData(message.getFileData());
         response.setFileType(message.getFileType());
+        response.setVoiceType(message.getVoiceType());
         response.setSentAt(message.getSentAt());
         return response;
     }

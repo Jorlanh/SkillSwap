@@ -3,7 +3,7 @@ import { Search, Home, Bell, LogIn, LogOut, ShieldCheck } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useEffect, useState } from 'react';
-import { UserService } from '@/services/api';
+import { AuthService, UserService } from '@/services/api';
 import { auth } from '@/lib/firebase';
 import { onIdTokenChanged, signOut } from 'firebase/auth';
 
@@ -33,7 +33,10 @@ const Header = () => {
   };
 
   const handleLogout = () => {
-    signOut(auth).finally(() => {
+    // O encerramento da sessão local não deve depender da disponibilidade do
+    // backend. O endpoint é apenas uma limpeza complementar no servidor.
+    void AuthService.logout().catch(() => undefined);
+    void signOut(auth).finally(() => {
       setUser(null);
       navigate('/');
     });
@@ -41,7 +44,7 @@ const Header = () => {
 
   return (
     <header className="sticky top-0 z-[70] w-full overflow-visible bg-card border-b border-border">
-      <div className="relative flex min-h-16 w-full items-center gap-2 px-2 py-2 sm:px-6 sm:py-3">
+      <div className="relative flex min-h-16 w-full items-center gap-1 px-2 py-2 sm:gap-2 sm:px-6 sm:py-3">
         <Link to="/" className="flex min-w-0 shrink-0 items-center gap-2 pl-12 sm:pl-0 group transition-all active:scale-95">
           {/* 🚀 APENAS A LOGO S.PNG, SEM CÍRCULO VERDE */}
           <img 
@@ -52,7 +55,7 @@ const Header = () => {
         </Link>
 
         {/* BUSCA CENTRALIZADA */}
-        <div className="flex min-w-0 flex-1 justify-center mx-1 sm:absolute sm:left-1/2 sm:top-1/2 sm:w-[min(52vw,36rem)] sm:-translate-x-1/2 sm:-translate-y-1/2 sm:mx-0">
+        <div className="flex w-[min(42vw,16rem)] flex-none justify-center mx-1 sm:absolute sm:left-1/2 sm:top-1/2 sm:w-[min(52vw,36rem)] sm:-translate-x-1/2 sm:-translate-y-1/2 sm:mx-0">
           <div className="relative w-full">
             <Input
               placeholder="Buscar mestre em..."

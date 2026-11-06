@@ -122,6 +122,18 @@
   }
 }
 
+[data-call-stage]:fullscreen {
+  width: 100vw;
+  height: 100vh;
+  min-height: 100vh;
+  border-radius: 0;
+  padding: 0;
+}
+
+[data-call-stage]:fullscreen > div {
+  border-radius: 0;
+}
+
 @layer utilities {
   .safe-area-bottom {
     padding-bottom: env(safe-area-inset-bottom, 0px);

@@ -37,6 +37,16 @@ const ChatbotGate = ({ isAuthenticated }: { isAuthenticated: boolean }) => {
   return isAuthenticated && location.pathname !== '/suspensao' ? <ChatbotELOS /> : null;
 };
 
+const ScrollToTop = () => {
+  const { pathname, search } = useLocation();
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+  }, [pathname, search]);
+
+  return null;
+};
+
 const App = () => {
   const [showAuthModal, setShowAuthModal] = useState(false);
   // A sessão é mantida pelo Firebase Auth. Tokens de acesso nunca são
@@ -67,6 +77,7 @@ const App = () => {
         <Toaster />
         <Sonner position="top-right" richColors />
         <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+          <ScrollToTop />
           {showAuthModal && <AuthPage isModal onClose={() => setShowAuthModal(false)} />}
           <Routes>
             <Route path="/login" element={<AuthPage />} />
