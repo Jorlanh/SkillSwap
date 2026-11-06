@@ -22,6 +22,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher; // ADICIONADO
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.time.Instant;
 import java.util.List;
@@ -32,6 +34,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class ProposalServiceImpl implements ProposalService {
+
+    private static final Logger logger = LoggerFactory.getLogger(ProposalServiceImpl.class);
 
     @Autowired
     private ProposalRepository proposalRepository;
@@ -272,13 +276,21 @@ public class ProposalServiceImpl implements ProposalService {
     // REMOVIDO: checkAutomaticVerification (movido para o Listener)
 
     private void sendNotification(User userToNotify, String email, String subject, String message) {
-        emailService.sendNotification(email, subject, message);
-
         Notification notification = new Notification();
         notification.setUser(userToNotify);
         notification.setMessage(message);
         notification.setSentAt(Instant.now());
         notification.setRead(false);
         notificationRepository.save(notification);
+
+        // A proposta e a notificação interna não podem deixar de ser salvas
+        // somente porque o SMTP está indisponível ou foi configurado com um
+        // endereço inválido. O e-mail é um aviso complementar.
+        try {
+            emailService.sendNotification(email, subject, message);
+        } catch (RuntimeException exception) {
+            logger.warn("Não foi possível enviar o e-mail da proposta para {}: {}",
+                    email, exception.getMessage());
+        }
     }
 }

@@ -8,9 +8,14 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.SimpleMailMessage; 
 import org.springframework.mail.javamail.JavaMailSender; 
 import org.springframework.stereotype.Service;
+import java.util.regex.Pattern;
 
 @Service
 public class EmailServiceImpl implements EmailService {
+
+    private static final Pattern SIMPLE_EMAIL = Pattern.compile(
+        "^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$"
+    );
 
     // Utiliza o JavaMailSender injetado pelo Spring
     @Autowired
@@ -36,12 +41,21 @@ public class EmailServiceImpl implements EmailService {
     // Método de envio de notificação usando Spring Mail
     @Override
     public void sendNotification(String to, String subject, String body) {
+        String normalizedTo = to == null ? "" : to.trim();
+        String normalizedFrom = mailFrom == null ? "" : mailFrom.trim();
+
+        if (normalizedTo.isBlank() || !SIMPLE_EMAIL.matcher(normalizedTo).matches()) {
+            throw new IllegalArgumentException("Destinatário de e-mail inválido");
+        }
+
         try {
             SimpleMailMessage message = new SimpleMailMessage();
-            message.setFrom(mailFrom);
-            message.setTo(to);
-            message.setSubject(subject);
-            message.setText(body);
+            if (!normalizedFrom.isBlank() && SIMPLE_EMAIL.matcher(normalizedFrom).matches()) {
+                message.setFrom(normalizedFrom);
+            }
+            message.setTo(normalizedTo);
+            message.setSubject(subject == null ? "SkillSwap" : subject.trim());
+            message.setText(body == null ? "" : body);
 
             mailSender.send(message);
         } catch (Exception ex) {
