@@ -7,6 +7,7 @@ public class ProposalRequestDTO {
     private UUID receiverId;
     private Long offeredSkillId;
     private Long requestedSkillId;
+    private String message;
     
     public UUID getSenderId() {
         return senderId;
@@ -38,5 +39,13 @@ public class ProposalRequestDTO {
 
     public void setRequestedSkillId(Long requestedSkillId) {
         this.requestedSkillId = requestedSkillId;
+    }
+
+    public String getMessage() {
+        return message;
+    }
+
+    public void setMessage(String message) {
+        this.message = message;
     }
 }

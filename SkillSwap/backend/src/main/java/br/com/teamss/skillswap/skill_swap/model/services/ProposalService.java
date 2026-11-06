@@ -11,6 +11,7 @@ public interface ProposalService {
     List<ProposalResponseDTO> getUserProposals(UUID userId);
     Proposal acceptProposal(Long proposalId);
     Proposal negotiateProposal(Long proposalId);
+    Proposal negotiateProposal(Long proposalId, String counterMessage);
     Proposal rejectProposal(Long proposalId);
     Proposal blockProposal(Long proposalId);
     Proposal completeProposal(Long proposalId);

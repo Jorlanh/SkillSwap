@@ -101,6 +101,7 @@ public class ProposalServiceImpl implements ProposalService {
         proposal.setReceiver(receiver);
         proposal.setOfferedSkill(offeredSkill);
         proposal.setRequestedSkill(requestedSkill);
+        proposal.setMessage(normalizeMessage(proposalRequest.getMessage()));
         proposal.setStatus("PENDING");
         proposal.setCreatedAt(Instant.now());
         proposal.setUpdatedAt(Instant.now());
@@ -110,7 +111,8 @@ public class ProposalServiceImpl implements ProposalService {
         String receiverEmail = savedProposal.getReceiver().getEmail();
         String messageContent = "Você recebeu uma proposta de troca de habilidades de " + savedProposal.getSender().getUsername() +
                                ": Oferece " + savedProposal.getOfferedSkill().getName() +
-                               " em troca de " + savedProposal.getRequestedSkill().getName();
+                               " em troca de " + savedProposal.getRequestedSkill().getName() +
+                               (savedProposal.getMessage() == null ? "" : ". Mensagem: " + savedProposal.getMessage());
         
         sendNotification(savedProposal.getReceiver(), receiverEmail, "Nova Proposta no SkillSwap", messageContent);
         
@@ -129,6 +131,8 @@ public class ProposalServiceImpl implements ProposalService {
             dto.setOfferedSkill(proposal.getOfferedSkill());
             dto.setRequestedSkill(proposal.getRequestedSkill());
             dto.setStatus(proposal.getStatus());
+            dto.setMessage(proposal.getMessage());
+            dto.setCounterMessage(proposal.getCounterMessage());
             dto.setCreatedAt(proposal.getCreatedAt());
             dto.setUpdatedAt(proposal.getUpdatedAt());
             return dto;
@@ -148,25 +152,35 @@ public class ProposalServiceImpl implements ProposalService {
         Proposal proposal = proposalRepository.findById(proposalId)
                 .orElseThrow(() -> new RuntimeException("Proposta não encontrada"));
 
-        if (!proposal.getReceiver().getUserId().equals(authenticatedUser.getUserId())) {
-            throw new AccessDeniedException("Você não tem permissão para aceitar esta proposta.");
+        boolean isSender = proposal.getSender().getUserId().equals(authenticatedUser.getUserId());
+        boolean isReceiver = proposal.getReceiver().getUserId().equals(authenticatedUser.getUserId());
+        if (("PENDING".equals(proposal.getStatus()) && !isReceiver)
+                || ("NEGOTIATING".equals(proposal.getStatus()) && !isSender)) {
+            throw new AccessDeniedException("Você não tem permissão para aceitar esta proposta neste estado.");
         }
-        
-        if (!proposal.getStatus().equals("PENDING") && !proposal.getStatus().equals("NEGOTIATING")) {
+
+        if (!"PENDING".equals(proposal.getStatus()) && !"NEGOTIATING".equals(proposal.getStatus())) {
             throw new IllegalStateException("Esta proposta não pode mais ser aceite.");
         }
 
         proposal.setStatus("ACCEPTED");
         proposal.setUpdatedAt(Instant.now());
         
-        String messageContent = "Boas notícias! " + proposal.getReceiver().getUsername() + " aceitou a sua proposta de troca. A conversa entre vocês já está disponível no chat.";
-        sendNotification(proposal.getSender(), proposal.getSender().getEmail(), "Proposta Aceite no SkillSwap!", messageContent);
+        User userToNotify = isReceiver ? proposal.getSender() : proposal.getReceiver();
+        String messageContent = "Boas notícias! " + authenticatedUser.getUsername() +
+                " aceitou a proposta de troca. A conversa entre vocês já está disponível no chat.";
+        sendNotification(userToNotify, userToNotify.getEmail(), "Proposta Aceita no SkillSwap!", messageContent);
         
         return proposalRepository.save(proposal);
     }
     
     @Override
     public Proposal negotiateProposal(Long proposalId) {
+        return negotiateProposal(proposalId, null);
+    }
+
+    @Override
+    public Proposal negotiateProposal(Long proposalId, String counterMessage) {
         UserDTO authenticatedUser = userServiceDTO.getAuthenticatedUser();
         Proposal proposal = proposalRepository.findById(proposalId)
                 .orElseThrow(() -> new RuntimeException("Proposta não encontrada"));
@@ -179,13 +193,26 @@ public class ProposalServiceImpl implements ProposalService {
             throw new IllegalStateException("Esta proposta não está mais disponível para negociação.");
         }
 
+        String normalizedCounterMessage = normalizeMessage(counterMessage);
+        if (normalizedCounterMessage == null) {
+            throw new IllegalArgumentException("Escreva uma contraproposta antes de enviar.");
+        }
+
+        proposal.setCounterMessage(normalizedCounterMessage);
         proposal.setStatus("NEGOTIATING");
         proposal.setUpdatedAt(Instant.now());
         
-        String messageContent = proposal.getReceiver().getUsername() + " gostaria de negociar os termos da sua proposta. Responda na tela de propostas!";
+        String messageContent = proposal.getReceiver().getUsername() +
+                " enviou uma contraproposta: " + normalizedCounterMessage;
         sendNotification(proposal.getSender(), proposal.getSender().getEmail(), "Contraproposta no SkillSwap", messageContent);
 
         return proposalRepository.save(proposal);
+    }
+
+    private String normalizeMessage(String message) {
+        if (message == null) return null;
+        String normalized = message.trim();
+        return normalized.isEmpty() ? null : normalized;
     }
 
     @Override

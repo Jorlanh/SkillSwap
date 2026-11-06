@@ -288,10 +288,10 @@ const ProfilePage = () => {
         requestedSkillId,
       } as any);
       
-      toast.success("Proposta enviada! Acompanhe em Solicitações.");
+    toast.success("Proposta enviada! A pessoa já pode ver sua mensagem em Solicitações.");
       setIsProposalOpen(false);
       setProposalMessage("");
-      navigate('/propostas');
+    navigate('/propostas', { state: { proposalSent: true } });
     } catch (error: any) {
       const message = error?.response?.data?.message || error?.response?.data?.error;
       toast.error(message || "Erro ao enviar proposta para a API.");

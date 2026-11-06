@@ -12,6 +12,8 @@ public class ProposalResponseDTO {
     private Skill offeredSkill;
     private Skill requestedSkill;
     private String status;
+    private String message;
+    private String counterMessage;
     private Instant createdAt;
     private Instant updatedAt;
 
@@ -63,6 +65,22 @@ public class ProposalResponseDTO {
 
     public void setStatus(String status) {
         this.status = status;
+    }
+
+    public String getMessage() {
+        return message;
+    }
+
+    public void setMessage(String message) {
+        this.message = message;
+    }
+
+    public String getCounterMessage() {
+        return counterMessage;
+    }
+
+    public void setCounterMessage(String counterMessage) {
+        this.counterMessage = counterMessage;
     }
 
     public Instant getCreatedAt() {

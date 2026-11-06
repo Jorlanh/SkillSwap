@@ -38,6 +38,12 @@ public class Proposal {
     @Column(name = "status")
     private String status;
 
+    @Column(name = "message", columnDefinition = "TEXT")
+    private String message;
+
+    @Column(name = "counter_message", columnDefinition = "TEXT")
+    private String counterMessage;
+
     @Column(name = "created_at")
     private Instant createdAt;
 

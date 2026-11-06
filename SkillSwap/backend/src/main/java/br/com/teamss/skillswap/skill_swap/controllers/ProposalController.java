@@ -49,8 +49,10 @@ public class ProposalController {
     }
 
     @PostMapping("/negotiate/{proposalId}")
-    public ResponseEntity<Proposal> negotiateProposal(@PathVariable Long proposalId) {
-        Proposal updatedProposal = proposalService.negotiateProposal(proposalId);
+    public ResponseEntity<Proposal> negotiateProposal(@PathVariable Long proposalId,
+                                                      @RequestBody(required = false) Map<String, String> request) {
+        String counterMessage = request == null ? null : request.get("message");
+        Proposal updatedProposal = proposalService.negotiateProposal(proposalId, counterMessage);
         return ResponseEntity.ok(updatedProposal);
     }
 

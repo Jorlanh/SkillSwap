@@ -17,13 +17,14 @@ import {
 } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from '@/components/ui/skeleton';
-import { Link } from 'react-router-dom'; // IMPORTADO para navegar ao clicar na comunidade
+import { Link, useNavigate } from 'react-router-dom'; // IMPORTADO para navegar ao clicar na comunidade
 
 const ActivitiesPage = () => {
   const [notifications, setNotifications] = useState<any[]>([]);
   const [proposals, setProposals] = useState<any[]>([]);
   const [viralCommunities, setViralCommunities] = useState<any[]>([]); // ESTADO PARA COMUNIDADES
   const [isLoading, setIsLoading] = useState(true);
+  const navigate = useNavigate();
   const { toast } = useToast();
 
   useEffect(() => {
@@ -37,7 +38,7 @@ const ActivitiesPage = () => {
       const [notifRes, propRes, commRes] = await Promise.all([
         NotificationService.getAll(),
         ProposalService.getAll(),
-        CommunityService.getAll().catch(() => ({ data: [] })) // Fallback silencioso se falhar
+        CommunityService.getAll().catch(() => ({ data: [] })), // Fallback silencioso se falhar
       ]);
       
       setNotifications(notifRes.data || []);
@@ -56,9 +57,16 @@ const ActivitiesPage = () => {
     }
   };
 
-  const handleProposalAction = async (id: number, action: 'accept' | 'reject' | 'block') => {
+  const handleProposalAction = async (proposal: any, action: 'accept' | 'reject' | 'block') => {
+    const id = proposal?.proposalId ?? proposal?.id;
     try {
-      if (action === 'accept') await ProposalService.accept(id);
+      if (!id) throw new Error('Proposta sem identificador.');
+      if (action === 'accept') {
+        await ProposalService.accept(id);
+        toast({ title: "Match confirmado!", description: "O chat foi liberado para vocês." });
+        navigate('/mensagens', { state: { openChatWith: proposal.sender } });
+        return;
+      }
       else if (action === 'reject') await ProposalService.reject(id);
       else await ProposalService.block(id);
 
@@ -103,25 +111,25 @@ const ActivitiesPage = () => {
                       </Avatar>
 
                       <div className="flex-1 text-center md:text-left">
-                        <h3 className="font-bold text-lg">
+                        <h3 className="font-bold text-lg break-words">
                           <span className="text-skillswap-teal">@{prop.sender?.username}</span> deseja trocar conhecimentos.
                         </h3>
                         <p className="text-xs text-muted-foreground mt-1">
                           Interesse em aprender: <span className="font-bold text-foreground">{prop.targetSkill}</span>
                         </p>
-                        <div className="mt-3 p-3 bg-muted/30 rounded-xl text-xs italic border-l-4 border-skillswap-teal">
+                        <div className="mt-3 p-3 bg-muted/30 rounded-xl text-xs italic border-l-4 border-skillswap-teal break-words whitespace-pre-wrap">
                           "{prop.message || "Olá! Vamos trocar habilidades?"}"
                         </div>
                       </div>
 
-                      <div className="flex gap-2 shrink-0">
-                        <Button onClick={() => handleProposalAction(prop.id, 'accept')} className="bg-skillswap-teal hover:bg-teal-700 rounded-full w-12 h-12">
+                      <div className="grid grid-cols-3 gap-2 w-full md:w-auto shrink-0">
+                        <Button onClick={() => handleProposalAction(prop, 'accept')} className="bg-skillswap-teal hover:bg-teal-700 rounded-full w-full h-12">
                           <Check size={20} />
                         </Button>
-                        <Button onClick={() => handleProposalAction(prop.id, 'reject')} variant="outline" className="rounded-full w-12 h-12">
+                        <Button onClick={() => handleProposalAction(prop, 'reject')} variant="outline" className="rounded-full w-full h-12">
                           <X size={20} />
                         </Button>
-                        <Button onClick={() => handleProposalAction(prop.id, 'block')} variant="ghost" className="rounded-full w-12 h-12 text-red-500 hover:bg-red-50">
+                        <Button onClick={() => handleProposalAction(prop, 'block')} variant="ghost" className="rounded-full w-full h-12 text-red-500 hover:bg-red-50">
                           <Ban size={20} />
                         </Button>
                       </div>
