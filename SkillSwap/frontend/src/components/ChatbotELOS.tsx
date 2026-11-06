@@ -8,6 +8,13 @@ import { Label } from './ui/label';
 
 interface ChatMessage { role: 'user' | 'bot'; text: string; }
 
+const cleanAssistantText = (text: string) => text
+  .replace(/\*\*(.*?)\*\*/g, '$1')
+  .replace(/^\s*#{1,6}\s*/gm, '')
+  .replace(/^\s*[-*]\s+/gm, '• ')
+  .replace(/\n{3,}/g, '\n\n')
+  .trim();
+
 const speak = (text: string) => {
   if (!('speechSynthesis' in window)) return;
   window.speechSynthesis.cancel();
@@ -40,8 +47,9 @@ export const ChatbotELOS = () => {
     setHistory((previous) => [...previous, { role: 'user', text: userMsg }]);
     try {
       const { data } = await ChatbotService.ask(userMsg, simplify);
-      setHistory((previous) => [...previous, { role: 'bot', text: data.response }]);
-      if (voiceMode) speak(data.response);
+      const responseText = cleanAssistantText(String(data.response ?? ''));
+      setHistory((previous) => [...previous, { role: 'bot', text: responseText }]);
+      if (voiceMode) speak(responseText);
     } catch {
       const fallback = 'Não foi possível conectar ao assistente. Tente novamente.';
       setHistory((previous) => [...previous, { role: 'bot', text: fallback }]);
@@ -83,8 +91,8 @@ export const ChatbotELOS = () => {
             {history.map((chat, index) => (
               <div key={index} className={`flex ${chat.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                 <div className={`max-w-[80%] p-3 rounded-2xl text-sm ${chat.role === 'user' ? 'bg-skillswap-teal text-white rounded-tr-none' : 'bg-card border text-foreground rounded-tl-none'}`}>
-                  <span>{chat.text}</span>
-                  {chat.role === 'bot' && <button type="button" aria-label="Ler resposta em voz alta" onClick={() => speak(chat.text)} className="ml-2 inline-flex align-middle text-skillswap-teal hover:text-teal-700"><Volume2 size={15} /></button>}
+                  <span className="whitespace-pre-wrap">{chat.role === 'bot' ? cleanAssistantText(chat.text) : chat.text}</span>
+                  {chat.role === 'bot' && <button type="button" aria-label="Ler resposta em voz alta" onClick={() => speak(cleanAssistantText(chat.text))} className="ml-2 inline-flex align-middle text-skillswap-teal hover:text-teal-700"><Volume2 size={15} /></button>}
                 </div>
               </div>
             ))}

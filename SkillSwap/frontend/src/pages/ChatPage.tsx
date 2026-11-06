@@ -38,6 +38,18 @@ const ChatPage = () => {
 
   const [myData, setMyData] = useState<any>({});
 
+  const getConversationUserId = (convo: any) => convo?.user?.id || convo?.user?.userId;
+
+  const appendUniqueMessage = (incoming: any) => {
+    setMessages((current) => {
+      const incomingId = incoming?.messageId ?? incoming?.id;
+      if (incomingId !== undefined && current.some((item) => String(item?.messageId ?? item?.id) === String(incomingId))) {
+        return current;
+      }
+      return [...current, incoming];
+    });
+  };
+
   useEffect(() => {
     UserService.getMe().then((response) => setMyData(response.data)).catch(() => undefined);
   }, []);
@@ -108,7 +120,7 @@ const ChatPage = () => {
     setShowInfoPanel(false);
     
     // Busca histórico real (Java: /history/{id1}/{id2})
-    const conversationUserId = convo.user?.id || convo.user?.userId;
+    const conversationUserId = getConversationUserId(convo);
     if (myData.userId && conversationUserId) {
         ChatService.getHistory(myData.userId, conversationUserId)
           .then(res => {
@@ -146,12 +158,32 @@ const ChatPage = () => {
             toast.error(msg.message || 'Não foi possível enviar a mensagem.');
             return;
           }
-          setMessages(prev => [...prev, msg]);
+          const currentContactId = String(conversationUserId);
+          const senderId = String(msg?.senderId || msg?.sender?.userId || msg?.sender?.id || '');
+          const receiverId = String(msg?.receiverId || msg?.receiver?.userId || msg?.receiver?.id || '');
+          const myUserId = String(myData.userId);
+          const belongsToConversation =
+            (senderId === myUserId && receiverId === currentContactId) ||
+            (senderId === currentContactId && receiverId === myUserId);
+          if (!belongsToConversation) return;
+          appendUniqueMessage(msg);
           scrollToBottom();
         } catch (e) { console.error("Erro na decodificação WS."); }
       };
     }
   };
+
+  useEffect(() => {
+    const conversationUserId = getConversationUserId(selectedConvo);
+    if (!myData.userId || !conversationUserId) return;
+    const refreshHistory = () => {
+      ChatService.getHistory(myData.userId, conversationUserId)
+        .then((res) => setMessages(Array.isArray(res.data) ? res.data : []))
+        .catch(() => undefined);
+    };
+    const interval = window.setInterval(refreshHistory, 5000);
+    return () => window.clearInterval(interval);
+  }, [myData.userId, selectedConvo?.id, selectedConvo?.user?.id, selectedConvo?.user?.userId]);
 
   const scrollToBottom = () => {
     setTimeout(() => {
@@ -160,7 +192,7 @@ const ChatPage = () => {
   };
 
   // 3. ENVIO DE MENSAGEM COM PERSISTÊNCIA
-  const handleSendMessage = () => {
+  const handleSendMessage = async () => {
     if (!message.trim() || !selectedConvo) return;
     
     const payload = { 
@@ -170,32 +202,41 @@ const ChatPage = () => {
       type: 'TEXT'
     };
     
-    if (socket.current?.readyState === WebSocket.OPEN) {
+    try {
+      // HTTP é a confirmação oficial de persistência. O backend publica a
+      // mesma mensagem no WebSocket depois de salvar no banco.
+      const { data } = await ChatService.sendMessage(payload);
+      appendUniqueMessage(data);
+      setMessage('');
+      scrollToBottom();
+    } catch {
+      // O WebSocket continua como fallback quando a rota HTTP estiver
+      // temporariamente indisponível.
+      if (socket.current?.readyState === WebSocket.OPEN) {
         socket.current.send(JSON.stringify(payload));
-        setMessages(prev => [...prev, { ...payload, isOwn: true, timestamp: new Date().toISOString() }]);
         setMessage('');
-        scrollToBottom();
-    } else {
-        // Fallback HTTP real para o ChatController.java
-        ChatService.sendMessage(payload)
-            .then(res => {
-                setMessages(prev => [...prev, res.data]);
-                setMessage('');
-                scrollToBottom();
-            }).catch(() => toast.error("Conexão com servidor de chat falhou."));
+        toast.info('Mensagem enviada pela conexão em tempo real.');
+      } else {
+        toast.error("Conexão com servidor de chat falhou.");
+      }
     }
   };
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    const receiverId = selectedConvo?.user?.id || selectedConvo?.user?.userId;
+    const receiverId = getConversationUserId(selectedConvo);
     if (!file || !receiverId) return;
+    if (file.size > 20 * 1024 * 1024) {
+      toast.error('O arquivo deve ter no máximo 20 MB.');
+      event.target.value = '';
+      return;
+    }
     const formData = new FormData();
     formData.append('file', file);
     formData.append('receiverId', receiverId);
     try {
       const { data } = await ChatService.uploadAttachment(formData);
-      setMessages((current) => [...current, data]);
+      appendUniqueMessage(data);
       toast.success('Arquivo enviado.');
     } catch { toast.error('Não foi possível enviar o arquivo.'); }
     event.target.value = '';
@@ -205,19 +246,27 @@ const ChatPage = () => {
     if (isRecording || !selectedConvo) return;
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const recorder = new MediaRecorder(stream);
+      const supportedMimeType = [
+        'audio/webm;codecs=opus',
+        'audio/webm',
+        'audio/ogg;codecs=opus',
+        'audio/mp4',
+      ].find((mimeType) => MediaRecorder.isTypeSupported(mimeType));
+      const recorder = supportedMimeType
+        ? new MediaRecorder(stream, { mimeType: supportedMimeType })
+        : new MediaRecorder(stream);
       audioChunksRef.current = [];
       recorder.ondataavailable = (event) => { if (event.data.size > 0) audioChunksRef.current.push(event.data); };
       recorder.onstop = async () => {
         stream.getTracks().forEach((track) => track.stop());
-        const receiverId = selectedConvo?.user?.id || selectedConvo?.user?.userId;
+        const receiverId = getConversationUserId(selectedConvo);
         if (!receiverId) return;
         const formData = new FormData();
         formData.append('voice', new Blob(audioChunksRef.current, { type: recorder.mimeType || 'audio/webm' }), 'mensagem.webm');
         formData.append('receiverId', receiverId);
         try {
           const { data } = await ChatService.sendVoiceMessage(formData);
-          setMessages((current) => [...current, data]);
+          appendUniqueMessage(data);
         } catch { toast.error('Não foi possível enviar o áudio.'); }
       };
       mediaRecorderRef.current = recorder;
@@ -241,7 +290,6 @@ const ChatPage = () => {
         studentId: myData.userId,
         scheduledTime: new Date(scheduledAt).toISOString(),
       });
-      if (data?.lessonId) await LessonService.notify(data.lessonId).catch(() => undefined);
       setShowSchedule(false);
       setScheduledAt('');
       toast.success('Aula agendada. Os participantes foram notificados.');
@@ -284,7 +332,7 @@ const ChatPage = () => {
   };
 
   return (
-    <div className="max-w-7xl mx-auto p-4 h-[calc(100vh-80px)] flex flex-col font-sans">
+    <div className="max-w-7xl mx-auto w-full p-3 pb-24 sm:p-4 sm:pb-6 min-h-[calc(100dvh-4rem)] flex flex-col font-sans">
       <Link to="/" className="inline-flex items-center gap-2 text-foreground font-bold mb-4 hover:text-skillswap-teal transition-colors">
         <ChevronLeft size={20} /> Voltar ao Feed
       </Link>
@@ -319,11 +367,14 @@ const ChatPage = () => {
 
         {/* ÁREA CENTRAL DO CHAT */}
         {selectedConvo ? (
-          <div className={`flex-1 flex flex-col bg-background/30 transition-all ${showInfoPanel ? 'hidden lg:flex' : 'flex'}`}>
+          <div className={`min-h-0 flex-1 flex flex-col bg-background/30 transition-all ${showInfoPanel ? 'hidden lg:flex' : 'flex'}`}>
             <div className="p-4 border-b border-border flex items-center justify-between bg-background/80 backdrop-blur-md z-10">
-              <div className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity" onClick={() => navigate(`/perfil/${selectedConvo?.user?.username}`)}>
+              <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+                <Button variant="ghost" size="icon" className="md:hidden shrink-0" aria-label="Voltar para conversas" onClick={() => { socket.current?.close(); setSelectedConvo(null); setMessages([]); }}>
+                  <ChevronLeft size={20} />
+                </Button>
                 <Avatar className="h-10 w-10 border border-border"><AvatarImage src={selectedConvo?.user?.avatarUrl} /></Avatar>
-                <div className="min-w-0">
+                <div className="min-w-0 cursor-pointer hover:opacity-80 transition-opacity" onClick={() => navigate(`/perfil/${selectedConvo?.user?.username}`)}>
                     <span className="font-bold text-base block truncate">{selectedConvo?.user?.name || selectedConvo?.user?.username}</span>
                     <p className="text-xs text-muted-foreground">@{selectedConvo?.user?.username}</p>
                 </div>
@@ -342,7 +393,7 @@ const ChatPage = () => {
               </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
+            <div className="min-h-0 flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
               {messages.map((msg, i) => {
                 const senderId = msg?.senderId || msg?.sender?.userId || msg?.sender?.id;
                 const ownMessage = String(senderId) === String(myData.userId) || msg?.isOwn;
@@ -351,7 +402,15 @@ const ChatPage = () => {
                   <div className={`max-w-[90%] sm:max-w-[75%] px-4 py-2 text-sm shadow-sm relative ${ownMessage ? 'bg-skillswap-teal text-white rounded-2xl rounded-tr-none' : 'bg-card border border-border rounded-2xl rounded-tl-none'}`}>
                     {msg?.content && <p className="whitespace-pre-wrap break-words">{msg.content}</p>}
                     {msg?.voiceData && <audio controls className="max-w-full" src={`data:audio/webm;base64,${msg.voiceData}`} />}
-                    {msg?.fileData && <a className="underline" download="arquivo" href={`data:${msg.fileType || 'application/octet-stream'};base64,${msg.fileData}`}>Baixar arquivo</a>}
+                    {msg?.fileData && String(msg.fileType || '').startsWith('image/') && (
+                      <img className="max-h-72 max-w-full rounded-lg object-contain" alt="Imagem enviada na conversa" src={`data:${msg.fileType};base64,${msg.fileData}`} />
+                    )}
+                    {msg?.fileData && String(msg.fileType || '').startsWith('video/') && (
+                      <video controls className="max-h-72 max-w-full rounded-lg" src={`data:${msg.fileType};base64,${msg.fileData}`} />
+                    )}
+                    {msg?.fileData && !String(msg.fileType || '').startsWith('image/') && !String(msg.fileType || '').startsWith('video/') && (
+                      <a className="underline" download="arquivo" href={`data:${msg.fileType || 'application/octet-stream'};base64,${msg.fileData}`}>Baixar arquivo</a>
+                    )}
                   </div>
                   <span className="text-[10px] text-muted-foreground mt-1 px-1">{formatMessageTime(msg.timestamp || msg.sentAt)}</span>
                 </div>
@@ -374,7 +433,7 @@ const ChatPage = () => {
             <div className="p-4 bg-background border-t border-border">
               <div className="flex items-end gap-2 bg-muted/30 p-2 rounded-3xl border border-border focus-within:ring-1 focus-within:ring-skillswap-teal transition-shadow">
                 <Button variant="ghost" size="icon" className="rounded-full shrink-0" onClick={() => fileInputRef.current?.click()}><Plus size={22} /></Button>
-                <input type="file" ref={fileInputRef} hidden onChange={(event) => void handleFileUpload(event)} />
+                <input type="file" accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.txt" ref={fileInputRef} hidden onChange={(event) => void handleFileUpload(event)} />
                 <Button variant={isRecording ? 'destructive' : 'ghost'} size="icon" className="rounded-full shrink-0" onClick={() => isRecording ? stopAudioRecording() : void startAudioRecording()} aria-label={isRecording ? 'Parar gravação' : 'Gravar mensagem de áudio'}><Mic size={20} /></Button>
                 <Textarea
                   value={message}

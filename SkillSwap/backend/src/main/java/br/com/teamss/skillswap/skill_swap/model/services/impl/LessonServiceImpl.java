@@ -106,8 +106,14 @@ public class LessonServiceImpl implements LessonService {
         lesson.setDurationMinutes(60);
         lesson.setScheduledTime(lessonRequest.getScheduledTime());
         lesson.setStatus("SCHEDULED");
-        createCalendarEvent(lesson, teacher.getEmail(), student.getEmail());
         Lesson savedLesson = lessonRepository.save(lesson);
+        try {
+            createCalendarEvent(savedLesson, teacher.getEmail(), student.getEmail());
+        } catch (RuntimeException exception) {
+            // O registro da aula continua válido mesmo quando a integração
+            // opcional do Google Calendar estiver indisponível.
+            System.err.println("Não foi possível criar o evento no Google Calendar: " + exception.getMessage());
+        }
         notifyParticipants(savedLesson,
                 "Aula agendada para " + savedLesson.getScheduledTime()
                         + " com " + teacher.getUsername() + ".");

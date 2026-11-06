@@ -4,6 +4,7 @@ import br.com.teamss.skillswap.skill_swap.dto.ChatMessageRequestDTO;
 import br.com.teamss.skillswap.skill_swap.dto.ChatMessageResponseDTO;
 import br.com.teamss.skillswap.skill_swap.dto.UserDTO;
 import br.com.teamss.skillswap.skill_swap.model.entities.ChatMessage;
+import br.com.teamss.skillswap.skill_swap.model.config.ChatWebSocketHandler;
 import br.com.teamss.skillswap.skill_swap.model.services.ChatService;
 import br.com.teamss.skillswap.skill_swap.model.services.UserServiceDTO;
 import java.io.IOException;
@@ -27,6 +28,9 @@ public class ChatController {
     @Autowired
     private UserServiceDTO userServiceDTO;
 
+    @Autowired
+    private ChatWebSocketHandler chatWebSocketHandler;
+
     @GetMapping("/conversations")
     public ResponseEntity<List<Map<String, Object>>> getMyConversations() {
         UserDTO authenticatedUser = userServiceDTO.getAuthenticatedUser();
@@ -39,24 +43,30 @@ public class ChatController {
         if (!authenticatedUser.getUserId().equals(messageRequest.getSenderId())) {
             throw new AccessDeniedException("Assinatura de usuário inválida.");
         }
-        return toResponse(chatService.sendMessage(messageRequest));
+        ChatMessage saved = chatService.sendMessage(messageRequest);
+        chatWebSocketHandler.publishPersistedMessage(saved);
+        return toResponse(saved);
     }
 
-    @PostMapping("/send-voice")
+    @PostMapping(value = "/send-voice", consumes = "multipart/form-data")
     public ChatMessageResponseDTO sendVoiceMessage(@RequestParam("voice") MultipartFile voiceFile, @RequestParam UUID receiverId) {
         UserDTO authenticatedUser = userServiceDTO.getAuthenticatedUser();
         try {
-            return toResponse(chatService.sendVoiceMessage(authenticatedUser.getUserId(), receiverId, voiceFile.getBytes()));
+            ChatMessage saved = chatService.sendVoiceMessage(authenticatedUser.getUserId(), receiverId, voiceFile.getBytes());
+            chatWebSocketHandler.publishPersistedMessage(saved);
+            return toResponse(saved);
         } catch (IOException e) {
             throw new RuntimeException("Erro ao processar áudio: " + e.getMessage());
         }
     }
 
-    @PostMapping("/upload-file")
+    @PostMapping(value = "/upload-file", consumes = "multipart/form-data")
     public ChatMessageResponseDTO uploadFile(@RequestParam("file") MultipartFile file, @RequestParam UUID receiverId) {
         UserDTO authenticatedUser = userServiceDTO.getAuthenticatedUser();
         try {
-            return toResponse(chatService.sendFileMessage(authenticatedUser.getUserId(), receiverId, file.getBytes(), file.getContentType()));
+            ChatMessage saved = chatService.sendFileMessage(authenticatedUser.getUserId(), receiverId, file.getBytes(), file.getContentType());
+            chatWebSocketHandler.publishPersistedMessage(saved);
+            return toResponse(saved);
         } catch (IOException e) {
             throw new RuntimeException("Falha no upload de arquivo.");
         }

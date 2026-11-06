@@ -1,5 +1,5 @@
 import { Link, useNavigate } from 'react-router-dom';
-import { Search, Home, Bell, LogIn, ShieldCheck } from 'lucide-react';
+import { Search, Home, Bell, LogIn, LogOut, ShieldCheck } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useEffect, useState } from 'react';
@@ -95,6 +95,14 @@ const Header = () => {
                   </AvatarFallback>
                 </Avatar>
               </Link>
+              <button
+                onClick={handleLogout}
+                className="flex h-9 w-9 items-center justify-center rounded-full text-skillswap-teal hover:bg-muted hover:text-destructive sm:hidden"
+                aria-label="Sair da conta"
+                title="Sair da conta"
+              >
+                <LogOut className="h-4 w-4" />
+              </button>
               <button 
                 onClick={handleLogout}
                 className="hidden sm:block text-[11px] uppercase font-black text-skillswap-teal hover:text-destructive transition-colors tracking-widest"

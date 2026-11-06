@@ -110,22 +110,43 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
             request.setSenderId(UUID.fromString(authenticatedUserId));
             ChatMessage saved = chatService.sendMessage(request);
 
-            // Persiste pelo mesmo serviço usado pelo endpoint HTTP e publica
-            // somente um payload enxuto, evitando serializar User e criar ciclos.
-            var persistedPayload = objectMapper.createObjectNode()
-                    .put("id", saved.getMessageId())
-                    .put("senderId", saved.getSender().getUserId().toString())
-                    .put("receiverId", saved.getReceiver().getUserId().toString())
-                    .put("content", saved.getContent() == null ? "" : saved.getContent())
-                    .put("sentAt", saved.getSentAt().toString())
-                    .put("type", "TEXT");
-            redisTemplate.convertAndSend(chatTopic.getTopic(), persistedPayload.toString());
+            String persistedPayload = publishPersistedMessage(saved);
+            // O remetente também precisa receber a confirmação persistida para
+            // que a mensagem apareça sem depender de um eco do navegador.
+            session.sendMessage(new TextMessage(persistedPayload));
         } catch (Exception exception) {
             session.sendMessage(new TextMessage(objectMapper.createObjectNode()
                     .put("type", "error")
                     .put("message", exception.getMessage() == null ? "Não foi possível enviar a mensagem." : exception.getMessage())
                     .toString()));
         }
+    }
+
+    /**
+     * Publica a mensagem já gravada no banco para o destinatário conectado e
+     * devolve o mesmo payload enxuto para a confirmação do remetente.
+     */
+    public String publishPersistedMessage(ChatMessage saved) {
+        var payload = objectMapper.createObjectNode()
+                .put("id", saved.getMessageId())
+                .put("messageId", saved.getMessageId())
+                .put("senderId", saved.getSender().getUserId().toString())
+                .put("receiverId", saved.getReceiver().getUserId().toString())
+                .put("content", saved.getContent() == null ? "" : saved.getContent())
+                .put("sentAt", saved.getSentAt() == null ? "" : saved.getSentAt().toString())
+                .put("type", saved.getVoiceData() != null ? "VOICE" : saved.getFileData() != null ? "FILE" : "TEXT");
+        if (saved.getFileType() != null) payload.put("fileType", saved.getFileType());
+        if (saved.getVoiceData() != null) payload.put("voiceData", saved.getVoiceData());
+        if (saved.getFileData() != null) payload.put("fileData", saved.getFileData());
+        String messagePayload = payload.toString();
+        try {
+            redisTemplate.convertAndSend(chatTopic.getTopic(), messagePayload);
+        } catch (RuntimeException exception) {
+            // O Redis é usado para entrega em tempo real entre instâncias, mas
+            // não pode invalidar uma mensagem que já foi gravada no PostgreSQL.
+            System.err.println("Aviso: Redis indisponível para o broadcast do chat: " + exception.getMessage());
+        }
+        return messagePayload;
     }
 
     /**

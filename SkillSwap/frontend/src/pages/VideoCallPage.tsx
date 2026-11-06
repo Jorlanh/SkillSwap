@@ -1,18 +1,20 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
-import { Mic, MicOff, MonitorUp, PhoneOff, Video, VideoOff } from 'lucide-react';
+import { Maximize2, Mic, MicOff, MonitorUp, PhoneOff, Video, VideoOff } from 'lucide-react';
 import { Room, RoomEvent, Track } from 'livekit-client';
 import { Button } from '@/components/ui/button';
 import { VideoService } from '@/services/api';
 import { toast } from 'sonner';
 
-const livekitUrl = import.meta.env.VITE_LIVEKIT_URL as string | undefined;
+const livekitUrl = (import.meta.env.VITE_LIVEKIT_URL as string | undefined)
+  || 'wss://skillswap-video-lxnf4r1k.livekit.cloud';
 
 const VideoCallPage = () => {
   const { userId = '' } = useParams();
   const [searchParams] = useSearchParams();
   const roomName = searchParams.get('room') || `skillswap-${[userId, 'shared'].sort().join('-')}`;
   const mediaContainer = useRef<HTMLDivElement>(null);
+  const stageRef = useRef<HTMLDivElement>(null);
   const roomRef = useRef<Room | null>(null);
   const [connected, setConnected] = useState(false);
   const [cameraEnabled, setCameraEnabled] = useState(false);
@@ -26,10 +28,13 @@ const VideoCallPage = () => {
 
     const attachTrack = (track: any) => {
       if (!mediaContainer.current || !track) return;
+      if (track.sid && mediaContainer.current.querySelector(`[data-track-sid="${track.sid}"]`)) return;
       const element = track.attach();
       element.dataset.trackSid = track.sid || '';
+      element.autoplay = true;
+      element.playsInline = true;
       element.className = track.kind === Track.Kind.Video
-        ? 'h-full min-h-48 w-full rounded-xl bg-black object-contain'
+        ? 'h-full min-h-48 w-full rounded-xl bg-black object-contain aspect-video'
         : 'hidden';
       mediaContainer.current.appendChild(element);
     };
@@ -39,13 +44,12 @@ const VideoCallPage = () => {
 
     room.on(RoomEvent.TrackSubscribed, (track) => attachTrack(track));
     room.on(RoomEvent.TrackUnsubscribed, (track) => detachTrack(track));
+    room.on(RoomEvent.LocalTrackPublished, (publication) => {
+      if (publication.track) attachTrack(publication.track);
+    });
     room.on(RoomEvent.Disconnected, () => setConnected(false));
 
     const connect = async () => {
-      if (!livekitUrl) {
-        toast.error('Configure VITE_LIVEKIT_URL no frontend para iniciar chamadas.');
-        return;
-      }
       try {
         const { data } = await VideoService.getJoinToken(roomName, userId);
         await room.connect(livekitUrl, data.token);
@@ -74,22 +78,43 @@ const VideoCallPage = () => {
   const toggleCamera = async () => {
     if (!roomRef.current) return;
     const next = !cameraEnabled;
-    await roomRef.current.localParticipant.setCameraEnabled(next);
-    setCameraEnabled(next);
+    try {
+      await roomRef.current.localParticipant.setCameraEnabled(next);
+      setCameraEnabled(next);
+    } catch {
+      toast.error('Não foi possível acessar a câmera. Verifique a permissão do navegador.');
+    }
   };
 
   const toggleMicrophone = async () => {
     if (!roomRef.current) return;
     const next = !microphoneEnabled;
-    await roomRef.current.localParticipant.setMicrophoneEnabled(next);
-    setMicrophoneEnabled(next);
+    try {
+      await roomRef.current.localParticipant.setMicrophoneEnabled(next);
+      setMicrophoneEnabled(next);
+    } catch {
+      toast.error('Não foi possível acessar o microfone. Verifique a permissão do navegador.');
+    }
   };
 
   const toggleScreen = async () => {
     if (!roomRef.current) return;
     const next = !screenEnabled;
-    await roomRef.current.localParticipant.setScreenShareEnabled(next);
-    setScreenEnabled(next);
+    try {
+      await roomRef.current.localParticipant.setScreenShareEnabled(next);
+      setScreenEnabled(next);
+    } catch {
+      toast.error('Não foi possível compartilhar a tela. O navegador pode ter bloqueado a captura.');
+    }
+  };
+
+  const toggleFullscreen = async () => {
+    try {
+      if (document.fullscreenElement) await document.exitFullscreen();
+      else await stageRef.current?.requestFullscreen();
+    } catch {
+      toast.error('Não foi possível abrir a chamada em tela cheia.');
+    }
   };
 
   return (
@@ -98,7 +123,12 @@ const VideoCallPage = () => {
         <div><h1 className="text-xl font-bold">Sala SkillSwap</h1><p className="text-sm text-muted-foreground">{connected ? 'Conectado' : 'Conectando...'} · {roomName}</p></div>
         <Link to="/mensagens"><Button variant="outline"><PhoneOff className="mr-2 h-4 w-4" />Sair da chamada</Button></Link>
       </div>
-      <div ref={mediaContainer} className="grid min-h-[50vh] auto-rows-fr gap-3 rounded-2xl bg-slate-950 p-3 sm:grid-cols-2" aria-live="polite" />
+      <div ref={stageRef} className="relative min-h-[50vh] rounded-2xl bg-slate-950 p-3">
+        <div ref={mediaContainer} className="grid h-full min-h-[50vh] auto-rows-fr gap-3 sm:grid-cols-2" aria-live="polite" />
+        <Button type="button" variant="secondary" size="icon" className="absolute right-5 top-5" onClick={() => void toggleFullscreen()} aria-label="Abrir chamada em tela cheia">
+          <Maximize2 className="h-4 w-4" />
+        </Button>
+      </div>
       <div className="flex flex-wrap justify-center gap-3">
         <Button type="button" variant={microphoneEnabled ? 'default' : 'destructive'} onClick={() => void toggleMicrophone()}><>{microphoneEnabled ? <Mic className="mr-2 h-4 w-4" /> : <MicOff className="mr-2 h-4 w-4" />}</>{microphoneEnabled ? 'Microfone' : 'Ativar microfone'}</Button>
         <Button type="button" variant={cameraEnabled ? 'default' : 'destructive'} onClick={() => void toggleCamera()}><>{cameraEnabled ? <Video className="mr-2 h-4 w-4" /> : <VideoOff className="mr-2 h-4 w-4" />}</>{cameraEnabled ? 'Câmera' : 'Ativar câmera'}</Button>
