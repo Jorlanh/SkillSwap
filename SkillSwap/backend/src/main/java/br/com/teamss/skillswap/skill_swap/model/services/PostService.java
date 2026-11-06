@@ -23,5 +23,6 @@ public interface PostService {
     List<LikeDTO> getLikesByPost(Long postId);
     boolean isLikedBy(Long postId, UUID userId);
     boolean isRepostedBy(Long postId, UUID userId);
+    void populateRepostMetadata(Post post, PostResponseDTO response);
     void deletePost(Long postId, UUID userId);
 }

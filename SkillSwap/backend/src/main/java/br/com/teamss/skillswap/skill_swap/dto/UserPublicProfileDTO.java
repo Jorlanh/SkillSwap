@@ -11,6 +11,8 @@ public record UserPublicProfileDTO(
     String name,
     Instant createdAt,
     boolean verifiedBadge, // NOVO CAMPO
+    int followers,
+    int following,
     ProfileDTO profile,
     Set<SkillDTO> skills,
     String accessibilitySymbol

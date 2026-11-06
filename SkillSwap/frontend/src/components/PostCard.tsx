@@ -277,6 +277,25 @@ const PostCard = ({ post }: PostCardProps) => {
       </div>
 
       <div className="mb-3 space-y-2">
+        {post.repostOf && (post.repostedFromUser || post.repostedFromCommunity) && (
+          <p className="text-xs text-muted-foreground">
+            <span className="font-semibold text-foreground">{author.name || author.username}</span>{' '}
+            republicou o post de:{' '}
+            {post.repostedFromUser ? (
+              <button type="button" className="font-semibold text-skillswap-teal hover:underline" onClick={() => navigate(`/perfil/${post.repostedFromUser.username}`)}>
+                @{post.repostedFromUser.username}
+              </button>
+            ) : (
+              <span className="font-semibold text-skillswap-teal">{post.repostedFromCommunity}</span>
+            )}
+            {post.repostedFromUser && post.repostedFromCommunity && (
+              <>
+                {' '}na comunidade{' '}
+                <span className="font-semibold text-skillswap-teal">{post.repostedFromCommunity}</span>
+              </>
+            )}
+          </p>
+        )}
         {post.title && <h3 className="font-bold text-base">{post.title}</h3>}
         <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">{post.content}</p>
         {(post.community || post.communityName) && <button type="button" onClick={() => communityId && navigate(`/comunidades/${communityId}`)} className="text-xs text-skillswap-teal hover:underline text-left">Publicado em {post.communityName || post.community}</button>}

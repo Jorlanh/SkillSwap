@@ -37,6 +37,9 @@ public class PostResponseDTO {
     private int viewsCount = 0;
     private boolean likedByMe = false;
     private boolean repostedByMe = false;
+    private Long repostOf;
+    private UserSummaryDTO repostedFromUser;
+    private String repostedFromCommunity;
 
     public PostResponseDTO() {}
 
@@ -79,4 +82,10 @@ public class PostResponseDTO {
     public void setLikedByMe(boolean likedByMe) { this.likedByMe = likedByMe; }
     public boolean isRepostedByMe() { return repostedByMe; }
     public void setRepostedByMe(boolean repostedByMe) { this.repostedByMe = repostedByMe; }
+    public Long getRepostOf() { return repostOf; }
+    public void setRepostOf(Long repostOf) { this.repostOf = repostOf; }
+    public UserSummaryDTO getRepostedFromUser() { return repostedFromUser; }
+    public void setRepostedFromUser(UserSummaryDTO repostedFromUser) { this.repostedFromUser = repostedFromUser; }
+    public String getRepostedFromCommunity() { return repostedFromCommunity; }
+    public void setRepostedFromCommunity(String repostedFromCommunity) { this.repostedFromCommunity = repostedFromCommunity; }
 }

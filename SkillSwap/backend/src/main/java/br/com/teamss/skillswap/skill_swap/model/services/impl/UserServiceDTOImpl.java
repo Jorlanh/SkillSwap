@@ -90,6 +90,10 @@ public class UserServiceDTOImpl implements UserServiceDTO {
         UserDTO userDTO = new UserDTO(); 
         userDTO.setUserId(user.getUserId());
         userDTO.setUsername(user.getUsername());
+        userDTO.setName(user.getName());
+        userDTO.setCreatedAt(user.getCreatedAt());
+        userDTO.setFollowers(user.getFollowers());
+        userDTO.setFollowing(user.getFollowingIds() == null ? 0 : user.getFollowingIds().size());
         userDTO.setRoles(roles);
         userDTO.setProfile(profileDTO);
         userDTO.setSkills(skills);
@@ -246,7 +250,8 @@ public class UserServiceDTOImpl implements UserServiceDTO {
             .orElse(null);
 
         return new UserPublicProfileDTO(
-            user.getUserId(), user.getUsername(), user.getName(), user.getCreatedAt(), user.isVerifiedBadge(), profileDTO, skills,
+            user.getUserId(), user.getUsername(), user.getName(), user.getCreatedAt(), user.isVerifiedBadge(),
+            user.getFollowers(), user.getFollowingIds() == null ? 0 : user.getFollowingIds().size(), profileDTO, skills,
             accessibilitySymbol
         );
     }

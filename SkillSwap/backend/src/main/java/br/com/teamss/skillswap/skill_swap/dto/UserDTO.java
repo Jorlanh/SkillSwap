@@ -6,6 +6,7 @@ import java.util.UUID;
 import java.util.HashSet;
 import java.util.List;
 import java.util.ArrayList;
+import java.time.Instant;
 
 public class UserDTO {
     @NotNull(message = "userId não pode ser nulo")
@@ -19,6 +20,10 @@ public class UserDTO {
     private String phoneNumber;
     private String email;
     private String verificationCode;
+    private String name;
+    private Instant createdAt;
+    private int followers;
+    private int following;
 
     // --- START: Accessibility Settings ---
     private boolean librasAvatarEnabled = false; // Valor padrão
@@ -50,6 +55,14 @@ public class UserDTO {
     public void setUserId(UUID userId) { this.userId = userId; }
     public String getUsername() { return username; }
     public void setUsername(String username) { this.username = username; }
+    public String getName() { return name; }
+    public void setName(String name) { this.name = name; }
+    public Instant getCreatedAt() { return createdAt; }
+    public void setCreatedAt(Instant createdAt) { this.createdAt = createdAt; }
+    public int getFollowers() { return followers; }
+    public void setFollowers(int followers) { this.followers = followers; }
+    public int getFollowing() { return following; }
+    public void setFollowing(int following) { this.following = following; }
     public Set<String> getRoles() { return roles; }
     public void setRoles(Set<String> roles) { this.roles = (roles != null) ? roles : new HashSet<>(); } // Garantir inicialização no setter
     public ProfileDTO getProfile() { return profile; }

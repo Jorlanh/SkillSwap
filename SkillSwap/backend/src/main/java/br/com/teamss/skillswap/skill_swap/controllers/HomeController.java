@@ -223,7 +223,10 @@ public class HomeController {
         response.setViewsCount(post.getViewsCount());
         if (viewerId != null) {
             response.setLikedByMe(postService.isLikedBy(post.getPostId(), viewerId));
-            response.setRepostedByMe(postService.isRepostedBy(post.getPostId(), viewerId));
+            boolean isOwnPersistedRepost = post.getRepostOf() != null
+                && post.getUser() != null
+                && viewerId.equals(post.getUser().getUserId());
+            response.setRepostedByMe(isOwnPersistedRepost || postService.isRepostedBy(post.getPostId(), viewerId));
         }
         if (post.getUser() != null) {
             UserSummaryDTO summary = new UserSummaryDTO(post.getUser().getUsername(), post.getUser().getName());
@@ -242,6 +245,7 @@ public class HomeController {
             response.setCommunityName(post.getCommunity().getName());
             response.setCommunityImageUrl(post.getCommunity().getImageUrl());
         }
+        postService.populateRepostMetadata(post, response);
         return response;
     }
 }

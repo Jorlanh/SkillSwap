@@ -122,6 +122,32 @@ public class PostServiceImpl implements PostService {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public void populateRepostMetadata(Post post, PostResponseDTO response) {
+        if (post == null || response == null || post.getRepostOf() == null) return;
+
+        response.setRepostOf(post.getRepostOf());
+        postRepository.findById(post.getRepostOf()).ifPresent(original -> {
+            if (original.getUser() != null) {
+                User sourceUser = original.getUser();
+                UserSummaryDTO source = new UserSummaryDTO(
+                    sourceUser.getUsername(), sourceUser.getName(), sourceUser.isVerifiedBadge());
+                source.setUserId(sourceUser.getUserId());
+                Profile sourceProfile = original.getProfile();
+                if (sourceProfile == null) sourceProfile = sourceUser.getProfile();
+                if (sourceProfile == null) {
+                    sourceProfile = profileRepository.findByUser_UserId(sourceUser.getUserId()).orElse(null);
+                }
+                source.setAvatarUrl(sourceProfile == null ? null : sourceProfile.getImageUrl());
+                response.setRepostedFromUser(source);
+            }
+            if (original.getCommunity() != null) {
+                response.setRepostedFromCommunity(original.getCommunity().getName());
+            }
+        });
+    }
+
+    @Override
     @Transactional
     public Post commentOnPost(Long postId, UUID userId, String content) {
         if (moderationService.isContentInappropriate(content)) {
@@ -296,6 +322,7 @@ public class PostServiceImpl implements PostService {
                 dto.setCommunityName(post.getCommunity().getName());
                 dto.setCommunityImageUrl(post.getCommunity().getImageUrl());
             }
+            populateRepostMetadata(post, dto);
             dto.setImageUrl(post.getImageUrl());
             dto.setVideoUrl(post.getVideoUrl());
             dto.setCreatedAt(post.getCreatedAt());
@@ -306,7 +333,11 @@ public class PostServiceImpl implements PostService {
             dto.setViewsCount(post.getViewsCount());
             if (authenticatedUserId != null) {
                 dto.setLikedByMe(likeRepository.existsByPost_PostIdAndUser_UserId(post.getPostId(), authenticatedUserId));
-                dto.setRepostedByMe(repostRepository.existsByPost_PostIdAndUser_UserId(post.getPostId(), authenticatedUserId));
+                boolean isOwnPersistedRepost = post.getRepostOf() != null
+                    && post.getUser() != null
+                    && authenticatedUserId.equals(post.getUser().getUserId());
+                dto.setRepostedByMe(isOwnPersistedRepost
+                    || repostRepository.existsByPost_PostIdAndUser_UserId(post.getPostId(), authenticatedUserId));
             }
             return dto;
         }).collect(Collectors.toList());

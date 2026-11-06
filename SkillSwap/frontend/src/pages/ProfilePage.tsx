@@ -459,9 +459,16 @@ const ProfilePage = () => {
                        {isFollowing ? "Deixar de seguir" : "Seguir"}
                     </Button>
                     {/* BOTÃO CHAT CORRIGIDO */}
-                    {canMessage && <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-muted hover:bg-skillswap-teal hover:text-white" onClick={handleOpenChat} aria-label="Enviar mensagem">
-                       <Mail size={16} />
-                    </Button>}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="rounded-full font-bold px-4 border-skillswap-teal text-skillswap-teal hover:bg-skillswap-teal hover:text-white"
+                      onClick={handleOpenChat}
+                      aria-label="Enviar mensagem"
+                      title={canMessage ? 'Enviar mensagem' : 'A mensagem é liberada após uma proposta aceita'}
+                    >
+                      <Mail size={16} className="mr-1" /> Enviar mensagem
+                    </Button>
                   </>
                 ) : (
                   <Button variant="outline" size="sm" onClick={() => setIsEditing(true)} className="rounded-full font-bold px-4 flex gap-2 border-skillswap-teal text-skillswap-teal">
@@ -483,8 +490,8 @@ const ProfilePage = () => {
             </div>
 
             <div className="flex gap-6 pt-4 border-t border-border/50">
-              <div className="text-center"><p className="font-bold text-lg">{user?.followers || 0}</p><p className="text-[10px] uppercase text-muted-foreground font-bold">Seguidores</p></div>
-              <div className="text-center"><p className="font-bold text-lg">{user?.following || 0}</p><p className="text-[10px] uppercase text-muted-foreground font-bold">Seguindo</p></div>
+              <div className="text-center"><p className="font-bold text-lg">{Number(user?.followers ?? user?.followersCount ?? 0)}</p><p className="text-[10px] uppercase text-muted-foreground font-bold">Seguidores</p></div>
+              <div className="text-center"><p className="font-bold text-lg">{Number(user?.following ?? user?.followingCount ?? user?.followingIds?.length ?? 0)}</p><p className="text-[10px] uppercase text-muted-foreground font-bold">Seguindo</p></div>
             </div>
           </div>
 
