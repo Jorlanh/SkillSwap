@@ -11,6 +11,7 @@ import br.com.teamss.skillswap.skill_swap.model.repositories.UserRepository;
 import br.com.teamss.skillswap.skill_swap.model.repositories.CommentLikeRepository;
 import br.com.teamss.skillswap.skill_swap.model.services.CommentService;
 import br.com.teamss.skillswap.skill_swap.model.services.ContentModerationService;
+import br.com.teamss.skillswap.skill_swap.model.services.NotificationService;
 import br.com.teamss.skillswap.skill_swap.model.exception.InappropriateContentException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -30,14 +31,16 @@ public class CommentServiceImpl implements CommentService {
     private final UserRepository userRepository;
     private final CommentLikeRepository commentLikeRepository;
     private final ContentModerationService moderationService;
+    private final NotificationService notificationService;
 
     @Autowired
-    public CommentServiceImpl(CommentRepository commentRepository, PostRepository postRepository, UserRepository userRepository, CommentLikeRepository commentLikeRepository, ContentModerationService moderationService) {
+    public CommentServiceImpl(CommentRepository commentRepository, PostRepository postRepository, UserRepository userRepository, CommentLikeRepository commentLikeRepository, ContentModerationService moderationService, NotificationService notificationService) {
         this.commentRepository = commentRepository;
         this.postRepository = postRepository;
         this.userRepository = userRepository;
         this.commentLikeRepository = commentLikeRepository;
         this.moderationService = moderationService;
+        this.notificationService = notificationService;
     }
 
     @Override
@@ -69,8 +72,26 @@ public class CommentServiceImpl implements CommentService {
         }
         post.setCommentsCount(post.getCommentsCount() + 1);
         postRepository.save(post);
+        Comment savedComment = commentRepository.save(comment);
 
-        return commentRepository.save(comment);
+        String preview = content == null ? "" : content.trim().replaceAll("\\s+", " ");
+        if (preview.length() > 140) {
+            preview = preview.substring(0, 137) + "...";
+        }
+        String notificationMessage = "@" + user.getUsername()
+                + (parentCommentId == null ? " comentou no seu post: " : " respondeu ao seu comentário: ")
+                + preview;
+        if (!post.getUser().getUserId().equals(userId)) {
+            notificationService.createNotification(post.getUser().getUserId(), notificationMessage);
+        }
+        if (parentCommentId != null) {
+            User parentOwner = savedComment.getParentComment().getUser();
+            if (!parentOwner.getUserId().equals(userId)
+                    && !parentOwner.getUserId().equals(post.getUser().getUserId())) {
+                notificationService.createNotification(parentOwner.getUserId(), notificationMessage);
+            }
+        }
+        return savedComment;
     }
 
     @Override

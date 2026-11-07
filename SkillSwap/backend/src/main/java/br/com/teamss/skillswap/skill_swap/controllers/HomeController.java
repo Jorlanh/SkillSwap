@@ -98,7 +98,7 @@ public class HomeController {
     @GetMapping("/notifications")
     public ResponseEntity<List<NotificationDTO>> getUnreadNotifications() {
         UserDTO authenticatedUser = userServiceDTO.getAuthenticatedUser();
-        return ResponseEntity.ok(notificationService.getUnreadNotifications(authenticatedUser.getUserId()));
+        return ResponseEntity.ok(notificationService.getAllNotifications(authenticatedUser.getUserId()));
     }
 
     @PostMapping("/communities/{communityId}/join")

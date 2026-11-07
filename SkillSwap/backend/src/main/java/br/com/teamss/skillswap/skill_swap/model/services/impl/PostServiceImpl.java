@@ -163,7 +163,12 @@ public class PostServiceImpl implements PostService {
         commentRepository.save(newComment);
         
         post.setCommentsCount(post.getCommentsCount() + 1);
-        notificationService.createNotification(post.getUser().getUserId(), "Seu post recebeu um comentário de " + user.getUsername());
+        if (!post.getUser().getUserId().equals(userId)) {
+            String preview = content == null ? "" : content.trim();
+            if (preview.length() > 140) preview = preview.substring(0, 140) + "…";
+            notificationService.createNotification(post.getUser().getUserId(),
+                "@" + user.getUsername() + " comentou no seu post: " + preview);
+        }
         
         return postRepository.save(post);
     }
@@ -180,7 +185,10 @@ public class PostServiceImpl implements PostService {
         } else {
             likeRepository.save(new Like(post, user));
             post.setLikesCount(post.getLikesCount() + 1);
-            notificationService.createNotification(post.getUser().getUserId(), "Seu post foi curtido por " + user.getUsername());
+            if (!post.getUser().getUserId().equals(userId)) {
+                notificationService.createNotification(post.getUser().getUserId(),
+                    "@" + user.getUsername() + " curtiu seu post.");
+            }
         }
         return postRepository.save(post);
     }
@@ -208,7 +216,10 @@ public class PostServiceImpl implements PostService {
             repost.setCreatedAt(Instant.now());
             postRepository.save(repost);
             originalPost.setRepostsCount(originalPost.getRepostsCount() + 1);
-            notificationService.createNotification(originalPost.getUser().getUserId(), "Seu post foi repostado por " + user.getUsername());
+            if (!originalPost.getUser().getUserId().equals(userId)) {
+                notificationService.createNotification(originalPost.getUser().getUserId(),
+                    "@" + user.getUsername() + " repostou seu post.");
+            }
         }
 
         return postRepository.save(originalPost);

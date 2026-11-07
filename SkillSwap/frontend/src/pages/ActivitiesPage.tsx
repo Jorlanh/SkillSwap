@@ -81,6 +81,20 @@ const ActivitiesPage = () => {
     }
   };
 
+  const markNotificationRead = async (notification: any) => {
+    const notificationId = notification?.notificationId ?? notification?.id;
+    if (!notificationId || notification?.read) return;
+    try {
+      await NotificationService.markRead(notificationId);
+      setNotifications((current) => current.map((item) => {
+        const itemId = item?.notificationId ?? item?.id;
+        return String(itemId) === String(notificationId) ? { ...item, read: true } : item;
+      }));
+    } catch {
+      // A falha ao marcar como lida não impede a leitura da notificação.
+    }
+  };
+
   return (
     <div className="flex gap-6 max-w-5xl mx-auto p-4 md:p-0">
       <div className="flex-1 min-w-0">
@@ -146,20 +160,35 @@ const ActivitiesPage = () => {
           </TabsContent>
 
           <TabsContent value="notifications" className="space-y-2">
-            {notifications.map((notif) => (
-              <div key={notif.id} className={`flex items-center gap-4 p-4 rounded-2xl transition-all ${notif.read ? 'opacity-50' : 'bg-skillswap-teal/5 border-l-4 border-skillswap-teal shadow-sm'}`}>
-                <div className="p-2 rounded-full bg-background shadow-sm flex items-center justify-center">
-                  {notif.type === 'LIKE' && <span className="text-red-500 text-lg leading-none">❤️</span>}
-                  {notif.type === 'COMMENT' && <MessageSquare className="text-blue-500" size={18} />}
-                  {notif.type === 'SYSTEM' && <Clock className="text-orange-500" size={18} />}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-foreground truncate">{notif.content}</p>
-                  <p className="text-[10px] text-muted-foreground uppercase font-bold">{new Date(notif.createdAt).toLocaleDateString()}</p>
-                </div>
-                {!notif.read && <div className="w-2 h-2 rounded-full bg-skillswap-teal animate-pulse shrink-0" />}
+            {notifications.length === 0 ? (
+              <div className="text-center py-16 bg-muted/20 rounded-3xl border border-dashed border-border text-muted-foreground">
+                <Bell className="mx-auto mb-3 opacity-30" size={38} />
+                <p>Nenhuma notificação por enquanto.</p>
               </div>
-            ))}
+            ) : notifications.map((notif) => {
+              const notificationId = notif?.notificationId ?? notif?.id;
+              const message = notif?.message ?? notif?.content ?? 'Nova notificação';
+              const sentAt = notif?.sentAt ?? notif?.createdAt;
+              return (
+                <button
+                  type="button"
+                  key={notificationId}
+                  onClick={() => void markNotificationRead(notif)}
+                  className={`w-full flex items-center gap-4 p-4 rounded-2xl transition-all text-left ${notif?.read ? 'opacity-60 bg-muted/20' : 'bg-skillswap-teal/5 border-l-4 border-skillswap-teal shadow-sm'}`}
+                >
+                  <div className="p-2 rounded-full bg-background shadow-sm flex items-center justify-center shrink-0">
+                    <MessageSquare className="text-skillswap-teal" size={18} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-foreground break-words whitespace-pre-wrap">{message}</p>
+                    <p className="text-[10px] text-muted-foreground uppercase font-bold mt-1">
+                      {sentAt ? new Date(sentAt).toLocaleString('pt-BR') : 'Agora'}
+                    </p>
+                  </div>
+                  {!notif?.read && <div className="w-2 h-2 rounded-full bg-skillswap-teal animate-pulse shrink-0" />}
+                </button>
+              );
+            })}
           </TabsContent>
         </Tabs>
       </div>

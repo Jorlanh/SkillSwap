@@ -3,14 +3,18 @@ package br.com.teamss.skillswap.skill_swap.model.services.impl;
 import br.com.teamss.skillswap.skill_swap.dto.LessonScheduleRequestDTO;
 import br.com.teamss.skillswap.skill_swap.dto.LessonCompletionResponse;
 import br.com.teamss.skillswap.skill_swap.dto.LessonCertificateResponse;
+import br.com.teamss.skillswap.skill_swap.dto.LessonReviewRequest;
 import br.com.teamss.skillswap.skill_swap.model.entities.Lesson;
+import br.com.teamss.skillswap.skill_swap.model.entities.LessonReview;
 import br.com.teamss.skillswap.skill_swap.model.entities.Notification;
 import br.com.teamss.skillswap.skill_swap.model.entities.User;
 import br.com.teamss.skillswap.skill_swap.model.repositories.LessonRepository;
+import br.com.teamss.skillswap.skill_swap.model.repositories.LessonReviewRepository;
 import br.com.teamss.skillswap.skill_swap.model.repositories.NotificationRepository;
 import br.com.teamss.skillswap.skill_swap.model.repositories.UserRepository;
 import br.com.teamss.skillswap.skill_swap.model.services.EmailService;
 import br.com.teamss.skillswap.skill_swap.model.services.LessonService;
+import br.com.teamss.skillswap.skill_swap.model.services.NotificationService;
 import br.com.teamss.skillswap.skill_swap.model.services.UserServiceDTO;
 import com.google.api.client.googleapis.javanet.GoogleNetHttpTransport;
 import com.google.api.client.http.javanet.NetHttpTransport;
@@ -55,6 +59,10 @@ public class LessonServiceImpl implements LessonService {
     private UserRepository userRepository;
     @Autowired
     private UserServiceDTO userServiceDTO;
+    @Autowired
+    private LessonReviewRepository lessonReviewRepository;
+    @Autowired
+    private NotificationService notificationService;
 
     // Injeta o CONTEÚDO do JSON a partir da variável de ambiente
     @Value("${GOOGLE_CREDENTIALS_JSON:}")
@@ -102,7 +110,8 @@ public class LessonServiceImpl implements LessonService {
         Lesson lesson = new Lesson();
         lesson.setTeacher(teacher);
         lesson.setStudent(student);
-        lesson.setTitle("Aula SkillSwap");
+        String requestedTitle = lessonRequest.getTitle();
+        lesson.setTitle(requestedTitle == null || requestedTitle.isBlank() ? "Aula SkillSwap" : requestedTitle.trim());
         lesson.setDurationMinutes(60);
         lesson.setScheduledTime(lessonRequest.getScheduledTime());
         lesson.setStatus("SCHEDULED");
@@ -115,7 +124,7 @@ public class LessonServiceImpl implements LessonService {
             System.err.println("Não foi possível criar o evento no Google Calendar: " + exception.getMessage());
         }
         notifyParticipants(savedLesson,
-                "Aula agendada para " + savedLesson.getScheduledTime()
+                "Aula \"" + savedLesson.getTitle() + "\" agendada para " + savedLesson.getScheduledTime()
                         + " com " + teacher.getUsername() + ".");
         return savedLesson;
     }
@@ -128,8 +137,9 @@ public class LessonServiceImpl implements LessonService {
             throw new IllegalStateException("O Google Calendar está habilitado, mas não foi inicializado.");
         }
         Event event = new Event()
-                .setSummary("Aula SkillSwap: " + lesson.getTeacher().getUsername() + " e " + lesson.getStudent().getUsername())
-                .setDescription("Aula de troca de habilidades.")
+                .setSummary("SkillSwap: " + lesson.getTitle())
+                .setDescription("Aula de troca de habilidades entre "
+                        + lesson.getTeacher().getUsername() + " e " + lesson.getStudent().getUsername() + ".")
                 .setStart(new EventDateTime()
                         .setDateTime(new com.google.api.client.util.DateTime(lesson.getScheduledTime().toEpochMilli()))
                         .setTimeZone("America/Sao_Paulo"))
@@ -185,20 +195,66 @@ public class LessonServiceImpl implements LessonService {
     }
 
     @Override
+    @Transactional
+    public void submitReview(Long lessonId, LessonReviewRequest request) {
+        Lesson lesson = lessonRepository.findById(lessonId)
+            .orElseThrow(() -> new EntityNotFoundException("Aula não encontrada."));
+        User current = userRepository.findById(userServiceDTO.getAuthenticatedUser().getUserId())
+            .orElseThrow(() -> new EntityNotFoundException("Usuário autenticado não encontrado."));
+        boolean isTeacher = lesson.getTeacher() != null && current.getUserId().equals(lesson.getTeacher().getUserId());
+        boolean isStudent = lesson.getStudent() != null && current.getUserId().equals(lesson.getStudent().getUserId());
+        if (!isTeacher && !isStudent) {
+            throw new SecurityException("Somente participantes podem avaliar esta aula.");
+        }
+        if (lessonReviewRepository.existsByLessonLessonIdAndReviewerUserId(lessonId, current.getUserId())) {
+            throw new IllegalStateException("Você já avaliou esta aula.");
+        }
+        User reviewed = isTeacher ? lesson.getStudent() : lesson.getTeacher();
+        LessonReview review = new LessonReview();
+        review.setLesson(lesson);
+        review.setReviewer(current);
+        review.setReviewedUser(reviewed);
+        review.setStars(request.stars());
+        review.setComment(request.comment() == null ? "" : request.comment().trim());
+        review.setSkillSubject(request.skillSubject().trim());
+        review.setReviewerFullName(request.fullName().trim());
+        lessonReviewRepository.save(review);
+
+        if (isTeacher) {
+            lesson.setTeacherCertificateName(request.fullName().trim());
+        } else {
+            lesson.setStudentCertificateName(request.fullName().trim());
+        }
+        lessonRepository.save(lesson);
+        String comment = request.comment() == null || request.comment().isBlank()
+            ? "Sem comentário."
+            : request.comment().trim();
+        notificationService.createNotification(reviewed.getUserId(),
+            "@" + current.getUsername() + " avaliou a aula \"" + lesson.getTitle()
+                + "\" com " + request.stars() + " estrelas. Comentário: " + comment);
+    }
+
+    @Override
     @Transactional(readOnly = true)
     public LessonCertificateResponse getCertificate(Long lessonId) {
         Lesson lesson = lessonRepository.findById(lessonId)
             .orElseThrow(() -> new EntityNotFoundException("Aula não encontrada."));
         UUID currentUserId = userServiceDTO.getAuthenticatedUser().getUserId();
-        if (lesson.getStudent() == null || !currentUserId.equals(lesson.getStudent().getUserId())) {
-            throw new SecurityException("O certificado está disponível para o aluno participante.");
+        boolean participant = (lesson.getStudent() != null && currentUserId.equals(lesson.getStudent().getUserId()))
+            || (lesson.getTeacher() != null && currentUserId.equals(lesson.getTeacher().getUserId()));
+        if (!participant) {
+            throw new SecurityException("O certificado está disponível apenas para os participantes.");
         }
         if (!"COMPLETED".equals(lesson.getStatus()) || lesson.getCompletedAt() == null) {
             throw new IllegalStateException("O certificado será liberado após a confirmação dos dois participantes.");
         }
         String certificateId = "SKILLSWAP-" + lesson.getLessonId() + "-" + lesson.getCompletedAt().toEpochMilli();
-        return new LessonCertificateResponse(certificateId, lesson.getStudent().getName(),
-            lesson.getTeacher().getName(), lesson.getTitle(), lesson.getDurationMinutes(), lesson.getCompletedAt());
+        String studentName = lesson.getStudentCertificateName() == null || lesson.getStudentCertificateName().isBlank()
+            ? lesson.getStudent().getName() : lesson.getStudentCertificateName();
+        String teacherName = lesson.getTeacherCertificateName() == null || lesson.getTeacherCertificateName().isBlank()
+            ? lesson.getTeacher().getName() : lesson.getTeacherCertificateName();
+        return new LessonCertificateResponse(certificateId, studentName,
+            teacherName, lesson.getTitle(), lesson.getDurationMinutes(), lesson.getCompletedAt());
     }
     @Override
     public List<Lesson> getUpcomingLessons(UUID userId) {
@@ -211,6 +267,9 @@ public class LessonServiceImpl implements LessonService {
     public void notifyLesson(Long lessonId) {
         Lesson lesson = lessonRepository.findById(lessonId)
                 .orElseThrow(() -> new RuntimeException("Lesson not found"));
+        if (lesson.getScheduledTime() == null) {
+            return;
+        }
         User teacher = lesson.getTeacher();
         User student = lesson.getStudent();
         ZonedDateTime now = ZonedDateTime.now(ZoneId.of("America/Sao_Paulo"));
@@ -219,10 +278,17 @@ public class LessonServiceImpl implements LessonService {
         String lessonDetails = null;
         if (now.toLocalTime().isAfter(lessonTime.toLocalTime().minusMinutes(15))
                 && now.toLocalTime().isBefore(lessonTime.toLocalTime().plusMinutes(15))) {
-            lessonDetails = "A aula com " + teacher.getUsername()
+            lessonDetails = "A aula \"" + lesson.getTitle() + "\" com " + teacher.getUsername()
                     + " começa agora às " + lessonTime.toLocalTime() + ".";
+            Instant lastReminder = lesson.getLastReminderSentAt();
+            Instant reminderWindowStart = lesson.getScheduledTime().minusSeconds(15 * 60L);
+            if (lastReminder != null && !lastReminder.isBefore(reminderWindowStart)) {
+                return;
+            }
+            lesson.setLastReminderSentAt(Instant.now());
+            lessonRepository.save(lesson);
         } else if (now.toLocalDate().equals(lessonTime.toLocalDate())) {
-            lessonDetails = "Aula agendada para hoje às " + lessonTime.toLocalTime()
+            lessonDetails = "Aula \"" + lesson.getTitle() + "\" agendada para hoje às " + lessonTime.toLocalTime()
                     + " com " + teacher.getUsername() + ".";
         }
         if (lessonDetails != null) {
@@ -251,8 +317,27 @@ public class LessonServiceImpl implements LessonService {
         List<Lesson> lessons = lessonRepository.findAll();
         ZonedDateTime now = ZonedDateTime.now(ZoneId.of("America/Sao_Paulo"));
         for (Lesson lesson : lessons) {
+            if (lesson.getScheduledTime() == null) {
+                continue;
+            }
             ZonedDateTime lessonTime = lesson.getScheduledTime().atZone(ZoneId.of("America/Sao_Paulo"));
             if (now.toLocalDate().equals(lessonTime.toLocalDate())) {
+                notifyLesson(lesson.getLessonId());
+            }
+        }
+    }
+
+    @Scheduled(fixedDelay = 60000, initialDelay = 60000)
+    public void lessonTimeNotificationCheck() {
+        Instant now = Instant.now();
+        // A consulta ampla permite verificar as aulas de todos os participantes.
+        for (Lesson lesson : lessonRepository.findAll()) {
+            if (lesson.getScheduledTime() == null) {
+                continue;
+            }
+            Instant scheduled = lesson.getScheduledTime();
+            if (!scheduled.isBefore(now.minusSeconds(15 * 60L))
+                    && !scheduled.isAfter(now.plusSeconds(15 * 60L))) {
                 notifyLesson(lesson.getLessonId());
             }
         }

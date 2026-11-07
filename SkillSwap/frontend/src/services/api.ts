@@ -236,6 +236,8 @@ export const LessonService = {
   getUpcoming: (userId: string | number) => api.get(`/lesson/upcoming/${userId}`),
   getMine: () => api.get('/lesson/mine'),
   confirmCompletion: (lessonId: number) => api.patch(`/lesson/${lessonId}/complete`),
+  review: (lessonId: number, data: { stars: number; comment?: string; skillSubject: string; fullName: string }) =>
+    api.post(`/lesson/${lessonId}/review`, data),
   getCertificate: (lessonId: number) => api.get(`/lesson/${lessonId}/certificate`),
   notify: (lessonId: number) => api.post(`/lesson/notify/${lessonId}`),
 };
@@ -244,8 +246,8 @@ export const LessonService = {
 // NOTIFICAÇÕES
 // ==========================================
 export const NotificationService = {
-  getAll: () => api.get('/notifications'),
-  markRead: (id: string | number) => api.put(`/notifications/${id}/read`),
+  getAll: () => api.get('/home/notifications'),
+  markRead: (id: string | number) => api.post(`/home/notifications/${id}/read`),
 };
 
 // A conta suspensa mantém acesso somente ao motivo, às notificações e à contestação.

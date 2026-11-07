@@ -6,6 +6,7 @@ import java.util.UUID;
 
 public interface NotificationService {
     List<NotificationDTO> getUnreadNotifications(UUID userId);
+    List<NotificationDTO> getAllNotifications(UUID userId);
     void markAsRead(Long notificationId, UUID userId); // Assinatura alterada
     void createNotification(UUID userId, String message);
 }

@@ -34,7 +34,15 @@ public class NotificationServiceImpl implements NotificationService {
 
     @Override
     public List<NotificationDTO> getUnreadNotifications(UUID userId) {
-        List<Notification> notifications = notificationRepository.findByUserUserIdAndReadFalse(userId);
+        return toDTOs(notificationRepository.findByUserUserIdAndReadFalse(userId));
+    }
+
+    @Override
+    public List<NotificationDTO> getAllNotifications(UUID userId) {
+        return toDTOs(notificationRepository.findByUserUserIdOrderBySentAtDesc(userId));
+    }
+
+    private List<NotificationDTO> toDTOs(List<Notification> notifications) {
         return notifications.stream()
                 .map(notification -> new NotificationDTO(
                         notification.getNotificationId(),

@@ -12,4 +12,7 @@ import java.util.UUID;
 public interface NotificationRepository extends JpaRepository<Notification, Long> {
     @Query("SELECT n FROM Notification n WHERE n.user.userId = :userId AND n.read = false")
     List<Notification> findByUserUserIdAndReadFalse(UUID userId);
+
+    @Query("SELECT n FROM Notification n WHERE n.user.userId = :userId ORDER BY n.sentAt DESC")
+    List<Notification> findByUserUserIdOrderBySentAtDesc(UUID userId);
 }

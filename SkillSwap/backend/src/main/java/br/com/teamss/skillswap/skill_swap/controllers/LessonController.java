@@ -3,6 +3,7 @@ package br.com.teamss.skillswap.skill_swap.controllers;
 import br.com.teamss.skillswap.skill_swap.dto.LessonCertificateResponse;
 import br.com.teamss.skillswap.skill_swap.dto.LessonCompletionResponse;
 import br.com.teamss.skillswap.skill_swap.dto.LessonScheduleRequestDTO;
+import br.com.teamss.skillswap.skill_swap.dto.LessonReviewRequest;
 import br.com.teamss.skillswap.skill_swap.model.entities.Lesson;
 import br.com.teamss.skillswap.skill_swap.model.services.LessonService;
 import br.com.teamss.skillswap.skill_swap.model.services.UserServiceDTO;
@@ -49,6 +50,13 @@ public class LessonController {
     @PatchMapping("/{lessonId}/complete")
     public ResponseEntity<LessonCompletionResponse> confirmCompletion(@PathVariable Long lessonId) {
         return ResponseEntity.ok(lessonService.confirmCompletion(lessonId));
+    }
+
+    @PostMapping("/{lessonId}/review")
+    public ResponseEntity<Void> submitReview(@PathVariable Long lessonId,
+                                             @Valid @RequestBody LessonReviewRequest request) {
+        lessonService.submitReview(lessonId, request);
+        return ResponseEntity.ok().build();
     }
 
     @GetMapping("/{lessonId}/certificate")

@@ -9,6 +9,7 @@ import br.com.teamss.skillswap.skill_swap.model.repositories.UserRepository;
 import br.com.teamss.skillswap.skill_swap.model.repositories.CommunityMemberRepository;
 import br.com.teamss.skillswap.skill_swap.model.services.FileUploadService;
 import br.com.teamss.skillswap.skill_swap.model.services.ProfileService;
+import br.com.teamss.skillswap.skill_swap.model.services.NotificationService;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -40,6 +41,9 @@ public class ProfileServiceImpl implements ProfileService {
 
     @Autowired
     private CommunityMemberRepository communityMemberRepository;
+
+    @Autowired
+    private NotificationService notificationService;
 
     // Construtor removido para evitar conflito com @Autowired nos campos
     // O Spring Boot injetará as dependências automaticamente.
@@ -256,6 +260,10 @@ public class ProfileServiceImpl implements ProfileService {
             target.setFollowers(target.getFollowers() + 1);
             userRepository.save(user);
             userRepository.save(target);
+            if (!userId.equals(targetUserId)) {
+                notificationService.createNotification(targetUserId,
+                    "@" + user.getUsername() + " começou a seguir você.");
+            }
         }
     }
 

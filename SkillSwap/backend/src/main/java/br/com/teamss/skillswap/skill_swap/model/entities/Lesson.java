@@ -47,4 +47,13 @@ public class Lesson {
 
     @Column(name = "completed_at")
     private Instant completedAt;
+
+    @Column(name = "last_reminder_sent_at")
+    private Instant lastReminderSentAt;
+
+    @Column(name = "teacher_certificate_name", length = 180)
+    private String teacherCertificateName;
+
+    @Column(name = "student_certificate_name", length = 180)
+    private String studentCertificateName;
 }

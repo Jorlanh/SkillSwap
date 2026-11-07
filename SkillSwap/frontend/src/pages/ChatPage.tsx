@@ -1,12 +1,11 @@
 import { useEffect, useState, useRef } from 'react';
-import { ChatService, BASE_URL, RatingService, UserService, ProfileService, LessonService } from '@/services/api';
+import { ChatService, BASE_URL, UserService, ProfileService, LessonService } from '@/services/api';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { ChevronLeft, Send, Plus, Video, Info, Mic, Calendar, CheckCircle2, UserPlus, UserMinus } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import RatingModal from '@/components/RatingModal';
 import { auth } from '@/lib/firebase';
 
 const ChatPage = () => {
@@ -25,10 +24,10 @@ const ChatPage = () => {
   // ESTADOS DE UI
   const [showInfoPanel, setShowInfoPanel] = useState(false);
   const [isFollowing, setIsFollowing] = useState(false);
-  const [isRatingModalOpen, setIsRatingModalOpen] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [showSchedule, setShowSchedule] = useState(false);
   const [scheduledAt, setScheduledAt] = useState('');
+  const [lessonTitle, setLessonTitle] = useState('');
   
   const socket = useRef<WebSocket | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -294,15 +293,20 @@ const ChatPage = () => {
 
   const scheduleLesson = async () => {
     const teacherId = selectedConvo?.user?.id || selectedConvo?.user?.userId;
-    if (!teacherId || !myData.userId || !scheduledAt) return;
+    if (!teacherId || !myData.userId || !scheduledAt || !lessonTitle.trim()) {
+      toast.error('Informe o assunto da aula, a data e o horário.');
+      return;
+    }
     try {
       await LessonService.schedule({
         teacherId,
         studentId: myData.userId,
         scheduledTime: new Date(scheduledAt).toISOString(),
+        title: lessonTitle.trim(),
       });
       setShowSchedule(false);
       setScheduledAt('');
+      setLessonTitle('');
       toast.success('Aula agendada. Os participantes foram notificados.');
     } catch (error: any) {
       toast.error(error?.response?.data?.message || 'Não foi possível agendar a aula.');
@@ -322,18 +326,6 @@ const ChatPage = () => {
               toast.success("Seguindo!");
           }
       } catch (e) { toast.error("Falha na operação de rede."); }
-  };
-
-  const submitRating = async (data: { proposalId: string; stars: number; comment: string }) => {
-      try {
-          await RatingService.submit({ 
-              proposalId: Number(data.proposalId) || selectedConvo?.proposalId || 0, 
-              stars: data.stars, 
-              comment: data.comment 
-          });
-          toast.success("Avaliação salva no banco de dados!");
-          setIsRatingModalOpen(false);
-      } catch (error) { toast.error("Erro ao salvar avaliação."); }
   };
 
   const formatMessageTime = (dateString: string) => {
@@ -409,7 +401,7 @@ const ChatPage = () => {
                     <Video size={16} className="sm:mr-2" /><span className="hidden sm:inline">Chamada</span>
                  </Button>
                  <Button variant="outline" size="sm" className="h-9 w-9 px-0 sm:h-10 sm:w-auto sm:px-3" title="Agendar aula" onClick={() => setShowSchedule((current) => !current)}><Calendar size={16} className="sm:mr-2" /><span className="hidden sm:inline">Agendar</span></Button>
-                 <Button variant="default" size="sm" className="h-9 w-9 px-0 sm:h-10 sm:w-auto sm:px-3 bg-green-600 hover:bg-green-700 text-white font-bold" title="Encerrar curso" onClick={() => setIsRatingModalOpen(true)}>
+                 <Button variant="default" size="sm" className="h-9 w-9 px-0 sm:h-10 sm:w-auto sm:px-3 bg-green-600 hover:bg-green-700 text-white font-bold" title="Encerrar curso" onClick={() => navigate('/cursos')}>
                     <CheckCircle2 size={16} className="sm:mr-2"/><span className="hidden sm:inline">Encerrar Curso</span>
                  </Button>
                  <Button variant="ghost" size="icon" onClick={() => setShowInfoPanel(!showInfoPanel)}>
@@ -446,10 +438,13 @@ const ChatPage = () => {
 
             {showSchedule && <div className="border-t border-border bg-card p-3">
               <div className="flex flex-wrap items-end gap-2">
+                <label className="text-xs font-semibold text-muted-foreground">Sobre qual aula?
+                  <input type="text" maxLength={180} value={lessonTitle} onChange={(event) => setLessonTitle(event.target.value)} placeholder="Ex.: Introdução à programação" className="mt-1 block w-64 max-w-full rounded-md border border-border bg-background px-2 py-2 text-sm" />
+                </label>
                 <label className="text-xs font-semibold text-muted-foreground">Data e hora da aula
                   <input type="datetime-local" min={new Date().toISOString().slice(0, 16)} value={scheduledAt} onChange={(event) => setScheduledAt(event.target.value)} className="mt-1 block rounded-md border border-border bg-background px-2 py-2 text-sm" />
                 </label>
-                <Button type="button" onClick={() => void scheduleLesson()} disabled={!scheduledAt} className="bg-skillswap-teal text-white">Salvar na Agenda</Button>
+                <Button type="button" onClick={() => void scheduleLesson()} disabled={!scheduledAt || !lessonTitle.trim()} className="bg-skillswap-teal text-white">Salvar na Agenda</Button>
                 <Link to="/agenda"><Button type="button" variant="outline">Abrir Agenda</Button></Link>
               </div>
               <p className="mt-2 text-xs text-muted-foreground">A aula fica registrada na Agenda SkillSwap. A integração com o Google Calendar é opcional.</p>
@@ -501,16 +496,6 @@ const ChatPage = () => {
         )}
       </div>
       
-      {/* MODAL DE AVALIAÇÃO - INTEGRADO COM BACKEND */}
-      {selectedConvo && (
-        <RatingModal 
-            open={isRatingModalOpen} 
-            onOpenChange={setIsRatingModalOpen} 
-            onSubmit={submitRating} 
-            user={selectedConvo.user}
-            proposalId={selectedConvo.proposalId || "0"}
-        />
-      )}
     </div>
   );
 };

@@ -2,8 +2,15 @@ import { useEffect, useState } from 'react';
 import { Award, CheckCircle2, Clock, Printer } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { LessonService } from '@/services/api';
+import { LessonService, UserService } from '@/services/api';
 import { toast } from 'sonner';
+
+type LessonParticipant = {
+  userId?: string;
+  id?: string;
+  name?: string;
+  username?: string;
+};
 
 type Lesson = {
   lessonId: number;
@@ -14,8 +21,8 @@ type Lesson = {
   teacherConfirmed?: boolean;
   studentConfirmed?: boolean;
   completedAt?: string;
-  teacher?: { name?: string; username?: string };
-  student?: { name?: string; username?: string };
+  teacher?: LessonParticipant;
+  student?: LessonParticipant;
 };
 
 const escapeHtml = (value: unknown) => String(value ?? '').replace(/[&<>'"]/g, (character) => ({
@@ -38,8 +45,9 @@ const printCertificate = (certificate: any) => {
     @media print{body{background:#fff;padding:0}.certificate{box-shadow:none}}
   </style></head><body><main class="certificate" aria-labelledby="title">
     <h1 id="title">SkillSwap</h1><p>Certificado de conclusão</p>
-    <p>Declaramos que</p><h2>${escapeHtml(certificate.studentName)}</h2>
-    <p>concluiu a aula <strong>${escapeHtml(certificate.lessonTitle)}</strong>, com duração de ${hours} hora(s), com acompanhamento de ${escapeHtml(certificate.teacherName)}.</p>
+    <p>Registramos a participação de</p><h2>${escapeHtml(certificate.studentName)}</h2>
+    <p>como aluno na aula <strong>${escapeHtml(certificate.lessonTitle)}</strong>, com duração de ${hours} hora(s), com acompanhamento de ${escapeHtml(certificate.teacherName)}.</p>
+    <p>O certificado também reconhece a participação de <strong>${escapeHtml(certificate.teacherName)}</strong> como professor e participante da troca de conhecimentos.</p>
     <p class="meta">Concluído em ${date}<br>Identificador: ${escapeHtml(certificate.certificateId)}</p>
     <p class="meta">Comprovante de participação na plataforma SkillSwap. Não substitui diploma ou certificação profissional.</p>
   </main><script>window.onload=()=>window.print()</script></body></html>`);
@@ -48,14 +56,24 @@ const printCertificate = (certificate: any) => {
 
 const CoursesPage = () => {
   const [lessons, setLessons] = useState<Lesson[]>([]);
+  const [currentUser, setCurrentUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [workingId, setWorkingId] = useState<number | null>(null);
+  const [reviewLesson, setReviewLesson] = useState<Lesson | null>(null);
+  const [reviewStars, setReviewStars] = useState(5);
+  const [reviewComment, setReviewComment] = useState('');
+  const [reviewSubject, setReviewSubject] = useState('');
+  const [reviewFullName, setReviewFullName] = useState('');
+  const [savingReview, setSavingReview] = useState(false);
 
   const load = async () => {
     setLoading(true);
     try {
-      const response = await LessonService.getMine();
-      setLessons(response.data || []);
+      const [lessonsResponse, userResponse] = await Promise.all([
+        LessonService.getMine(),
+        UserService.getMe(),
+      ]);
+      setLessons(lessonsResponse.data || []);
+      setCurrentUser(userResponse.data || null);
     } catch {
       toast.error('Não foi possível carregar as aulas.');
     } finally {
@@ -65,18 +83,38 @@ const CoursesPage = () => {
 
   useEffect(() => { load(); }, []);
 
-  const confirm = async (lessonId: number) => {
-    setWorkingId(lessonId);
+  const openReview = (lesson: Lesson) => {
+    setReviewLesson(lesson);
+    setReviewStars(5);
+    setReviewComment('');
+    setReviewSubject(lesson.title || '');
+    setReviewFullName('');
+  };
+
+  const submitReview = async () => {
+    if (!reviewLesson) return;
+    if (!reviewSubject.trim() || !reviewFullName.trim()) {
+      toast.error('Informe o assunto da aula e o nome completo para o certificado.');
+      return;
+    }
+    setSavingReview(true);
     try {
-      const response = await LessonService.confirmCompletion(lessonId);
-      toast.success(response.data.readyForCertificate
-        ? 'Aula concluída. O certificado foi liberado para o aluno.'
-        : 'Sua confirmação foi registrada. A outra pessoa ainda precisa confirmar.');
+      await LessonService.review(reviewLesson.lessonId, {
+        stars: reviewStars,
+        comment: reviewComment.trim(),
+        skillSubject: reviewSubject.trim(),
+        fullName: reviewFullName.trim(),
+      });
+      const response = await LessonService.confirmCompletion(reviewLesson.lessonId);
+      toast.success(response.data?.readyForCertificate
+        ? 'Avaliação registrada. O certificado dos dois participantes foi liberado.'
+        : 'Avaliação registrada. A outra pessoa ainda precisa avaliar e confirmar a aula.');
+      setReviewLesson(null);
       await load();
-    } catch {
-      toast.error('Não foi possível confirmar a conclusão.');
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || 'Não foi possível registrar a avaliação.');
     } finally {
-      setWorkingId(null);
+      setSavingReview(false);
     }
   };
 
@@ -101,7 +139,14 @@ const CoursesPage = () => {
         <div className="grid gap-4">
           {lessons.map((lesson) => {
             const completed = lesson.status === 'COMPLETED';
-            const currentUserConfirmed = lesson.studentConfirmed || lesson.teacherConfirmed;
+            const currentUserId = currentUser?.userId || currentUser?.id;
+            const teacherId = lesson.teacher?.userId || lesson.teacher?.id;
+            const studentId = lesson.student?.userId || lesson.student?.id;
+            const currentUserConfirmed = String(currentUserId) === String(teacherId)
+              ? Boolean(lesson.teacherConfirmed)
+              : String(currentUserId) === String(studentId)
+                ? Boolean(lesson.studentConfirmed)
+                : false;
             return <Card key={lesson.lessonId} className="p-5">
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
@@ -111,7 +156,7 @@ const CoursesPage = () => {
                   <p className="text-sm">Aluno: {lesson.student?.name || lesson.student?.username || 'participante'}</p>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  {completed ? <Button type="button" onClick={() => certificate(lesson.lessonId)} className="bg-skillswap-teal text-white"><Award size={17} className="mr-2" /> Gerar certificado</Button> : <Button type="button" onClick={() => confirm(lesson.lessonId)} disabled={workingId === lesson.lessonId} variant={currentUserConfirmed ? 'outline' : 'default'}><CheckCircle2 size={17} className="mr-2" />{currentUserConfirmed ? 'Confirmação registrada' : 'Concluir aula'}</Button>}
+                  {completed ? <Button type="button" onClick={() => certificate(lesson.lessonId)} className="bg-skillswap-teal text-white"><Award size={17} className="mr-2" /> Gerar certificado</Button> : <Button type="button" onClick={() => openReview(lesson)} disabled={savingReview || currentUserConfirmed} variant={currentUserConfirmed ? 'outline' : 'default'}><CheckCircle2 size={17} className="mr-2" />{currentUserConfirmed ? 'Avaliação registrada' : 'Encerrar e avaliar'}</Button>}
                 </div>
               </div>
               {!completed && <p className="text-xs text-muted-foreground mt-4">A aula só será concluída depois que professor e aluno confirmarem. O certificado será liberado depois disso.</p>}
@@ -120,6 +165,44 @@ const CoursesPage = () => {
         </div>
       )}
       <p className="mt-6 text-xs text-muted-foreground flex items-center gap-2"><Printer size={14} /> O botão gera uma página acessível para impressão ou salvamento em PDF pelo navegador.</p>
+
+      {reviewLesson && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" role="dialog" aria-modal="true" aria-labelledby="review-title">
+          <div className="w-full max-w-lg rounded-2xl bg-background p-5 shadow-2xl max-h-[90dvh] overflow-y-auto">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h2 id="review-title" className="text-xl font-bold">Encerrar e avaliar a aula</h2>
+                <p className="mt-1 text-sm text-muted-foreground">A avaliação será registrada para a outra pessoa. Depois que os dois participantes confirmarem, o certificado será liberado.</p>
+              </div>
+              <button type="button" className="text-muted-foreground hover:text-foreground" onClick={() => setReviewLesson(null)} aria-label="Fechar">×</button>
+            </div>
+
+            <div className="mt-5 space-y-4">
+              <label className="block text-sm font-semibold">Assunto da aula
+                <input value={reviewSubject} onChange={(event) => setReviewSubject(event.target.value)} maxLength={180} placeholder="Ex.: Introdução à programação" className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 font-normal" />
+              </label>
+              <label className="block text-sm font-semibold">Nome completo no certificado
+                <input value={reviewFullName} onChange={(event) => setReviewFullName(event.target.value)} maxLength={180} placeholder="Digite seu nome completo" className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 font-normal" />
+              </label>
+              <fieldset>
+                <legend className="text-sm font-semibold">Nota para a outra pessoa</legend>
+                <div className="mt-2 flex gap-1" aria-label={`${reviewStars} de 5 estrelas`}>
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <button type="button" key={star} onClick={() => setReviewStars(star)} className={`text-3xl leading-none ${star <= reviewStars ? 'text-yellow-400' : 'text-muted-foreground/30'}`} aria-label={`${star} estrelas`}>★</button>
+                  ))}
+                </div>
+              </fieldset>
+              <label className="block text-sm font-semibold">Comentário (opcional)
+                <textarea value={reviewComment} onChange={(event) => setReviewComment(event.target.value)} maxLength={1200} rows={4} placeholder="Como foi a troca de conhecimentos?" className="mt-1 w-full resize-y rounded-lg border border-border bg-background px-3 py-2 font-normal" />
+              </label>
+              <div className="flex justify-end gap-2">
+                <Button type="button" variant="outline" onClick={() => setReviewLesson(null)} disabled={savingReview}>Cancelar</Button>
+                <Button type="button" onClick={() => void submitReview()} disabled={savingReview} className="bg-skillswap-teal text-white">{savingReview ? 'Salvando...' : 'Salvar avaliação e encerrar'}</Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 };
