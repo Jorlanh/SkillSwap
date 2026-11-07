@@ -1,6 +1,6 @@
 import { NavLink } from '@/components/NavLink';
 import {
-  User, MessageSquare, FileText, Settings, Sun, BookOpen, Home, Users, Menu, X, Trophy, BriefcaseBusiness
+  User, MessageSquare, FileText, Settings, Sun, BookOpen, Home, Users, Menu, X, Trophy, BriefcaseBusiness, CalendarDays
 } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
@@ -14,6 +14,7 @@ const sidebarLinks = [
   { to: '/rankings', label: 'Rankings', icon: Trophy, public: true },
   { to: '/perfil', label: 'Perfil', icon: User, public: false },
   { to: '/mensagens', label: 'Mensagens', icon: MessageSquare, public: false },
+  { to: '/agenda', label: 'Agenda', icon: CalendarDays, public: false },
   { to: '/propostas', label: 'Propostas', icon: FileText, public: false },
   { to: '/comunidades', label: 'Comunidades', icon: Users, public: true },
   { to: '/configuracoes', label: 'Configurações', icon: Settings, public: false },

@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.RestController;
 import br.com.teamss.skillswap.skill_swap.dto.UserDTO;
 import br.com.teamss.skillswap.skill_swap.model.services.UserServiceDTO;
 import br.com.teamss.skillswap.skill_swap.model.services.ProposalService;
+import br.com.teamss.skillswap.skill_swap.model.services.NotificationService;
 import io.livekit.server.AccessToken;
 import io.livekit.server.RoomJoin;
 import io.livekit.server.RoomName;
@@ -26,6 +27,7 @@ public class VideoController {
     private final UserServiceDTO userServiceDTO;
     private final RoomServiceClient roomServiceClient;
     private final ProposalService proposalService;
+    private final NotificationService notificationService;
 
     @Value("${livekit.api.key}")
     private String livekitApiKey;
@@ -33,10 +35,12 @@ public class VideoController {
     @Value("${livekit.api.secret}")
     private String livekitApiSecret;
 
-    public VideoController(UserServiceDTO userServiceDTO, RoomServiceClient roomServiceClient, ProposalService proposalService) {
+    public VideoController(UserServiceDTO userServiceDTO, RoomServiceClient roomServiceClient, ProposalService proposalService,
+                           NotificationService notificationService) {
         this.userServiceDTO = userServiceDTO;
         this.roomServiceClient = roomServiceClient;
         this.proposalService = proposalService;
+        this.notificationService = notificationService;
     }
 
     /**
@@ -82,6 +86,18 @@ public class VideoController {
 
             // Gera a assinatura criptográfica JWT
             String jwt = token.toJwt();
+
+            // Registra a tentativa de entrada para que o outro participante saiba que a chamada foi iniciada.
+            // A autorização continua dependendo de uma proposta aceita; a notificação não concede acesso.
+            try {
+                notificationService.createNotification(
+                        UUID.fromString(peerUserId),
+                        authenticatedUser.getUsername() + " iniciou uma chamada com você. Acesse as mensagens para entrar."
+                );
+            } catch (RuntimeException notificationError) {
+                // Uma indisponibilidade da fila de notificações não deve impedir a entrada na sala.
+                System.err.println("Não foi possível registrar a notificação da chamada: " + notificationError.getMessage());
+            }
 
             // Retorna o payload de autorização
             return ResponseEntity.ok(Map.of("token", jwt));

@@ -296,7 +296,7 @@ const ChatPage = () => {
     const teacherId = selectedConvo?.user?.id || selectedConvo?.user?.userId;
     if (!teacherId || !myData.userId || !scheduledAt) return;
     try {
-      const { data } = await LessonService.schedule({
+      await LessonService.schedule({
         teacherId,
         studentId: myData.userId,
         scheduledTime: new Date(scheduledAt).toISOString(),
@@ -340,6 +340,20 @@ const ChatPage = () => {
       if (!dateString) return '';
       const date = new Date(dateString);
       return date.toLocaleString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  };
+
+  const openSharedCall = () => {
+      const peerId = selectedConvo?.user?.id || selectedConvo?.user?.userId;
+      if (!peerId || !myData.userId) return;
+      const room = `skillswap-call-${[String(myData.userId), String(peerId)].sort().join('-')}`;
+      const peer = selectedConvo?.user || {};
+      const params = new URLSearchParams({
+          room,
+          peerName: peer.name || peer.username || 'Participante',
+          peerUsername: peer.username || '',
+          peerAvatar: peer.profile?.imageUrl || peer.avatarUrl || peer.imageUrl || '',
+      });
+      navigate(`/chamada/${peerId}?${params.toString()}`);
   };
 
   return (
@@ -391,7 +405,7 @@ const ChatPage = () => {
                 </div>
               </div>
               <div className="flex flex-wrap justify-end gap-1 sm:gap-2 shrink-0">
-                 <Button variant="outline" size="sm" className="h-9 w-9 px-0 sm:h-10 sm:w-auto sm:px-3" title="Iniciar chamada de vídeo e áudio" onClick={() => navigate(`/chamada/${selectedConvo?.user?.id || selectedConvo?.user?.userId}`)} disabled={!selectedConvo?.user?.id && !selectedConvo?.user?.userId}>
+                 <Button variant="outline" size="sm" className="h-9 w-9 shrink-0 px-0 sm:h-10 sm:w-auto sm:px-3" title="Iniciar chamada de vídeo e áudio" onClick={openSharedCall} disabled={!selectedConvo?.user?.id && !selectedConvo?.user?.userId}>
                     <Video size={16} className="sm:mr-2" /><span className="hidden sm:inline">Chamada</span>
                  </Button>
                  <Button variant="outline" size="sm" className="h-9 w-9 px-0 sm:h-10 sm:w-auto sm:px-3" title="Agendar aula" onClick={() => setShowSchedule((current) => !current)}><Calendar size={16} className="sm:mr-2" /><span className="hidden sm:inline">Agendar</span></Button>
@@ -435,7 +449,8 @@ const ChatPage = () => {
                 <label className="text-xs font-semibold text-muted-foreground">Data e hora da aula
                   <input type="datetime-local" min={new Date().toISOString().slice(0, 16)} value={scheduledAt} onChange={(event) => setScheduledAt(event.target.value)} className="mt-1 block rounded-md border border-border bg-background px-2 py-2 text-sm" />
                 </label>
-                <Button type="button" onClick={() => void scheduleLesson()} disabled={!scheduledAt} className="bg-skillswap-teal text-white">Salvar no calendário</Button>
+                <Button type="button" onClick={() => void scheduleLesson()} disabled={!scheduledAt} className="bg-skillswap-teal text-white">Salvar na Agenda</Button>
+                <Link to="/agenda"><Button type="button" variant="outline">Abrir Agenda</Button></Link>
               </div>
               <p className="mt-2 text-xs text-muted-foreground">A aula fica registrada na Agenda SkillSwap. A integração com o Google Calendar é opcional.</p>
             </div>}

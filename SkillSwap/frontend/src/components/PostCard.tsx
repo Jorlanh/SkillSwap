@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { MessageSquare, Repeat2, ArrowUp, Share, Send, Heart, Trash2, Reply, Eye } from 'lucide-react';
+import { MessageSquare, Repeat2, ArrowUp, Share, Send, Heart, Trash2, Reply, Eye, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useOutletContext, useNavigate } from 'react-router-dom';
@@ -73,6 +73,7 @@ const PostCard = ({ post }: PostCardProps) => {
   const [expandedReplies, setExpandedReplies] = useState<Record<number, boolean>>({});
   const [commentLikes, setCommentLikes] = useState<Record<number, number>>({});
   const [commentLiked, setCommentLiked] = useState<Record<number, boolean>>({});
+  const [previewMedia, setPreviewMedia] = useState<{ type: 'image' | 'video'; url: string; alt: string } | null>(null);
 
   const author = post.user || post.author || { username: 'Usuário', avatarUrl: '' };
   const postId = post.postId ?? post.id;
@@ -100,6 +101,20 @@ const PostCard = ({ post }: PostCardProps) => {
     setIsReposted(Boolean(post.isRepostedByMe));
     setRepostsCount(Number(post.repostsCount ?? 0));
   }, [postId, post.isLikedByMe, post.likesCount, post.isRepostedByMe, post.repostsCount]);
+
+  useEffect(() => {
+    if (!previewMedia) return;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setPreviewMedia(null);
+    };
+    document.addEventListener('keydown', closeOnEscape);
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.removeEventListener('keydown', closeOnEscape);
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [previewMedia]);
 
   const refreshComments = useCallback(async () => {
     if (!postId) return;
@@ -301,8 +316,8 @@ const PostCard = ({ post }: PostCardProps) => {
         {(post.community || post.communityName) && <button type="button" onClick={() => communityId && navigate(`/comunidades/${communityId}`)} className="text-xs text-skillswap-teal hover:underline text-left">Publicado em {post.communityName || post.community}</button>}
         {post.createdAt && <time dateTime={post.createdAt} className="text-[11px] text-muted-foreground block">Publicado em {new Date(post.createdAt).toLocaleString('pt-BR')}</time>}
       </div>
-      {(post.imageUrl || post.image) && <div className="rounded-xl overflow-hidden mb-3 border border-border bg-muted/20"><img src={post.imageUrl || post.image} alt="Imagem da publicação" className="w-full max-h-[500px] object-cover" /></div>}
-      {post.videoUrl && <video controls className="w-full max-h-[500px] rounded-xl mb-3" src={post.videoUrl} />}
+      {(post.imageUrl || post.image) && <button type="button" className="group relative block w-full overflow-hidden rounded-xl mb-3 border border-border bg-muted/20 text-left cursor-zoom-in" onClick={() => setPreviewMedia({ type: 'image', url: post.imageUrl || post.image, alt: 'Imagem da publicação' })} aria-label="Ampliar imagem da publicação"><img src={post.imageUrl || post.image} alt="Imagem da publicação" className="w-full max-h-[500px] object-cover transition-transform duration-200 group-hover:scale-[1.02]" /><span className="pointer-events-none absolute bottom-3 right-3 rounded-full bg-black/65 px-3 py-1 text-xs font-semibold text-white opacity-0 transition-opacity group-hover:opacity-100">Ampliar</span></button>}
+      {(post.videoUrl || post.video) && <button type="button" className="group relative block w-full overflow-hidden rounded-xl mb-3 border border-border bg-black text-left cursor-zoom-in" onClick={() => setPreviewMedia({ type: 'video', url: post.videoUrl || post.video, alt: 'Vídeo da publicação' })} aria-label="Abrir vídeo da publicação em tela ampliada"><video muted playsInline preload="metadata" className="w-full max-h-[500px] object-contain" src={post.videoUrl || post.video} /><span className="pointer-events-none absolute bottom-3 right-3 rounded-full bg-black/65 px-3 py-1 text-xs font-semibold text-white opacity-0 transition-opacity group-hover:opacity-100">Abrir vídeo</span></button>}
 
       <div className="flex flex-wrap items-center gap-4 pt-2 border-t border-border">
         <button type="button" onClick={() => setShowComments(!showComments)} className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground"><MessageSquare className="h-4 w-4" /><span>{formatNumber(commentsCount)}</span></button>
@@ -319,6 +334,13 @@ const PostCard = ({ post }: PostCardProps) => {
           <Button type="submit" size="sm" disabled={!newComment.trim()} className="bg-skillswap-teal hover:bg-teal-700 h-9"><Send size={14} /></Button>
         </form>}
         <div className="space-y-4">{commentTree.map((comment) => renderComment(comment))}</div>
+      </div>}
+
+      {previewMedia && <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/85 p-4 sm:p-8" role="dialog" aria-modal="true" aria-label="Visualização ampliada da publicação" onClick={() => setPreviewMedia(null)}>
+        <button type="button" className="absolute right-4 top-4 z-10 rounded-full bg-white/15 p-2 text-white hover:bg-white/25" onClick={() => setPreviewMedia(null)} aria-label="Fechar visualização"><X className="h-6 w-6" /></button>
+        <div className="flex max-h-full max-w-6xl items-center justify-center" onClick={(event) => event.stopPropagation()}>
+          {previewMedia.type === 'image' ? <img src={previewMedia.url} alt={previewMedia.alt} className="max-h-[90vh] max-w-[95vw] rounded-lg object-contain" /> : <video src={previewMedia.url} controls autoPlay playsInline className="max-h-[90vh] max-w-[95vw] rounded-lg object-contain" />}
+        </div>
       </div>}
     </div>
   );
