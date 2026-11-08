@@ -37,7 +37,22 @@ const ChatPage = () => {
 
   const [myData, setMyData] = useState<any>({});
 
-  const getConversationUserId = (convo: any) => convo?.user?.id || convo?.user?.userId;
+  const getCurrentUserId = () => myData?.userId || myData?.id || myData?.user?.userId || myData?.user?.id;
+  const getConversationUserId = (convo: any) =>
+    convo?.user?.userId
+    || convo?.user?.id
+    || convo?.participant?.userId
+    || convo?.participant?.id
+    || convo?.userId
+    || convo?.id;
+  const currentUserId = getCurrentUserId();
+
+  const getLocalDateTimeMin = () => {
+    const now = new Date();
+    now.setSeconds(0, 0);
+    now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+    return now.toISOString().slice(0, 16);
+  };
 
   const appendUniqueMessage = (incoming: any) => {
     setMessages((current) => {
@@ -57,7 +72,7 @@ const ChatPage = () => {
   useEffect(() => {
     // Espera o usuário autenticado estar carregado para que a conversa direta
     // aberta a partir de um perfil consiga buscar o histórico correto.
-    if (!myData.userId) return;
+    if (!getCurrentUserId()) return;
 
     ChatService.getConversations()
       .then(res => {
@@ -107,12 +122,12 @@ const ChatPage = () => {
       });
       
     return () => socket.current?.close();
-  }, [myData.userId, openChatTargetId, navigate, location.pathname]);
+  }, [currentUserId, openChatTargetId, navigate, location.pathname]);
 
   // Mantém a lista atualizada para que conversas e mensagens novas apareçam
   // sem abrir automaticamente a primeira conversa.
   useEffect(() => {
-    if (!myData.userId) return;
+    if (!currentUserId) return;
     const refreshConversations = () => {
       ChatService.getConversations()
         .then((res) => setConversations(Array.isArray(res.data) ? res.data : []))
@@ -120,7 +135,7 @@ const ChatPage = () => {
     };
     const interval = window.setInterval(refreshConversations, 7000);
     return () => window.clearInterval(interval);
-  }, [myData.userId]);
+  }, [currentUserId]);
 
   // 2. SELECIONAR CONVERSA E SINCRONIZAR HISTÓRICO
   const handleSelectConversation = async (convo: any) => {
@@ -129,8 +144,8 @@ const ChatPage = () => {
     
     // Busca histórico real (Java: /history/{id1}/{id2})
     const conversationUserId = getConversationUserId(convo);
-    if (myData.userId && conversationUserId) {
-        ChatService.getHistory(myData.userId, conversationUserId)
+    if (currentUserId && conversationUserId) {
+        ChatService.getHistory(currentUserId, conversationUserId)
           .then(res => {
             setMessages(res.data || []);
             scrollToBottom();
@@ -169,7 +184,7 @@ const ChatPage = () => {
           const currentContactId = String(conversationUserId);
           const senderId = String(msg?.senderId || msg?.sender?.userId || msg?.sender?.id || '');
           const receiverId = String(msg?.receiverId || msg?.receiver?.userId || msg?.receiver?.id || '');
-          const myUserId = String(myData.userId);
+          const myUserId = String(currentUserId);
           const belongsToConversation =
             (senderId === myUserId && receiverId === currentContactId) ||
             (senderId === currentContactId && receiverId === myUserId);
@@ -183,15 +198,15 @@ const ChatPage = () => {
 
   useEffect(() => {
     const conversationUserId = getConversationUserId(selectedConvo);
-    if (!myData.userId || !conversationUserId) return;
+    if (!currentUserId || !conversationUserId) return;
     const refreshHistory = () => {
-      ChatService.getHistory(myData.userId, conversationUserId)
+      ChatService.getHistory(currentUserId, conversationUserId)
         .then((res) => setMessages(Array.isArray(res.data) ? res.data : []))
         .catch(() => undefined);
     };
     const interval = window.setInterval(refreshHistory, 5000);
     return () => window.clearInterval(interval);
-  }, [myData.userId, selectedConvo?.id, selectedConvo?.user?.id, selectedConvo?.user?.userId]);
+  }, [currentUserId, selectedConvo?.id, selectedConvo?.user?.id, selectedConvo?.user?.userId]);
 
   const scrollToBottom = () => {
     setTimeout(() => {
@@ -205,8 +220,8 @@ const ChatPage = () => {
     
     const payload = { 
       content: message, 
-      senderId: myData.userId,
-      receiverId: selectedConvo.user.id || selectedConvo.user.userId,
+      senderId: currentUserId,
+      receiverId: getConversationUserId(selectedConvo),
       type: 'TEXT'
     };
     
@@ -292,16 +307,19 @@ const ChatPage = () => {
   };
 
   const scheduleLesson = async () => {
-    const teacherId = selectedConvo?.user?.id || selectedConvo?.user?.userId;
-    if (!teacherId || !myData.userId || !scheduledAt || !lessonTitle.trim()) {
+    const teacherId = getConversationUserId(selectedConvo);
+    const studentId = getCurrentUserId();
+    const lessonDate = scheduledAt ? new Date(scheduledAt) : null;
+    if (!teacherId || !studentId || !scheduledAt || !lessonTitle.trim()
+      || !lessonDate || Number.isNaN(lessonDate.getTime()) || lessonDate.getTime() <= Date.now()) {
       toast.error('Informe o assunto da aula, a data e o horário.');
       return;
     }
     try {
       await LessonService.schedule({
         teacherId,
-        studentId: myData.userId,
-        scheduledTime: new Date(scheduledAt).toISOString(),
+        studentId,
+        scheduledTime: lessonDate.toISOString(),
         title: lessonTitle.trim(),
       });
       setShowSchedule(false);
@@ -335,9 +353,10 @@ const ChatPage = () => {
   };
 
   const openSharedCall = () => {
-      const peerId = selectedConvo?.user?.id || selectedConvo?.user?.userId;
-      if (!peerId || !myData.userId) return;
-      const room = `skillswap-call-${[String(myData.userId), String(peerId)].sort().join('-')}`;
+      const peerId = getConversationUserId(selectedConvo);
+      const currentUserId = getCurrentUserId();
+      if (!peerId || !currentUserId) return;
+      const room = `skillswap-call-${[String(currentUserId), String(peerId)].sort().join('-')}`;
       const peer = selectedConvo?.user || {};
       const params = new URLSearchParams({
           room,
@@ -401,7 +420,20 @@ const ChatPage = () => {
                     <Video size={16} className="sm:mr-2" /><span className="hidden sm:inline">Chamada</span>
                  </Button>
                  <Button variant="outline" size="sm" className="h-9 w-9 px-0 sm:h-10 sm:w-auto sm:px-3" title="Agendar aula" onClick={() => setShowSchedule((current) => !current)}><Calendar size={16} className="sm:mr-2" /><span className="hidden sm:inline">Agendar</span></Button>
-                 <Button variant="default" size="sm" className="h-9 w-9 px-0 sm:h-10 sm:w-auto sm:px-3 bg-green-600 hover:bg-green-700 text-white font-bold" title="Encerrar curso" onClick={() => navigate('/cursos')}>
+                 <Button
+                    variant="default"
+                    size="sm"
+                    className="h-9 w-9 px-0 sm:h-10 sm:w-auto sm:px-3 bg-green-600 hover:bg-green-700 text-white font-bold"
+                    title="Encerrar curso"
+                    onClick={() => {
+                      const participantId = getConversationUserId(selectedConvo);
+                      if (!participantId) {
+                        toast.error('Não foi possível identificar a pessoa desta conversa.');
+                        return;
+                      }
+                      navigate(`/cursos?participantId=${encodeURIComponent(String(participantId))}`);
+                    }}
+                 >
                     <CheckCircle2 size={16} className="sm:mr-2"/><span className="hidden sm:inline">Encerrar Curso</span>
                  </Button>
                  <Button variant="ghost" size="icon" onClick={() => setShowInfoPanel(!showInfoPanel)}>
@@ -413,7 +445,7 @@ const ChatPage = () => {
             <div className="min-h-0 flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
               {messages.map((msg, i) => {
                 const senderId = msg?.senderId || msg?.sender?.userId || msg?.sender?.id;
-                const ownMessage = String(senderId) === String(myData.userId) || msg?.isOwn;
+                const ownMessage = String(senderId) === String(currentUserId) || msg?.isOwn;
                 return (
                 <div key={msg?.messageId || msg?.id || i} className={`flex flex-col ${ownMessage ? 'items-end' : 'items-start'}`}>
                   <div className={`max-w-[90%] sm:max-w-[75%] px-4 py-2 text-sm shadow-sm relative ${ownMessage ? 'bg-skillswap-teal text-white rounded-2xl rounded-tr-none' : 'bg-card border border-border rounded-2xl rounded-tl-none'}`}>
@@ -442,12 +474,12 @@ const ChatPage = () => {
                   <input type="text" maxLength={180} value={lessonTitle} onChange={(event) => setLessonTitle(event.target.value)} placeholder="Ex.: Introdução à programação" className="mt-1 block w-64 max-w-full rounded-md border border-border bg-background px-2 py-2 text-sm" />
                 </label>
                 <label className="text-xs font-semibold text-muted-foreground">Data e hora da aula
-                  <input type="datetime-local" min={new Date().toISOString().slice(0, 16)} value={scheduledAt} onChange={(event) => setScheduledAt(event.target.value)} className="mt-1 block rounded-md border border-border bg-background px-2 py-2 text-sm" />
+                  <input type="datetime-local" min={getLocalDateTimeMin()} value={scheduledAt} onChange={(event) => setScheduledAt(event.target.value)} className="mt-1 block rounded-md border border-border bg-background px-2 py-2 text-sm" />
                 </label>
                 <Button type="button" onClick={() => void scheduleLesson()} disabled={!scheduledAt || !lessonTitle.trim()} className="bg-skillswap-teal text-white">Salvar na Agenda</Button>
                 <Link to="/agenda"><Button type="button" variant="outline">Abrir Agenda</Button></Link>
               </div>
-              <p className="mt-2 text-xs text-muted-foreground">A aula fica registrada na Agenda SkillSwap. A integração com o Google Calendar é opcional.</p>
+              <p className="mt-2 text-xs text-muted-foreground">A aula fica registrada somente na Agenda SkillSwap. Os participantes recebem as notificações por e-mail e pela plataforma.</p>
             </div>}
 
             {/* BARRA DE INPUT */}

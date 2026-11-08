@@ -13,35 +13,17 @@ import br.com.teamss.skillswap.skill_swap.model.repositories.UserRepository;
 import br.com.teamss.skillswap.skill_swap.model.services.LessonService;
 import br.com.teamss.skillswap.skill_swap.model.services.NotificationService;
 import br.com.teamss.skillswap.skill_swap.model.services.UserServiceDTO;
-import com.google.api.client.googleapis.javanet.GoogleNetHttpTransport;
-import com.google.api.client.http.javanet.NetHttpTransport;
-import com.google.api.client.json.JsonFactory;
-import com.google.api.client.json.gson.GsonFactory;
-import com.google.api.services.calendar.Calendar;
-import com.google.api.services.calendar.model.Event;
-import com.google.api.services.calendar.model.EventAttendee;
-import com.google.api.services.calendar.model.EventDateTime;
-import com.google.auth.http.HttpCredentialsAdapter;
-import com.google.auth.oauth2.GoogleCredentials;
-import jakarta.annotation.PostConstruct;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.stereotype.Service;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.ByteArrayInputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.nio.charset.StandardCharsets;
-import java.security.GeneralSecurityException;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
-import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 
@@ -61,49 +43,28 @@ public class LessonServiceImpl implements LessonService {
     @Autowired
     private NotificationService notificationService;
 
-    // Injeta o CONTEÚDO do JSON a partir da variável de ambiente
-    @Value("${GOOGLE_CREDENTIALS_JSON:}")
-    private String credentialsJsonString;
-
-    @Value("${google.calendar.enabled:false}")
-    private boolean calendarEnabled;
-
-    @Value("${app.notifications.time-zone:America/Sao_Paulo}")
+    @org.springframework.beans.factory.annotation.Value("${app.notifications.time-zone:America/Sao_Paulo}")
     private String notificationTimeZone;
-
-    private static final JsonFactory JSON_FACTORY = GsonFactory.getDefaultInstance();
-    private static final String APPLICATION_NAME = "SkillSwap";
-    private Calendar calendarService;
 
     public LessonServiceImpl() {
     }
 
-    @PostConstruct
-    public void init() throws IOException, GeneralSecurityException {
-        if (!calendarEnabled) {
-            return;
-        }
-        if (credentialsJsonString == null || credentialsJsonString.isBlank()) {
-            logger.warn("Google Calendar habilitado, mas GOOGLE_CREDENTIALS_JSON não foi definido. "
-                    + "A agenda interna do SkillSwap continuará funcionando.");
-            return;
-        }
-
-        // Cria um InputStream a partir da String da variável de ambiente
-        try (InputStream inputStream = new ByteArrayInputStream(credentialsJsonString.getBytes(StandardCharsets.UTF_8))) {
-            final NetHttpTransport HTTP_TRANSPORT = GoogleNetHttpTransport.newTrustedTransport();
-            GoogleCredentials credentials = GoogleCredentials.fromStream(inputStream)
-                    .createScoped(Collections.singletonList("https://www.googleapis.com/auth/calendar"));
-            this.calendarService = new Calendar.Builder(HTTP_TRANSPORT, JSON_FACTORY, new HttpCredentialsAdapter(credentials))
-                    .setApplicationName(APPLICATION_NAME)
-                    .build();
-        }
-    }
-
-    // ... O resto da sua classe (scheduleLesson, createCalendarEvent, etc.) continua aqui sem alterações ...
     @Override
     @Transactional
     public Lesson scheduleLesson(LessonScheduleRequestDTO lessonRequest) {
+        if (lessonRequest == null
+                || lessonRequest.getTeacherId() == null
+                || lessonRequest.getStudentId() == null
+                || lessonRequest.getScheduledTime() == null) {
+            throw new IllegalArgumentException("Informe os participantes e a data da aula.");
+        }
+        if (lessonRequest.getTeacherId().equals(lessonRequest.getStudentId())) {
+            throw new IllegalArgumentException("Não é possível agendar uma aula com a própria conta.");
+        }
+        if (!lessonRequest.getScheduledTime().isAfter(Instant.now())) {
+            throw new IllegalArgumentException("A aula precisa ser agendada para uma data futura.");
+        }
+
         User teacher = userRepository.findById(lessonRequest.getTeacherId())
                 .orElseThrow(() -> new EntityNotFoundException("Professor não encontrado com ID: " + lessonRequest.getTeacherId()));
         User student = userRepository.findById(lessonRequest.getStudentId())
@@ -118,54 +79,16 @@ public class LessonServiceImpl implements LessonService {
         lesson.setScheduledTime(lessonRequest.getScheduledTime());
         lesson.setStatus("SCHEDULED");
         Lesson savedLesson = lessonRepository.save(lesson);
-        try {
-            createCalendarEvent(savedLesson, teacher.getEmail(), student.getEmail());
-        } catch (RuntimeException exception) {
-            // O registro da aula continua válido mesmo quando a integração
-            // opcional do Google Calendar estiver indisponível.
-            System.err.println("Não foi possível criar o evento no Google Calendar: " + exception.getMessage());
-        }
         notifyParticipants(savedLesson,
                 "Aula \"" + savedLesson.getTitle() + "\" agendada para " + savedLesson.getScheduledTime()
                         + " com " + teacher.getUsername() + ".");
         return savedLesson;
     }
 
-    private void createCalendarEvent(Lesson lesson, String teacherEmail, String studentEmail) {
-        if (!calendarEnabled) {
-            return;
-        }
-        if (calendarService == null) {
-            throw new IllegalStateException("O Google Calendar está habilitado, mas não foi inicializado.");
-        }
-        Event event = new Event()
-                .setSummary("SkillSwap: " + lesson.getTitle())
-                .setDescription("Aula de troca de habilidades entre "
-                        + lesson.getTeacher().getUsername() + " e " + lesson.getStudent().getUsername() + ".")
-                .setStart(new EventDateTime()
-                        .setDateTime(new com.google.api.client.util.DateTime(lesson.getScheduledTime().toEpochMilli()))
-                        .setTimeZone("America/Sao_Paulo"))
-                .setEnd(new EventDateTime()
-                        .setDateTime(new com.google.api.client.util.DateTime(
-                                lesson.getScheduledTime().atZone(ZoneId.of("America/Sao_Paulo"))
-                                        .plusHours(1).toInstant().toEpochMilli()))
-                        .setTimeZone("America/Sao_Paulo"));
-
-        EventAttendee teacher = new EventAttendee().setEmail(teacherEmail);
-        EventAttendee student = new EventAttendee().setEmail(studentEmail);
-        event.setAttendees(List.of(teacher, student));
-
-        try {
-            calendarService.events().insert("primary", event).execute();
-        } catch (IOException e) {
-            throw new RuntimeException("Erro ao criar evento no Google Calendar: " + e.getMessage());
-        }
-    }
-
 
     @Override
     public List<Lesson> getLessonsForUser(UUID userId) {
-        return lessonRepository.findByTeacher_UserIdOrStudent_UserIdOrderByScheduledTimeDesc(userId, userId);
+        return lessonRepository.findAllForUser(userId);
     }
 
     @Override
@@ -199,6 +122,15 @@ public class LessonServiceImpl implements LessonService {
     @Override
     @Transactional
     public void submitReview(Long lessonId, LessonReviewRequest request) {
+        if (request == null || request.stars() == null || request.stars() < 1 || request.stars() > 5) {
+            throw new IllegalArgumentException("Escolha uma nota de 1 a 5 estrelas antes de encerrar a aula.");
+        }
+        String skillSubject = request.skillSubject() == null ? "" : request.skillSubject().trim();
+        String reviewerFullName = request.fullName() == null ? "" : request.fullName().trim();
+        if (skillSubject.isBlank() || reviewerFullName.isBlank()) {
+            throw new IllegalArgumentException("Informe seu nome completo e o assunto da aula.");
+        }
+
         Lesson lesson = lessonRepository.findById(lessonId)
             .orElseThrow(() -> new EntityNotFoundException("Aula não encontrada."));
         User current = userRepository.findById(userServiceDTO.getAuthenticatedUser().getUserId())
@@ -218,14 +150,14 @@ public class LessonServiceImpl implements LessonService {
         review.setReviewedUser(reviewed);
         review.setStars(request.stars());
         review.setComment(request.comment() == null ? "" : request.comment().trim());
-        review.setSkillSubject(request.skillSubject().trim());
-        review.setReviewerFullName(request.fullName().trim());
+        review.setSkillSubject(skillSubject);
+        review.setReviewerFullName(reviewerFullName);
         lessonReviewRepository.save(review);
 
         if (isTeacher) {
-            lesson.setTeacherCertificateName(request.fullName().trim());
+            lesson.setTeacherCertificateName(reviewerFullName);
         } else {
-            lesson.setStudentCertificateName(request.fullName().trim());
+            lesson.setStudentCertificateName(reviewerFullName);
         }
         lessonRepository.save(lesson);
         String comment = request.comment() == null || request.comment().isBlank()
@@ -261,7 +193,7 @@ public class LessonServiceImpl implements LessonService {
     @Override
     public List<Lesson> getUpcomingLessons(UUID userId) {
         Instant now = Instant.now();
-        return lessonRepository.findByTeacher_UserIdOrStudent_UserIdAndScheduledTimeAfter(userId, userId, now);
+        return lessonRepository.findUpcomingForUser(userId, now);
     }
 
     @Override
@@ -297,7 +229,7 @@ public class LessonServiceImpl implements LessonService {
         boolean changed = false;
 
         if (now.toLocalDate().equals(lessonTime.toLocalDate())
-                && now.isBefore(lessonTime.minusHours(1))
+                && now.isBefore(lessonTime.plusMinutes(15))
                 && lesson.getMidnightReminderSentAt() == null) {
             notifyParticipants(lesson, "Hoje tem a aula \"" + lesson.getTitle() + "\" às "
                     + lessonTime.toLocalTime() + ".");

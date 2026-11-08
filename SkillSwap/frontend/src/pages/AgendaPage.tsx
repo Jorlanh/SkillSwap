@@ -16,12 +16,18 @@ const AgendaPage = () => {
   const [loading, setLoading] = useState(true);
 
   const loadAgenda = async () => {
+    setLoading(true);
     try {
-      const [{ data: lessonData }, { data: userData }] = await Promise.all([LessonService.getMine(), UserService.getMe()]);
+      const { data: lessonData } = await LessonService.getMine();
       setLessons(Array.isArray(lessonData) ? lessonData : []);
-      setCurrentUser(userData || null);
-    } catch {
-      toast.error('Não foi possível carregar sua agenda agora.');
+      try {
+        const { data: userData } = await UserService.getMe();
+        setCurrentUser(userData || null);
+      } catch {
+        setCurrentUser(null);
+      }
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || 'Não foi possível carregar sua agenda agora.');
     } finally {
       setLoading(false);
     }
@@ -39,11 +45,15 @@ const AgendaPage = () => {
       </div>
       {loading ? <div className="rounded-xl border border-border bg-card p-6 text-sm text-muted-foreground">Carregando sua agenda...</div> : orderedLessons.length === 0 ? <div className="rounded-xl border border-dashed border-border bg-card p-10 text-center text-sm text-muted-foreground">Nenhuma aula ou chamada agendada ainda.</div> : <div className="space-y-3">
         {orderedLessons.map((lesson) => {
+          const currentUserId = currentUser?.userId
+            || currentUser?.id
+            || currentUser?.user?.userId
+            || currentUser?.user?.id;
           const teacherId = lesson.teacher?.userId || lesson.teacher?.id;
           const studentId = lesson.student?.userId || lesson.student?.id;
-          const other = String(teacherId) === String(currentUser?.userId) ? lesson.student : lesson.teacher;
+          const other = String(teacherId) === String(currentUserId) ? lesson.student : lesson.teacher;
           const otherId = other?.userId || other?.id;
-          const room = otherId && currentUser?.userId ? `skillswap-call-${[String(currentUser.userId), String(otherId)].sort().join('-')}` : '';
+          const room = otherId && currentUserId ? `skillswap-call-${[String(currentUserId), String(otherId)].sort().join('-')}` : '';
           return <article key={lesson.lessonId || lesson.id} className="rounded-xl border border-border bg-card p-4 shadow-sm">
             <div className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="font-bold">{lesson.title || 'Aula SkillSwap'}</h2><p className="mt-1 flex items-center gap-1 text-sm text-muted-foreground"><Clock3 className="h-4 w-4" />{lesson.scheduledTime ? formatDate(lesson.scheduledTime) : 'Data não informada'}</p><p className="mt-1 text-sm text-muted-foreground">Com {other?.name || other?.username || 'participante'}</p></div><span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700"><CheckCircle2 className="h-4 w-4" />{lesson.status || 'AGENDADA'}</span></div>
             <div className="mt-4 flex flex-wrap gap-2">{otherId && room && <Link to={`/chamada/${otherId}?room=${encodeURIComponent(room)}&peerName=${encodeURIComponent(other?.name || other?.username || '')}&peerUsername=${encodeURIComponent(other?.username || '')}&peerAvatar=${encodeURIComponent(other?.profile?.imageUrl || other?.avatarUrl || other?.imageUrl || '')}`}><Button className="bg-skillswap-teal text-white"><Video className="mr-2 h-4 w-4" />Entrar na chamada</Button></Link>}<Button type="button" variant="outline" onClick={() => void loadAgenda()}>Atualizar</Button></div>

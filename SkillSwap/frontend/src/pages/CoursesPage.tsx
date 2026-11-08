@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Award, CheckCircle2, Clock, Printer } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -55,6 +56,7 @@ const printCertificate = (certificate: any) => {
 };
 
 const CoursesPage = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [lessons, setLessons] = useState<Lesson[]>([]);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -68,14 +70,16 @@ const CoursesPage = () => {
   const load = async () => {
     setLoading(true);
     try {
-      const [lessonsResponse, userResponse] = await Promise.all([
-        LessonService.getMine(),
-        UserService.getMe(),
-      ]);
+      const lessonsResponse = await LessonService.getMine();
       setLessons(lessonsResponse.data || []);
-      setCurrentUser(userResponse.data || null);
-    } catch {
-      toast.error('Não foi possível carregar as aulas.');
+      try {
+        const userResponse = await UserService.getMe();
+        setCurrentUser(userResponse.data || null);
+      } catch {
+        setCurrentUser(null);
+      }
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || 'Não foi possível carregar as aulas.');
     } finally {
       setLoading(false);
     }
@@ -90,6 +94,31 @@ const CoursesPage = () => {
     setReviewSubject(lesson.title || '');
     setReviewFullName('');
   };
+
+  useEffect(() => {
+    if (!lessons.length || reviewLesson) return;
+    const requestedLessonId = searchParams.get('lessonId');
+    const requestedParticipantId = searchParams.get('participantId');
+    const target = requestedLessonId
+      ? lessons.find((lesson) => String(lesson.lessonId) === requestedLessonId)
+      : requestedParticipantId
+        ? lessons.find((lesson) => {
+          const participantIds = [
+            lesson.teacher?.userId || lesson.teacher?.id,
+            lesson.student?.userId || lesson.student?.id,
+          ];
+          return participantIds.some((id) => String(id) === String(requestedParticipantId))
+            && lesson.status !== 'COMPLETED';
+        })
+        : undefined;
+
+    if (!target) return;
+    openReview(target);
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete('lessonId');
+    nextParams.delete('participantId');
+    setSearchParams(nextParams, { replace: true });
+  }, [lessons, reviewLesson, searchParams, setSearchParams]);
 
   const submitReview = async () => {
     if (!reviewLesson) return;
@@ -139,7 +168,10 @@ const CoursesPage = () => {
         <div className="grid gap-4">
           {lessons.map((lesson) => {
             const completed = lesson.status === 'COMPLETED';
-            const currentUserId = currentUser?.userId || currentUser?.id;
+  const currentUserId = currentUser?.userId
+    || currentUser?.id
+    || currentUser?.user?.userId
+    || currentUser?.user?.id;
             const teacherId = lesson.teacher?.userId || lesson.teacher?.id;
             const studentId = lesson.student?.userId || lesson.student?.id;
             const currentUserConfirmed = String(currentUserId) === String(teacherId)
