@@ -2,16 +2,14 @@ package br.com.teamss.skillswap.skill_swap.model.services.impl;
 
 import br.com.teamss.skillswap.skill_swap.dto.ChatMessageRequestDTO;
 import br.com.teamss.skillswap.skill_swap.model.entities.ChatMessage;
-import br.com.teamss.skillswap.skill_swap.model.entities.Notification;
 import br.com.teamss.skillswap.skill_swap.model.entities.User;
 import br.com.teamss.skillswap.skill_swap.model.exception.InappropriateContentException;
 import br.com.teamss.skillswap.skill_swap.model.repositories.ChatRepository;
-import br.com.teamss.skillswap.skill_swap.model.repositories.NotificationRepository;
 import br.com.teamss.skillswap.skill_swap.model.repositories.ProposalRepository;
 import br.com.teamss.skillswap.skill_swap.model.repositories.UserRepository;
 import br.com.teamss.skillswap.skill_swap.model.services.ChatService;
 import br.com.teamss.skillswap.skill_swap.model.services.ContentModerationService;
-import br.com.teamss.skillswap.skill_swap.model.services.EmailService;
+import br.com.teamss.skillswap.skill_swap.model.services.NotificationService;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -27,15 +25,13 @@ public class ChatServiceImpl implements ChatService {
     @Autowired
     private ChatRepository chatRepository;
     @Autowired
-    private NotificationRepository notificationRepository;
-    @Autowired
-    private EmailService emailService;
-    @Autowired
     private UserRepository userRepository;
     @Autowired
     private ContentModerationService moderationService;
     @Autowired
     private ProposalRepository proposalRepository;
+    @Autowired
+    private NotificationService notificationService;
 
     @Override
     @Transactional
@@ -100,30 +96,13 @@ public class ChatServiceImpl implements ChatService {
     private ChatMessage saveAndNotify(ChatMessage message) {
         ChatMessage savedMessage = chatRepository.save(message);
 
-        String receiverEmail = savedMessage.getReceiver().getEmail();
         String messageContent = "Você recebeu uma nova mensagem de " + savedMessage.getSender().getUsername() + ".";
-
-        Notification notification = new Notification();
-        notification.setUser(savedMessage.getReceiver());
-        notification.setMessage(messageContent);
-        notification.setSentAt(Instant.now());
-        notification.setRead(false);
         try {
-            notificationRepository.save(notification);
+            notificationService.createNotification(savedMessage.getReceiver().getUserId(), messageContent);
         } catch (RuntimeException exception) {
-            // A gravação da conversa não pode ser desfeita porque o serviço de
-            // notificações está com problema ou em migração.
-            System.err.println("Aviso: não foi possível registrar a notificação da mensagem: "
+            // A mensagem já foi salva; notificação é uma camada complementar.
+            System.err.println("Aviso: não foi possível distribuir a notificação da mensagem: "
                     + exception.getMessage());
-        }
-
-        // A mensagem continua disponível mesmo quando o SMTP do ambiente ainda
-        // não foi configurado. O e-mail é uma camada adicional de aviso, não o
-        // mecanismo de persistência do chat.
-        try {
-            emailService.sendNotification(receiverEmail, "Nova Mensagem no SkillSwap", messageContent);
-        } catch (RuntimeException exception) {
-            System.err.println("Aviso: não foi possível enviar o e-mail da mensagem: " + exception.getMessage());
         }
 
         return savedMessage;

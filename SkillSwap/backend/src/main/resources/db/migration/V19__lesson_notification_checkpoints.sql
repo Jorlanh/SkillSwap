@@ -1,0 +1,4 @@
+ALTER TABLE tb_lessons
+    ADD COLUMN IF NOT EXISTS midnight_reminder_sent_at TIMESTAMP WITH TIME ZONE,
+    ADD COLUMN IF NOT EXISTS one_hour_reminder_sent_at TIMESTAMP WITH TIME ZONE,
+    ADD COLUMN IF NOT EXISTS start_reminder_sent_at TIMESTAMP WITH TIME ZONE;

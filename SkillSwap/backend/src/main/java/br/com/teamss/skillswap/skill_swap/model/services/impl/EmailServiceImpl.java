@@ -1,6 +1,9 @@
 package br.com.teamss.skillswap.skill_swap.model.services.impl;
 
 import br.com.teamss.skillswap.skill_swap.model.services.EmailService;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.twilio.Twilio;
 import com.twilio.rest.api.v2010.account.Message;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -8,6 +11,10 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.SimpleMailMessage; 
 import org.springframework.mail.javamail.JavaMailSender; 
 import org.springframework.stereotype.Service;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.util.regex.Pattern;
 
 @Service
@@ -17,25 +24,39 @@ public class EmailServiceImpl implements EmailService {
         "^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$"
     );
 
-    // Utiliza o JavaMailSender injetado pelo Spring
-    @Autowired
-    private JavaMailSender mailSender;
+    private final JavaMailSender mailSender;
+    private final ObjectMapper objectMapper;
+    private final HttpClient httpClient = HttpClient.newHttpClient();
 
     // Obtém o email remetente configurado no application.properties (spring.mail.username)
-    @Value("${spring.mail.username}") 
+    @Value("${spring.mail.username:}")
     private String mailFrom;
 
-    @Value("${twilio.account.sid}")
+    @Value("${brevo.api-key:}")
+    private String brevoApiKey;
+
+    @Value("${brevo.api-url:https://api.brevo.com/v3/smtp/email}")
+    private String brevoApiUrl;
+
+    @Value("${brevo.sender-email:}")
+    private String brevoSenderEmail;
+
+    @Value("${brevo.sender-name:SkillSwap}")
+    private String brevoSenderName;
+
+    @Value("${twilio.account.sid:}")
     private String twilioAccountSid;
 
-    @Value("${twilio.auth.token}")
+    @Value("${twilio.auth.token:}")
     private String twilioAuthToken;
     
-    @Value("${twilio.phone.number}")
+    @Value("${twilio.phone.number:}")
     private String twilioPhoneNumber;
 
-    // Construtor vazio padrão, pois os atributos já usam @Autowired ou @Value
-    public EmailServiceImpl() {
+    @Autowired
+    public EmailServiceImpl(JavaMailSender mailSender, ObjectMapper objectMapper) {
+        this.mailSender = mailSender;
+        this.objectMapper = objectMapper;
     }
 
     // Método de envio de notificação usando Spring Mail
@@ -49,19 +70,49 @@ public class EmailServiceImpl implements EmailService {
         }
 
         try {
-            SimpleMailMessage message = new SimpleMailMessage();
-            if (!normalizedFrom.isBlank() && SIMPLE_EMAIL.matcher(normalizedFrom).matches()) {
-                message.setFrom(normalizedFrom);
+            if (brevoApiKey != null && !brevoApiKey.isBlank()) {
+                sendViaBrevo(normalizedTo, subject, body);
+            } else {
+                SimpleMailMessage message = new SimpleMailMessage();
+                if (!normalizedFrom.isBlank() && SIMPLE_EMAIL.matcher(normalizedFrom).matches()) {
+                    message.setFrom(normalizedFrom);
+                }
+                message.setTo(normalizedTo);
+                message.setSubject(subject == null ? "SkillSwap" : subject.trim());
+                message.setText(body == null ? "" : body);
+                mailSender.send(message);
             }
-            message.setTo(normalizedTo);
-            message.setSubject(subject == null ? "SkillSwap" : subject.trim());
-            message.setText(body == null ? "" : body);
-
-            mailSender.send(message);
         } catch (Exception ex) {
-            // Lança RuntimeException para que o Controller capture e retorne um erro 500/400
-            // Se a senha do App Password estiver errada, o erro virá daqui.
-            throw new RuntimeException("Falha ao enviar email via Spring Mail: " + ex.getMessage(), ex);
+            throw new RuntimeException("Falha ao enviar e-mail de notificação: " + ex.getMessage(), ex);
+        }
+    }
+
+    private void sendViaBrevo(String to, String subject, String body) throws Exception {
+        String sender = brevoSenderEmail == null || brevoSenderEmail.isBlank()
+                ? mailFrom
+                : brevoSenderEmail.trim();
+        if (sender == null || !SIMPLE_EMAIL.matcher(sender).matches()) {
+            throw new IllegalStateException("BREVO_SENDER_EMAIL precisa ser um remetente verificado no Brevo.");
+        }
+
+        ObjectNode payload = objectMapper.createObjectNode();
+        ObjectNode senderNode = payload.putObject("sender");
+        senderNode.put("email", sender);
+        senderNode.put("name", brevoSenderName == null || brevoSenderName.isBlank() ? "SkillSwap" : brevoSenderName);
+        ArrayNode recipients = payload.putArray("to");
+        recipients.addObject().put("email", to);
+        payload.put("subject", subject == null || subject.isBlank() ? "SkillSwap" : subject.trim());
+        payload.put("textContent", body == null ? "" : body);
+
+        HttpRequest request = HttpRequest.newBuilder(URI.create(brevoApiUrl))
+                .header("accept", "application/json")
+                .header("api-key", brevoApiKey.trim())
+                .header("content-type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(payload)))
+                .build();
+        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+        if (response.statusCode() < 200 || response.statusCode() >= 300) {
+            throw new IllegalStateException("Brevo respondeu HTTP " + response.statusCode());
         }
     }
 

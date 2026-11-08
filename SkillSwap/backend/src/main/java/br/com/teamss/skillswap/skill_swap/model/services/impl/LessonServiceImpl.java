@@ -6,13 +6,10 @@ import br.com.teamss.skillswap.skill_swap.dto.LessonCertificateResponse;
 import br.com.teamss.skillswap.skill_swap.dto.LessonReviewRequest;
 import br.com.teamss.skillswap.skill_swap.model.entities.Lesson;
 import br.com.teamss.skillswap.skill_swap.model.entities.LessonReview;
-import br.com.teamss.skillswap.skill_swap.model.entities.Notification;
 import br.com.teamss.skillswap.skill_swap.model.entities.User;
 import br.com.teamss.skillswap.skill_swap.model.repositories.LessonRepository;
 import br.com.teamss.skillswap.skill_swap.model.repositories.LessonReviewRepository;
-import br.com.teamss.skillswap.skill_swap.model.repositories.NotificationRepository;
 import br.com.teamss.skillswap.skill_swap.model.repositories.UserRepository;
-import br.com.teamss.skillswap.skill_swap.model.services.EmailService;
 import br.com.teamss.skillswap.skill_swap.model.services.LessonService;
 import br.com.teamss.skillswap.skill_swap.model.services.NotificationService;
 import br.com.teamss.skillswap.skill_swap.model.services.UserServiceDTO;
@@ -33,6 +30,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.stereotype.Service;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -49,12 +48,10 @@ import java.util.UUID;
 @Service
 public class LessonServiceImpl implements LessonService {
 
+    private static final Logger logger = LoggerFactory.getLogger(LessonServiceImpl.class);
+
     @Autowired
     private LessonRepository lessonRepository;
-    @Autowired
-    private EmailService emailService;
-    @Autowired
-    private NotificationRepository notificationRepository;
     @Autowired
     private UserRepository userRepository;
     @Autowired
@@ -71,6 +68,9 @@ public class LessonServiceImpl implements LessonService {
     @Value("${google.calendar.enabled:false}")
     private boolean calendarEnabled;
 
+    @Value("${app.notifications.time-zone:America/Sao_Paulo}")
+    private String notificationTimeZone;
+
     private static final JsonFactory JSON_FACTORY = GsonFactory.getDefaultInstance();
     private static final String APPLICATION_NAME = "SkillSwap";
     private Calendar calendarService;
@@ -84,7 +84,9 @@ public class LessonServiceImpl implements LessonService {
             return;
         }
         if (credentialsJsonString == null || credentialsJsonString.isBlank()) {
-            throw new IllegalStateException("A variável de ambiente 'GOOGLE_CREDENTIALS_JSON' não foi definida.");
+            logger.warn("Google Calendar habilitado, mas GOOGLE_CREDENTIALS_JSON não foi definido. "
+                    + "A agenda interna do SkillSwap continuará funcionando.");
+            return;
         }
 
         // Cria um InputStream a partir da String da variável de ambiente
@@ -266,80 +268,82 @@ public class LessonServiceImpl implements LessonService {
     @Transactional
     public void notifyLesson(Long lessonId) {
         Lesson lesson = lessonRepository.findById(lessonId)
-                .orElseThrow(() -> new RuntimeException("Lesson not found"));
-        if (lesson.getScheduledTime() == null) {
+                .orElseThrow(() -> new RuntimeException("Aula não encontrada."));
+        processLessonReminders(lesson, ZonedDateTime.now(notificationZone()));
+    }
+
+    private ZoneId notificationZone() {
+        try {
+            return ZoneId.of(notificationTimeZone);
+        } catch (RuntimeException exception) {
+            logger.warn("Fuso de notificações inválido '{}'. Usando America/Sao_Paulo.", notificationTimeZone);
+            return ZoneId.of("America/Sao_Paulo");
+        }
+    }
+
+    /**
+     * Mantém três pontos de controle separados para que cada participante
+     * receba exatamente um aviso no dia, um aviso uma hora antes e um aviso
+     * no início da aula, mesmo que o scheduler execute várias vezes.
+     */
+    private void processLessonReminders(Lesson lesson, ZonedDateTime now) {
+        if (lesson.getScheduledTime() == null || lesson.getTeacher() == null || lesson.getStudent() == null
+                || !"SCHEDULED".equalsIgnoreCase(lesson.getStatus())) {
             return;
         }
-        User teacher = lesson.getTeacher();
-        User student = lesson.getStudent();
-        ZonedDateTime now = ZonedDateTime.now(ZoneId.of("America/Sao_Paulo"));
-        ZonedDateTime lessonTime = lesson.getScheduledTime().atZone(ZoneId.of("America/Sao_Paulo"));
 
-        String lessonDetails = null;
-        if (now.toLocalTime().isAfter(lessonTime.toLocalTime().minusMinutes(15))
-                && now.toLocalTime().isBefore(lessonTime.toLocalTime().plusMinutes(15))) {
-            lessonDetails = "A aula \"" + lesson.getTitle() + "\" com " + teacher.getUsername()
-                    + " começa agora às " + lessonTime.toLocalTime() + ".";
-            Instant lastReminder = lesson.getLastReminderSentAt();
-            Instant reminderWindowStart = lesson.getScheduledTime().minusSeconds(15 * 60L);
-            if (lastReminder != null && !lastReminder.isBefore(reminderWindowStart)) {
-                return;
-            }
-            lesson.setLastReminderSentAt(Instant.now());
-            lessonRepository.save(lesson);
-        } else if (now.toLocalDate().equals(lessonTime.toLocalDate())) {
-            lessonDetails = "Aula \"" + lesson.getTitle() + "\" agendada para hoje às " + lessonTime.toLocalTime()
-                    + " com " + teacher.getUsername() + ".";
+        ZonedDateTime lessonTime = lesson.getScheduledTime().atZone(notificationZone());
+        Instant nowInstant = now.toInstant();
+        boolean changed = false;
+
+        if (now.toLocalDate().equals(lessonTime.toLocalDate())
+                && now.isBefore(lessonTime.minusHours(1))
+                && lesson.getMidnightReminderSentAt() == null) {
+            notifyParticipants(lesson, "Hoje tem a aula \"" + lesson.getTitle() + "\" às "
+                    + lessonTime.toLocalTime() + ".");
+            lesson.setMidnightReminderSentAt(nowInstant);
+            changed = true;
         }
-        if (lessonDetails != null) {
-            notifyParticipants(lesson, lessonDetails);
+
+        if (!now.isBefore(lessonTime.minusHours(1))
+                && now.isBefore(lessonTime.minusMinutes(5))
+                && lesson.getOneHourReminderSentAt() == null) {
+            notifyParticipants(lesson, "Falta 1 hora para a aula \"" + lesson.getTitle() + "\" começar.");
+            lesson.setOneHourReminderSentAt(nowInstant);
+            changed = true;
+        }
+
+        if (!now.isBefore(lessonTime.minusMinutes(1))
+                && now.isBefore(lessonTime.plusMinutes(15))
+                && lesson.getStartReminderSentAt() == null) {
+            notifyParticipants(lesson, "A aula \"" + lesson.getTitle() + "\" começa agora.");
+            lesson.setStartReminderSentAt(nowInstant);
+            lesson.setLastReminderSentAt(nowInstant);
+            changed = true;
+        }
+
+        if (changed) {
+            lessonRepository.save(lesson);
         }
     }
 
     private void notifyParticipants(Lesson lesson, String message) {
         for (User participant : List.of(lesson.getTeacher(), lesson.getStudent())) {
-            Notification notification = new Notification();
-            notification.setUser(participant);
-            notification.setMessage(message);
-            notification.setSentAt(Instant.now());
-            notification.setRead(false);
-            notificationRepository.save(notification);
             try {
-                emailService.sendLessonNotification(participant.getEmail(), message);
+                notificationService.createNotification(participant.getUserId(), message);
             } catch (RuntimeException exception) {
-                System.err.println("Aviso: não foi possível enviar o e-mail da aula: " + exception.getMessage());
+                logger.warn("Não foi possível distribuir o lembrete para {}: {}",
+                        participant.getUserId(), exception.getMessage());
             }
         }
     }
 
-    @Scheduled(cron = "0 0 0 * * ?")
-    public void dailyNotificationCheck() {
-        List<Lesson> lessons = lessonRepository.findAll();
-        ZonedDateTime now = ZonedDateTime.now(ZoneId.of("America/Sao_Paulo"));
-        for (Lesson lesson : lessons) {
-            if (lesson.getScheduledTime() == null) {
-                continue;
-            }
-            ZonedDateTime lessonTime = lesson.getScheduledTime().atZone(ZoneId.of("America/Sao_Paulo"));
-            if (now.toLocalDate().equals(lessonTime.toLocalDate())) {
-                notifyLesson(lesson.getLessonId());
-            }
-        }
-    }
-
-    @Scheduled(fixedDelay = 60000, initialDelay = 60000)
-    public void lessonTimeNotificationCheck() {
-        Instant now = Instant.now();
-        // A consulta ampla permite verificar as aulas de todos os participantes.
+    @Scheduled(fixedDelay = 60000, initialDelay = 10000)
+    @Transactional
+    public void lessonReminderCheck() {
+        ZonedDateTime now = ZonedDateTime.now(notificationZone());
         for (Lesson lesson : lessonRepository.findAll()) {
-            if (lesson.getScheduledTime() == null) {
-                continue;
-            }
-            Instant scheduled = lesson.getScheduledTime();
-            if (!scheduled.isBefore(now.minusSeconds(15 * 60L))
-                    && !scheduled.isAfter(now.plusSeconds(15 * 60L))) {
-                notifyLesson(lesson.getLessonId());
-            }
+            processLessonReminders(lesson, now);
         }
     }
 }

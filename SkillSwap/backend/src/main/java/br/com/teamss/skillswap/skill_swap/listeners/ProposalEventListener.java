@@ -1,14 +1,12 @@
 package br.com.teamss.skillswap.skill_swap.listeners;
 
 import br.com.teamss.skillswap.skill_swap.events.ProposalCompletedEvent;
-import br.com.teamss.skillswap.skill_swap.model.entities.Notification;
 import br.com.teamss.skillswap.skill_swap.model.entities.Proposal;
 import br.com.teamss.skillswap.skill_swap.model.entities.User;
-import br.com.teamss.skillswap.skill_swap.model.repositories.NotificationRepository;
 import br.com.teamss.skillswap.skill_swap.model.repositories.ProposalRepository;
 import br.com.teamss.skillswap.skill_swap.model.repositories.UserRepository;
 import br.com.teamss.skillswap.skill_swap.model.services.AchievementService;
-import br.com.teamss.skillswap.skill_swap.model.services.EmailService;
+import br.com.teamss.skillswap.skill_swap.model.services.NotificationService;
 import br.com.teamss.skillswap.skill_swap.model.services.SearchService;
 import br.com.teamss.skillswap.skill_swap.model.services.impl.SearchServiceImpl;
 import org.slf4j.Logger;
@@ -18,18 +16,13 @@ import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 
-import java.time.Instant;
-
 @Component
 public class ProposalEventListener {
 
     private static final Logger logger = LoggerFactory.getLogger(ProposalEventListener.class);
 
     @Autowired
-    private EmailService emailService;
-
-    @Autowired
-    private NotificationRepository notificationRepository;
+    private NotificationService notificationService;
 
     @Autowired
     private AchievementService achievementService;
@@ -104,13 +97,6 @@ public class ProposalEventListener {
 
     // Lógica movida do ProposalServiceImpl
     private void sendNotification(User userToNotify, String subject, String message) {
-        emailService.sendNotification(userToNotify.getEmail(), subject, message);
-
-        Notification notification = new Notification();
-        notification.setUser(userToNotify);
-        notification.setMessage(message);
-        notification.setSentAt(Instant.now());
-        notification.setRead(false);
-        notificationRepository.save(notification);
+        notificationService.createNotification(userToNotify.getUserId(), message);
     }
 }

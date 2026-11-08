@@ -5,6 +5,7 @@ import br.com.teamss.skillswap.skill_swap.model.entities.Notification;
 import br.com.teamss.skillswap.skill_swap.model.entities.User;
 import br.com.teamss.skillswap.skill_swap.model.repositories.NotificationRepository;
 import br.com.teamss.skillswap.skill_swap.model.repositories.UserRepository;
+import br.com.teamss.skillswap.skill_swap.model.services.EmailService;
 import br.com.teamss.skillswap.skill_swap.model.services.NotificationService;
 
 // IMPORTS DO FIREBASE ADICIONADOS
@@ -12,8 +13,11 @@ import com.google.firebase.messaging.FirebaseMessaging;
 import com.google.firebase.messaging.Message;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.time.Instant;
 import java.util.List;
@@ -23,13 +27,25 @@ import java.util.stream.Collectors;
 @Service
 public class NotificationServiceImpl implements NotificationService {
 
+    private static final Logger logger = LoggerFactory.getLogger(NotificationServiceImpl.class);
+
     private final NotificationRepository notificationRepository;
     private final UserRepository userRepository;
+    private final EmailService emailService;
+
+    @Value("${notifications.email.enabled:true}")
+    private boolean emailEnabled;
+
+    @Value("${notifications.push.enabled:true}")
+    private boolean pushEnabled;
 
     @Autowired
-    public NotificationServiceImpl(NotificationRepository notificationRepository, UserRepository userRepository) {
+    public NotificationServiceImpl(NotificationRepository notificationRepository,
+                                   UserRepository userRepository,
+                                   EmailService emailService) {
         this.notificationRepository = notificationRepository;
         this.userRepository = userRepository;
+        this.emailService = emailService;
     }
 
     @Override
@@ -79,24 +95,34 @@ public class NotificationServiceImpl implements NotificationService {
         notification.setRead(false);
         notificationRepository.save(notification);
 
-        // 2. DISPARAR PUSH REAL (Para o navegador/celular do usuário)
-        // Certifique-se de que o campo fcmToken existe na sua entidade User
-        String deviceToken = user.getFcmToken(); 
-        
-        if (deviceToken != null && !deviceToken.isEmpty()) {
+        // 2. E-MAIL TRANSACIONAL (Brevo por API; SMTP como fallback)
+        if (emailEnabled && user.getEmail() != null && !user.getEmail().isBlank()) {
             try {
-                Message firebaseMessage = Message.builder()
-                    .setToken(deviceToken)
-                    .setNotification(com.google.firebase.messaging.Notification.builder()
-                        .setTitle("SkillSwapHub")
-                        .setBody(message)
-                        .build())
-                    .build();
+                emailService.sendNotification(user.getEmail(), "SkillSwap - Nova notificação", message);
+            } catch (RuntimeException exception) {
+                logger.warn("Notificação interna salva, mas o e-mail não foi enviado para {}: {}",
+                        user.getEmail(), exception.getMessage());
+            }
+        }
 
+        // 3. PUSH REAL (Firebase Cloud Messaging)
+        String deviceToken = user.getFcmToken();
+        if (pushEnabled && deviceToken != null && !deviceToken.isBlank()) {
+            try {
+                if (com.google.firebase.FirebaseApp.getApps().isEmpty()) {
+                    logger.warn("Push não enviado para {}: Firebase Admin não está configurado.", user.getUserId());
+                    return;
+                }
+                Message firebaseMessage = Message.builder()
+                        .setToken(deviceToken)
+                        .setNotification(com.google.firebase.messaging.Notification.builder()
+                                .setTitle("SkillSwap")
+                                .setBody(message)
+                                .build())
+                        .build();
                 FirebaseMessaging.getInstance().sendAsync(firebaseMessage);
             } catch (Exception e) {
-                // Log de erro silencioso para não travar o fluxo do sistema
-                System.err.println("Erro ao enviar Push: " + e.getMessage());
+                logger.warn("Não foi possível enviar push para {}: {}", user.getUserId(), e.getMessage());
             }
         }
     }

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter, Route, Routes, useLocation } from 'react-router-dom';
@@ -30,6 +30,7 @@ import VideoCallPage from '@/pages/VideoCallPage';
 import AgendaPage from '@/pages/AgendaPage';
 import { auth } from './lib/firebase';
 import { onIdTokenChanged } from 'firebase/auth';
+import { requestNotificationPermission } from './lib/messaging';
 
 const queryClient = new QueryClient();
 
@@ -54,12 +55,18 @@ const App = () => {
   // persistidos no localStorage; o interceptor solicita um token fresco
   // diretamente ao SDK quando uma chamada protegida é feita.
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const notificationPermissionRequested = useRef(false);
 
   useEffect(() => onIdTokenChanged(auth, async (user) => {
     if (user) {
       setIsAuthenticated(true);
+      if (!notificationPermissionRequested.current) {
+        notificationPermissionRequested.current = true;
+        void requestNotificationPermission();
+      }
     } else {
       setIsAuthenticated(false);
+      notificationPermissionRequested.current = false;
     }
   }), []);
 

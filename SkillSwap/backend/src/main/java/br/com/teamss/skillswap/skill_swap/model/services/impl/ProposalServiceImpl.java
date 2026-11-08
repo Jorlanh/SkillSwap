@@ -5,16 +5,14 @@ import br.com.teamss.skillswap.skill_swap.dto.ProposalResponseDTO;
 import br.com.teamss.skillswap.skill_swap.dto.UserDTO;
 import br.com.teamss.skillswap.skill_swap.dto.UserSummaryDTO;
 import br.com.teamss.skillswap.skill_swap.events.ProposalCompletedEvent; // ADICIONADO
-import br.com.teamss.skillswap.skill_swap.model.entities.Notification;
 import br.com.teamss.skillswap.skill_swap.model.entities.Proposal;
 import br.com.teamss.skillswap.skill_swap.model.entities.Skill;
 import br.com.teamss.skillswap.skill_swap.model.entities.User;
-import br.com.teamss.skillswap.skill_swap.model.repositories.NotificationRepository;
 import br.com.teamss.skillswap.skill_swap.model.repositories.ProposalRepository;
 import br.com.teamss.skillswap.skill_swap.model.repositories.SkillRepository;
 import br.com.teamss.skillswap.skill_swap.model.repositories.UserRepository;
 import br.com.teamss.skillswap.skill_swap.model.services.AchievementService;
-import br.com.teamss.skillswap.skill_swap.model.services.EmailService;
+import br.com.teamss.skillswap.skill_swap.model.services.NotificationService;
 import br.com.teamss.skillswap.skill_swap.model.services.ProposalService;
 import br.com.teamss.skillswap.skill_swap.model.services.UserServiceDTO;
 import jakarta.persistence.EntityNotFoundException;
@@ -40,13 +38,11 @@ public class ProposalServiceImpl implements ProposalService {
     @Autowired
     private ProposalRepository proposalRepository;
     @Autowired
-    private NotificationRepository notificationRepository;
-    @Autowired
     private UserRepository userRepository;
     @Autowired
     private SkillRepository skillRepository;
     @Autowired
-    private EmailService emailService;
+    private NotificationService notificationService;
     @Autowired
     private UserServiceDTO userServiceDTO;
     
@@ -108,13 +104,12 @@ public class ProposalServiceImpl implements ProposalService {
         
         Proposal savedProposal = proposalRepository.save(proposal);
 
-        String receiverEmail = savedProposal.getReceiver().getEmail();
         String messageContent = "Você recebeu uma proposta de troca de habilidades de " + savedProposal.getSender().getUsername() +
                                ": Oferece " + savedProposal.getOfferedSkill().getName() +
                                " em troca de " + savedProposal.getRequestedSkill().getName() +
                                (savedProposal.getMessage() == null ? "" : ". Mensagem: " + savedProposal.getMessage());
         
-        sendNotification(savedProposal.getReceiver(), receiverEmail, "Nova Proposta no SkillSwap", messageContent);
+        sendNotification(savedProposal.getReceiver(), messageContent);
         
         return savedProposal;
     }
@@ -169,7 +164,7 @@ public class ProposalServiceImpl implements ProposalService {
         User userToNotify = isReceiver ? proposal.getSender() : proposal.getReceiver();
         String messageContent = "Boas notícias! " + authenticatedUser.getUsername() +
                 " aceitou a proposta de troca. A conversa entre vocês já está disponível no chat.";
-        sendNotification(userToNotify, userToNotify.getEmail(), "Proposta Aceita no SkillSwap!", messageContent);
+        sendNotification(userToNotify, messageContent);
         
         return proposalRepository.save(proposal);
     }
@@ -204,7 +199,7 @@ public class ProposalServiceImpl implements ProposalService {
         
         String messageContent = proposal.getReceiver().getUsername() +
                 " enviou uma contraproposta: " + normalizedCounterMessage;
-        sendNotification(proposal.getSender(), proposal.getSender().getEmail(), "Contraproposta no SkillSwap", messageContent);
+        sendNotification(proposal.getSender(), messageContent);
 
         return proposalRepository.save(proposal);
     }
@@ -236,7 +231,7 @@ public class ProposalServiceImpl implements ProposalService {
         
         User userToNotify = isSender ? proposal.getReceiver() : proposal.getSender();
         String messageContent = "A proposta de troca de habilidades foi rejeitada.";
-        sendNotification(userToNotify, userToNotify.getEmail(), "Proposta Rejeitada", messageContent);
+        sendNotification(userToNotify, messageContent);
         
         return proposalRepository.save(proposal);
     }
@@ -259,7 +254,7 @@ public class ProposalServiceImpl implements ProposalService {
         proposal.setUpdatedAt(Instant.now());
         
         String messageContent = "A sua proposta foi bloqueada pelo destinatário. Você não poderá enviar novas propostas para este utilizador.";
-        sendNotification(proposal.getSender(), proposal.getSender().getEmail(), "Proposta Bloqueada", messageContent);
+        sendNotification(proposal.getSender(), messageContent);
         
         return proposalRepository.save(proposal);
     }
@@ -302,22 +297,12 @@ public class ProposalServiceImpl implements ProposalService {
 
     // REMOVIDO: checkAutomaticVerification (movido para o Listener)
 
-    private void sendNotification(User userToNotify, String email, String subject, String message) {
-        Notification notification = new Notification();
-        notification.setUser(userToNotify);
-        notification.setMessage(message);
-        notification.setSentAt(Instant.now());
-        notification.setRead(false);
-        notificationRepository.save(notification);
-
-        // A proposta e a notificação interna não podem deixar de ser salvas
-        // somente porque o SMTP está indisponível ou foi configurado com um
-        // endereço inválido. O e-mail é um aviso complementar.
+    private void sendNotification(User userToNotify, String message) {
         try {
-            emailService.sendNotification(email, subject, message);
+            notificationService.createNotification(userToNotify.getUserId(), message);
         } catch (RuntimeException exception) {
-            logger.warn("Não foi possível enviar o e-mail da proposta para {}: {}",
-                    email, exception.getMessage());
+            logger.warn("Não foi possível distribuir a notificação da proposta para {}: {}",
+                    userToNotify.getUserId(), exception.getMessage());
         }
     }
 }
