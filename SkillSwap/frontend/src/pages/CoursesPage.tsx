@@ -26,33 +26,13 @@ type Lesson = {
   student?: LessonParticipant;
 };
 
-const escapeHtml = (value: unknown) => String(value ?? '').replace(/[&<>'"]/g, (character) => ({
-  '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;',
-}[character] ?? character));
-
-const printCertificate = (certificate: any) => {
-  const popup = window.open('', '_blank', 'noopener,noreferrer,width=900,height=700');
-  if (!popup) {
-    toast.error('O navegador bloqueou a janela do certificado. Permita pop-ups para a SkillSwap.');
-    return;
-  }
-  const date = new Date(certificate.completedAt).toLocaleDateString('pt-BR');
-  const hours = (Number(certificate.durationMinutes || 60) / 60).toFixed(1).replace('.', ',');
-  popup.document.write(`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Certificado SkillSwap</title><style>
-    body{font-family:Arial,sans-serif;background:#f4f7f8;padding:48px;color:#17202a}
-    .certificate{max-width:760px;margin:auto;background:#fff;border:12px solid #0d9488;padding:64px;text-align:center;box-shadow:0 10px 30px #0002}
-    h1{color:#0d9488;font-size:36px;margin:0 0 24px} h2{font-size:28px;margin:18px 0}
-    p{font-size:18px;line-height:1.6}.meta{margin-top:32px;font-size:14px;color:#435}
-    @media print{body{background:#fff;padding:0}.certificate{box-shadow:none}}
-  </style></head><body><main class="certificate" aria-labelledby="title">
-    <h1 id="title">SkillSwap</h1><p>Certificado de conclusão</p>
-    <p>Registramos a participação de</p><h2>${escapeHtml(certificate.studentName)}</h2>
-    <p>como aluno na aula <strong>${escapeHtml(certificate.lessonTitle)}</strong>, com duração de ${hours} hora(s), com acompanhamento de ${escapeHtml(certificate.teacherName)}.</p>
-    <p>O certificado também reconhece a participação de <strong>${escapeHtml(certificate.teacherName)}</strong> como professor e participante da troca de conhecimentos.</p>
-    <p class="meta">Concluído em ${date}<br>Identificador: ${escapeHtml(certificate.certificateId)}</p>
-    <p class="meta">Comprovante de participação na plataforma SkillSwap. Não substitui diploma ou certificação profissional.</p>
-  </main><script>window.onload=()=>window.print()</script></body></html>`);
-  popup.document.close();
+type CertificateData = {
+  certificateId: string;
+  studentName: string;
+  teacherName: string;
+  lessonTitle: string;
+  durationMinutes?: number;
+  completedAt: string;
 };
 
 const CoursesPage = () => {
@@ -66,6 +46,7 @@ const CoursesPage = () => {
   const [reviewSubject, setReviewSubject] = useState('');
   const [reviewFullName, setReviewFullName] = useState('');
   const [savingReview, setSavingReview] = useState(false);
+  const [certificatePreview, setCertificatePreview] = useState<CertificateData | null>(null);
 
   const load = async () => {
     setLoading(true);
@@ -150,10 +131,14 @@ const CoursesPage = () => {
   const certificate = async (lessonId: number) => {
     try {
       const response = await LessonService.getCertificate(lessonId);
-      printCertificate(response.data);
+      setCertificatePreview(response.data);
     } catch {
-      toast.error('O certificado só é liberado após a confirmação dos dois participantes e fica disponível para o aluno.');
+      toast.info('O certificado ainda não está disponível. Os dois participantes precisam confirmar a aula.');
     }
+  };
+
+  const printCertificate = () => {
+    window.print();
   };
 
   return (
@@ -234,6 +219,49 @@ const CoursesPage = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {certificatePreview && (
+        <>
+          <style>{`@page{size:A4 landscape;margin:0}
+            @media print{
+              body *{visibility:hidden!important}
+              .certificate-print-sheet,.certificate-print-sheet *{visibility:visible!important}
+              .certificate-preview-overlay{position:static!important;background:transparent!important;padding:0!important}
+              .certificate-preview-dialog{display:block!important;max-width:none!important;width:100%!important;padding:0!important;box-shadow:none!important;background:transparent!important}
+              .certificate-preview-toolbar{display:none!important}
+              .certificate-print-sheet{position:absolute!important;inset:0!important;width:297mm!important;height:210mm!important;max-width:none!important;aspect-ratio:auto!important;border-radius:0!important;box-shadow:none!important}
+            }`}</style>
+          <div className="certificate-preview-overlay fixed inset-0 z-[60] flex items-center justify-center overflow-y-auto bg-black/70 p-4" role="dialog" aria-modal="true" aria-labelledby="certificate-preview-title">
+            <div className="certificate-preview-dialog w-full max-w-5xl rounded-2xl bg-background p-4 shadow-2xl">
+              <div className="certificate-preview-toolbar mb-4 flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h2 id="certificate-preview-title" className="text-xl font-bold">Certificado SkillSwap</h2>
+                  <p className="text-sm text-muted-foreground">Use “Salvar como PDF” na janela de impressão.</p>
+                </div>
+                <div className="flex gap-2">
+                  <Button type="button" variant="outline" onClick={() => setCertificatePreview(null)}>Fechar</Button>
+                  <Button type="button" onClick={printCertificate} className="bg-skillswap-teal text-white"><Printer size={17} className="mr-2" />Salvar como PDF</Button>
+                </div>
+              </div>
+              <article className="certificate-print-sheet relative mx-auto flex aspect-[1.414] max-w-5xl flex-col items-center justify-center overflow-hidden rounded-xl border-[14px] border-skillswap-teal bg-white p-10 text-center text-slate-800 shadow-xl">
+                <div className="pointer-events-none absolute inset-3 rounded-lg border border-skillswap-teal/30" />
+                <img src="/skillswap-logo.png" alt="SkillSwap" className="relative mb-5 h-16 w-auto object-contain" />
+                <p className="relative text-sm font-semibold uppercase tracking-[0.3em] text-skillswap-teal">Certificado de conclusão</p>
+                <p className="relative mt-6 text-base">Certificamos que</p>
+                <h1 className="relative mt-2 text-4xl font-bold text-slate-900">{certificatePreview.studentName}</h1>
+                <p className="relative mt-5 max-w-3xl text-lg leading-relaxed">
+                  concluiu a aula <strong>{certificatePreview.lessonTitle || 'Aula SkillSwap'}</strong>, com duração de {((Number(certificatePreview.durationMinutes || 60)) / 60).toFixed(1).replace('.', ',')} hora(s), sob acompanhamento de <strong>{certificatePreview.teacherName}</strong>.
+                </p>
+                <p className="relative mt-5 text-sm text-slate-600">A SkillSwap também reconhece {certificatePreview.teacherName} como professor participante desta troca de conhecimentos.</p>
+                <div className="relative mt-8 grid w-full max-w-3xl grid-cols-2 gap-10 text-xs text-slate-600">
+                  <span className="border-t border-slate-400 pt-2">SkillSwap · Plataforma de troca de conhecimentos</span>
+                  <span className="border-t border-slate-400 pt-2">Concluído em {new Date(certificatePreview.completedAt).toLocaleDateString('pt-BR')} · {certificatePreview.certificateId}</span>
+                </div>
+              </article>
+            </div>
+          </div>
+        </>
       )}
     </main>
   );
