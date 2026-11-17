@@ -2,6 +2,7 @@ package br.com.teamss.skillswap.skill_swap.controllers;
 
 import br.com.teamss.skillswap.skill_swap.dto.ProposalRequestDTO;
 import br.com.teamss.skillswap.skill_swap.dto.ProposalResponseDTO;
+import br.com.teamss.skillswap.skill_swap.dto.ProposalCreatedResponse;
 import br.com.teamss.skillswap.skill_swap.model.entities.Proposal;
 import br.com.teamss.skillswap.skill_swap.model.services.ProposalService;
 import br.com.teamss.skillswap.skill_swap.model.services.UserServiceDTO;
@@ -25,9 +26,15 @@ public class ProposalController {
     private UserServiceDTO userServiceDTO;
 
     @PostMapping("/send")
-    public ResponseEntity<Proposal> sendProposal(@Valid @RequestBody ProposalRequestDTO proposalRequest) {
+    public ResponseEntity<ProposalCreatedResponse> sendProposal(@Valid @RequestBody ProposalRequestDTO proposalRequest) {
         Proposal savedProposal = proposalService.sendProposal(proposalRequest);
-        return ResponseEntity.ok(savedProposal);
+        // Não devolva a entidade JPA completa: ela contém relações lazy e
+        // referências que podem causar erro de serialização depois do commit.
+        return ResponseEntity.ok(new ProposalCreatedResponse(
+                savedProposal.getProposalId(),
+                savedProposal.getStatus(),
+                savedProposal.getMessage(),
+                savedProposal.getCreatedAt()));
     }
 
     @GetMapping("/user/{userId}")

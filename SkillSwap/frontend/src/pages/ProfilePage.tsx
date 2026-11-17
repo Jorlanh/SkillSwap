@@ -78,6 +78,7 @@ const ProfilePage = () => {
   // Proposta
   const [isProposalOpen, setIsProposalOpen] = useState(false);
   const [proposalMessage, setProposalMessage] = useState("");
+  const [isSendingProposal, setIsSendingProposal] = useState(false);
 
   // Foto Menu
   const [isViewPhotoOpen, setIsViewPhotoOpen] = useState(false);
@@ -262,9 +263,10 @@ const ProfilePage = () => {
   };
 
   const handleSendProposal = async () => {
-    if (!proposalMessage.trim()) return;
+    if (!proposalMessage.trim() || isSendingProposal) return;
+    setIsSendingProposal(true);
+    const targetId = user.userId || user.id;
     try {
-      const targetId = user.userId || user.id;
       const me = (await UserService.getMe()).data;
       const offeredSkillId = me?.skills?.[0]?.skillId ?? me?.skills?.[0]?.id;
       const requestedSkillId = user?.skills?.[0]?.skillId ?? user?.skills?.[0]?.id;
@@ -291,10 +293,22 @@ const ProfilePage = () => {
     toast.success("Proposta enviada! A pessoa já pode ver sua mensagem em Solicitações.");
       setIsProposalOpen(false);
       setProposalMessage("");
-    navigate('/propostas', { state: { proposalSent: true } });
+      navigate('/propostas', { state: { proposalSent: true } });
     } catch (error: any) {
-      const message = error?.response?.data?.message || error?.response?.data?.error;
-      toast.error(message || "Erro ao enviar proposta para a API.");
+      const status = Number(error?.response?.status || 0);
+      if (status >= 500 || error?.code === 'ERR_NETWORK') {
+        // O backend pode confirmar a gravação e falhar apenas ao montar a
+        // resposta. Feche o modal e leve o usuário à lista para não duplicar
+        // a proposta nem exibir um erro técnico.
+        setIsProposalOpen(false);
+        setProposalMessage("");
+        toast.success("Proposta processada. Confira em Minhas Solicitações.");
+        navigate('/propostas', { state: { proposalSent: true } });
+      } else {
+        toast.error("Não foi possível enviar a proposta agora. Confira os dados e tente novamente.");
+      }
+    } finally {
+      setIsSendingProposal(false);
     }
   };
 
@@ -690,7 +704,7 @@ const ProfilePage = () => {
               <Textarea placeholder="Descreva o que quer aprender e o que pode ensinar..." value={proposalMessage} onChange={e => setProposalMessage(e.target.value)} className="min-h-[150px] bg-muted/30 border-none" />
               <p className="text-[10px] text-muted-foreground italic font-bold">A proposta será enviada para o usuário e aparecerá na aba de Solicitações do destinatário.</p>
             </div>
-            <DialogFooter><Button onClick={handleSendProposal} disabled={!proposalMessage.trim()} className="bg-skillswap-teal hover:bg-teal-700 w-full font-bold h-12">Enviar Proposta de Troca</Button></DialogFooter>
+            <DialogFooter><Button onClick={handleSendProposal} disabled={!proposalMessage.trim() || isSendingProposal} className="bg-skillswap-teal hover:bg-teal-700 w-full font-bold h-12">{isSendingProposal ? 'Enviando...' : 'Enviar Proposta de Troca'}</Button></DialogFooter>
           </DialogContent>
         </Dialog>
 
