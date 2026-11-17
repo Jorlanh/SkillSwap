@@ -635,12 +635,12 @@ const ProfilePage = () => {
 
         {/* MODAL DE EDIÇÃO DO PERFIL GERAL */}
         <Dialog open={isEditing} onOpenChange={setIsEditing}>
-          <DialogContent className="max-w-md bg-card border-border shadow-2xl">
+          <DialogContent className="max-w-md max-h-[90dvh] overflow-y-auto bg-card border-border shadow-2xl" onOpenAutoFocus={e => e.preventDefault()}>
             <DialogHeader>
                <DialogTitle className="font-bold text-xl text-skillswap-teal">Editar perfil e habilidades</DialogTitle>
                <DialogDescription className="hidden">Painel de edição.</DialogDescription>
             </DialogHeader>
-            <div className="space-y-4 py-4 max-h-[70vh] overflow-y-auto pr-1">
+            <div className="space-y-4 py-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1"><label className="text-[10px] font-bold uppercase text-muted-foreground">Nome Exibido</label><Input value={editName} onChange={e => setEditName(e.target.value)} /></div>
                 <div className="space-y-1"><label className="text-[10px] font-bold uppercase text-muted-foreground">Username Único</label><Input value={editUsername} onChange={e => setEditUsername(e.target.value)} /></div>
@@ -672,7 +672,10 @@ const ProfilePage = () => {
                 <Button variant={isPrivate ? "default" : "outline"} size="sm" onClick={togglePrivacy} className={isPrivate ? "bg-skillswap-teal" : ""}>{isPrivate ? "Ativado" : "Desativado"}</Button>
               </div>
             </div>
-            <Button onClick={handleSaveProfile} className="w-full bg-skillswap-teal text-white font-bold h-12 shadow-lg">Confirmar no Banco</Button>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => setIsEditing(false)} className="flex-1 font-bold h-12">Cancelar</Button>
+              <Button onClick={handleSaveProfile} className="flex-1 bg-skillswap-teal text-white font-bold h-12 shadow-lg">Confirmar</Button>
+            </div>
           </DialogContent>
         </Dialog>
 

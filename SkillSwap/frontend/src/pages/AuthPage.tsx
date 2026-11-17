@@ -12,7 +12,7 @@ import {
   signInWithPopup,
   updateProfile
 } from 'firebase/auth';
-import { SettingsService, SuspensionService, UserService } from '@/services/api';
+import { ProfileService, SettingsService, SuspensionService, UserService } from '@/services/api';
 
 interface AuthPageProps {
   isModal?: boolean;
@@ -35,6 +35,9 @@ const AuthPage = ({ isModal, onClose }: AuthPageProps) => {
     try {
       await user.getIdToken(true);
       const profile = await UserService.getMe();
+      if (!isLogin && fullName.trim()) {
+        await ProfileService.update({ name: fullName.trim() }).catch(() => null);
+      }
       const suspension = await SuspensionService.getStatus().catch(() => null);
       if (suspension?.data?.suspended) {
         toast.info('Sua conta está com acesso limitado. Consulte o motivo e, se quiser, envie uma contestação.');
